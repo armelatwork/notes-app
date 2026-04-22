@@ -1,0 +1,15 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "Dart-Code.dart-code",
+  "dart.flutterSdkPath": "/opt/homebrew/share/flutter",
+  "dart.lineLength": 100,
+  "[dart]": {
+    "editor.rulers": [100],
+    "editor.wordWrap": "off"
+  },
+  "files.exclude": {
+    "**/.dart_tool": true,
+    "**/.packages": true,
+    "**/build": false
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter test *)",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(brew install *)",
+      "Bash(gh auth *)",
+      "Bash(git reset *)",
+      "Bash(git update-ref *)",
+      "Bash(git add *)",
+      "Bash(git restore *)"
+    ]
+  }
+}
