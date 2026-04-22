@@ -16,6 +16,7 @@ import 'note_link_handler.dart';
 const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
+const _kTabIndent = '    '; // 4 spaces
 
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
@@ -51,12 +52,22 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   bool _onKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+    if (!_focusNode.hasFocus || _controller == null) return false;
+
     final isCmdV = HardwareKeyboard.instance.isMetaPressed &&
         event.logicalKey == LogicalKeyboardKey.keyV;
-    if (isCmdV && _focusNode.hasFocus && _controller != null) {
+    if (isCmdV) {
       pasteImageFromClipboard(_controller!);
       return false;
     }
+
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      final sel = _controller!.selection;
+      _controller!.replaceText(
+          sel.start, sel.end - sel.start, _kTabIndent, null);
+      return true;
+    }
+
     return false;
   }
 
