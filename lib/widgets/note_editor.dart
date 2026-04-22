@@ -17,10 +17,6 @@ import 'note_tab_embed.dart';
 const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
-class _InsertTabIntent extends Intent {
-  const _InsertTabIntent();
-}
-
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
 
@@ -204,42 +200,36 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditor() {
-    return Shortcuts(
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.tab): _InsertTabIntent(),
-      },
-      child: Actions(
-        actions: {
-          _InsertTabIntent: CallbackAction<_InsertTabIntent>(
-            onInvoke: (_) {
-              _insertTab();
-              return null;
-            },
-          ),
+    return QuillEditor.basic(
+      controller: _controller!,
+      focusNode: _focusNode,
+      config: QuillEditorConfig(
+        placeholder: 'Start writing…',
+        enableInteractiveSelection: true,
+        embedBuilders: [
+          NoteImageEmbedBuilder(controller: _controller!),
+          const NoteTabEmbedBuilder(),
+        ],
+        // ignore: experimental_member_use
+        onKeyPressed: (event, node) {
+          if (event is KeyDownEvent &&
+              event.logicalKey == LogicalKeyboardKey.tab) {
+            _insertTab();
+            return KeyEventResult.handled;
+          }
+          return null;
         },
-        child: QuillEditor.basic(
-          controller: _controller!,
-          focusNode: _focusNode,
-          config: QuillEditorConfig(
-            placeholder: 'Start writing…',
-            enableInteractiveSelection: true,
-            embedBuilders: [
-              NoteImageEmbedBuilder(controller: _controller!),
-              const NoteTabEmbedBuilder(),
-            ],
-            onTapUp: (details, getPosition) {
-              final pos = getPosition(details.localPosition);
-              openLinkAtPosition(_controller!, pos.offset);
-              return false;
-            },
-            onLaunchUrl: (url) async {
-              final uri = Uri.tryParse(url);
-              if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
-            },
-            contextMenuBuilder: (ctx, rawEditorState) =>
-                _buildContextMenu(ctx, rawEditorState),
-          ),
-        ),
+        onTapUp: (details, getPosition) {
+          final pos = getPosition(details.localPosition);
+          openLinkAtPosition(_controller!, pos.offset);
+          return false;
+        },
+        onLaunchUrl: (url) async {
+          final uri = Uri.tryParse(url);
+          if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
+        },
+        contextMenuBuilder: (ctx, rawEditorState) =>
+            _buildContextMenu(ctx, rawEditorState),
       ),
     );
   }
