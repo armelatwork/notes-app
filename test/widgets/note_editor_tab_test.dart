@@ -1,53 +1,32 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-// Mirrors the private constant in note_editor.dart so the test breaks
-// if the value is changed without updating both sides.
-const _kTabIndent = '    ';
+import 'package:notes_app/widgets/note_tab_embed.dart';
 
 void main() {
-  group('Tab key indent', () {
-    test('_kTabIndent_value_isFourSpaces', () {
-      expect(_kTabIndent, equals('    '));
-      expect(_kTabIndent.length, equals(4));
-    });
-
-    test('replaceText_withTabIndent_atCursorInsertsFourSpaces', () {
+  group('Tab embed insert', () {
+    test('insert_tabEmbed_atCursor_addsEmbedToDocument', () {
       // Arrange
-      final doc = Document();
       final controller = QuillController(
-        document: doc,
+        document: Document(),
         selection: const TextSelection.collapsed(offset: 0),
       );
 
-      // Act – simulate what _onKeyEvent does on Tab
-      const sel = TextSelection.collapsed(offset: 0);
-      controller.replaceText(sel.start, sel.end - sel.start, _kTabIndent, null);
+      // Act
+      controller.document.insert(0, const Embeddable(kTabEmbedType, ''));
 
-      // Assert
-      expect(controller.document.toPlainText(), startsWith(_kTabIndent));
-    });
-
-    test('replaceText_withTabIndent_replacesSelection', () {
-      // Arrange
-      final doc = Document()..insert(0, 'hello');
-      final controller = QuillController(
-        document: doc,
-        selection: const TextSelection(baseOffset: 0, extentOffset: 5),
+      // Assert — delta contains a tab embed op
+      final ops = controller.document.toDelta().toList();
+      expect(
+        ops.any((op) =>
+            op.isInsert &&
+            op.data is Map &&
+            (op.data as Map).containsKey(kTabEmbedType)),
+        isTrue,
       );
-
-      // Act – tab over a selection replaces it with indent
-      const sel = TextSelection(baseOffset: 0, extentOffset: 5);
-      controller.replaceText(sel.start, sel.end - sel.start, _kTabIndent, null);
-
-      // Assert – 'hello' replaced by four spaces
-      final text = controller.document.toPlainText();
-      expect(text, startsWith(_kTabIndent));
-      expect(text, isNot(contains('hello')));
     });
 
-    test('replaceText_withTabIndent_atMidDocumentPosition_insertsCorrectly', () {
+    test('insert_tabEmbed_atMidDocumentPosition_insertsCorrectly', () {
       // Arrange
       final doc = Document()..insert(0, 'ab');
       final controller = QuillController(
@@ -55,13 +34,42 @@ void main() {
         selection: const TextSelection.collapsed(offset: 1),
       );
 
-      // Act – insert tab between 'a' and 'b'
-      const sel = TextSelection.collapsed(offset: 1);
-      controller.replaceText(sel.start, sel.end - sel.start, _kTabIndent, null);
+      // Act — insert tab between 'a' and 'b'
+      controller.document.insert(1, const Embeddable(kTabEmbedType, ''));
 
-      // Assert
-      final text = controller.document.toPlainText();
-      expect(text, startsWith('a    b'));
+      // Assert — plain text is 'a<obj>b\n' where obj is embed character
+      final plain = controller.document.toPlainText();
+      expect(plain, startsWith('a'));
+      expect(plain, contains('b'));
+    });
+
+    test('insert_tabEmbed_withSelection_replacesSelectionThenInsertsEmbed', () {
+      // Arrange
+      final doc = Document()..insert(0, 'hello');
+      final controller = QuillController(
+        document: doc,
+        selection: const TextSelection(baseOffset: 0, extentOffset: 5),
+      );
+
+      // Act — replicate _insertTab behaviour: delete selection, then embed
+      controller.replaceText(0, 5, '', null);
+      controller.document.insert(0, const Embeddable(kTabEmbedType, ''));
+
+      // Assert — 'hello' is gone, embed is present
+      final plain = controller.document.toPlainText();
+      expect(plain, isNot(contains('hello')));
+      final ops = controller.document.toDelta().toList();
+      expect(
+        ops.any((op) =>
+            op.isInsert &&
+            op.data is Map &&
+            (op.data as Map).containsKey(kTabEmbedType)),
+        isTrue,
+      );
+    });
+
+    test('kTabEmbedType_value_isTab', () {
+      expect(kTabEmbedType, equals('tab'));
     });
   });
 }
