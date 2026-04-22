@@ -16,7 +16,7 @@ import 'note_link_handler.dart';
 const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
-const _kTabIndent = '    '; // 4 spaces
+const _kTabIndent = '\u2003'; // EM SPACE (U+2003) — 1em wide, single cursor unit
 
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
@@ -64,7 +64,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       final sel = _controller!.selection;
       _controller!.replaceText(
-          sel.start, sel.end - sel.start, _kTabIndent, null);
+        sel.start,
+        sel.end - sel.start,
+        _kTabIndent,
+        TextSelection.collapsed(offset: sel.start + _kTabIndent.length),
+      );
       return true;
     }
 
