@@ -18,6 +18,10 @@ const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
 const _kTabIndent = '\u2003'; // EM SPACE (U+2003) — 1em wide, single cursor unit
 
+class _InsertTabIntent extends Intent {
+  const _InsertTabIntent();
+}
+
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
 
@@ -61,13 +65,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       return false;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.tab) {
-      final sel = _controller!.selection;
-      _controller!.replaceText(sel.start, sel.end - sel.start, _kTabIndent, null);
-      return true;
-    }
-
     return false;
+  }
+
+  void _insertTab() {
+    if (_controller == null) return;
+    final sel = _controller!.selection;
+    _controller!.replaceText(sel.start, sel.end - sel.start, _kTabIndent, null);
   }
 
   void _loadNote(Note note) {
@@ -198,24 +202,39 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditor() {
-    return QuillEditor.basic(
-      controller: _controller!,
-      focusNode: _focusNode,
-      config: QuillEditorConfig(
-        placeholder: 'Start writing…',
-        enableInteractiveSelection: true,
-        embedBuilders: [NoteImageEmbedBuilder(controller: _controller!)],
-        onTapUp: (details, getPosition) {
-          final pos = getPosition(details.localPosition);
-          openLinkAtPosition(_controller!, pos.offset);
-          return false;
+    return Shortcuts(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.tab): _InsertTabIntent(),
+      },
+      child: Actions(
+        actions: {
+          _InsertTabIntent: CallbackAction<_InsertTabIntent>(
+            onInvoke: (_) {
+              _insertTab();
+              return null;
+            },
+          ),
         },
-        onLaunchUrl: (url) async {
-          final uri = Uri.tryParse(url);
-          if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
-        },
-        contextMenuBuilder: (ctx, rawEditorState) =>
-            _buildContextMenu(ctx, rawEditorState),
+        child: QuillEditor.basic(
+          controller: _controller!,
+          focusNode: _focusNode,
+          config: QuillEditorConfig(
+            placeholder: 'Start writing…',
+            enableInteractiveSelection: true,
+            embedBuilders: [NoteImageEmbedBuilder(controller: _controller!)],
+            onTapUp: (details, getPosition) {
+              final pos = getPosition(details.localPosition);
+              openLinkAtPosition(_controller!, pos.offset);
+              return false;
+            },
+            onLaunchUrl: (url) async {
+              final uri = Uri.tryParse(url);
+              if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
+            },
+            contextMenuBuilder: (ctx, rawEditorState) =>
+                _buildContextMenu(ctx, rawEditorState),
+          ),
+        ),
       ),
     );
   }
