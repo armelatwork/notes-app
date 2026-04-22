@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/local_auth_service.dart';
 import '../services/encryption_service.dart';
 import '../services/drive_sync_service.dart';
+import '../utils/note_utils.dart';
 
 // ── Drive sync status ─────────────────────────────────────────────────────────
 
@@ -108,6 +109,8 @@ final foldersProvider =
 // ── Notes ─────────────────────────────────────────────────────────────────────
 
 class NotesNotifier extends AsyncNotifier<List<Note>> {
+  bool _creating = false;
+
   @override
   Future<List<Note>> build() => _load();
 
@@ -129,16 +132,27 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   }
 
   Future<Note> createNote({int? folderId}) async {
-    final note = Note.create(
-      title: 'New Note',
-      content: '{"ops":[{"insert":"\\n"}]}',
-      preview: '',
-      folderId: folderId,
-    );
-    final id = await DatabaseService.instance.saveNote(note);
-    note.id = id;
-    await reload();
-    return note;
+    if (_creating) {
+      // Return existing first note if double-tap guard fires
+      return state.valueOrNull?.firstOrNull ??
+          Note.create(title: 'New Note', content: '{"ops":[{"insert":"\\n"}]}', preview: '', folderId: folderId);
+    }
+    _creating = true;
+    try {
+      final title = computeDefaultNoteTitle(state.valueOrNull ?? []);
+      final note = Note.create(
+        title: title,
+        content: '{"ops":[{"insert":"\\n"}]}',
+        preview: '',
+        folderId: folderId,
+      );
+      final id = await DatabaseService.instance.saveNote(note);
+      note.id = id;
+      await reload();
+      return note;
+    } finally {
+      _creating = false;
+    }
   }
 
   Future<void> saveNote(Note note) async {
