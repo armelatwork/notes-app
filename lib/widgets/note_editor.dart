@@ -70,6 +70,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       _controller!.replaceText(sel.start, sel.end - sel.start, '', null);
     }
     _controller!.document.insert(sel.start, const Embeddable(kTabEmbedType, ''));
+    _controller!.updateSelection(
+      TextSelection.collapsed(offset: sel.start + 1),
+      ChangeSource.local,
+    );
   }
 
   void _loadNote(Note note) {
