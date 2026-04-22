@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
+import '../utils/note_utils.dart';
 
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
@@ -25,13 +27,56 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   Note? _currentNote;
   bool _saving = false;
   bool _dragging = false;
+  bool _isDirty = false;
+  String _hintTitle = 'New Note';
+
+  static const _clipboardChannel =
+      MethodChannel('com.armelchao.notesApp/clipboard');
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKeyEvent);
+  }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _controller?.dispose();
     _focusNode.dispose();
     _titleController.dispose();
     super.dispose();
+  }
+
+  bool _onKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final isMeta = HardwareKeyboard.instance.isMetaPressed;
+    if (isMeta && event.logicalKey == LogicalKeyboardKey.keyV) {
+      if (_focusNode.hasFocus || _titleController.value.composing != TextRange.empty) {
+        _pasteFromClipboard();
+        return false;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    if (_controller == null) return;
+    try {
+      final result = await _clipboardChannel.invokeMethod<Map>('getImageData');
+      if (result == null) return;
+      final bytes = (result['data'] as Uint8List);
+      final ext = result['ext'] as String? ?? 'png';
+      final appDir = await getApplicationDocumentsDirectory();
+      final imagesDir = Directory(p.join(appDir.path, 'note_images'));
+      await imagesDir.create(recursive: true);
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final dest = p.join(imagesDir.path, fileName);
+      await File(dest).writeAsBytes(bytes);
+      await _embedImageFile(dest);
+    } catch (_) {
+      // Not an image in clipboard — let default paste handle text
+    }
   }
 
   void _loadNote(Note note) {
@@ -39,7 +84,16 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _saveCurrentNote();
 
     _currentNote = note;
-    _titleController.text = note.title;
+    _isDirty = false;
+
+    // Default titles show as hint text; user-entered titles show as real text.
+    if (isDefaultNoteTitle(note.title)) {
+      _hintTitle = note.title;
+      _titleController.text = '';
+    } else {
+      _hintTitle = 'New Note';
+      _titleController.text = note.title;
+    }
 
     Document doc;
     try {
@@ -59,6 +113,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   void _scheduleSave() {
+    _isDirty = true;
     if (_saving) return;
     _saving = true;
     Future.delayed(const Duration(milliseconds: 800), _saveCurrentNote);
@@ -66,6 +121,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   Future<void> _saveCurrentNote() async {
     _saving = false;
+    if (!_isDirty) return;
+    _isDirty = false;
+
     final note = _currentNote;
     if (note == null || _controller == null) return;
 
@@ -74,9 +132,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     final plainText = _controller!.document.toPlainText();
     final preview = plainText.trim().replaceAll('\n', ' ');
 
-    note.title = _titleController.text.trim().isEmpty
-        ? 'New Note'
-        : _titleController.text.trim();
+    final typedTitle = _titleController.text.trim();
+    note.title = typedTitle.isEmpty ? _hintTitle : typedTitle;
     note.content = contentJson;
     note.preview = preview.length > 120 ? preview.substring(0, 120) : preview;
 
@@ -244,7 +301,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         children: [
           Column(
             children: [
-              _TitleField(controller: _titleController, onChanged: _scheduleSave),
+              _TitleField(
+                controller: _titleController,
+                hintText: _hintTitle,
+                onChanged: _scheduleSave,
+              ),
               _FormattingToolbar(
                 quillController: _controller!,
                 onInsertImage: _insertImage,
@@ -259,7 +320,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                     config: QuillEditorConfig(
                       placeholder: 'Start writing…',
                       enableInteractiveSelection: true,
-                      embedBuilders: [const _ImageEmbedBuilder()],
+                      embedBuilders: [_ImageEmbedBuilder(controller: _controller!)],
                       onTapUp: (details, getPosition) {
                         if (_controller == null) return false;
                         final pos = getPosition(details.localPosition);
@@ -326,10 +387,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
 class _TitleField extends StatelessWidget {
   final TextEditingController controller;
+  final String hintText;
   final VoidCallback onChanged;
 
   const _TitleField(
-      {required this.controller, required this.onChanged});
+      {required this.controller, required this.hintText, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -339,10 +401,10 @@ class _TitleField extends StatelessWidget {
         controller: controller,
         onChanged: (_) => onChanged(),
         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           border: InputBorder.none,
-          hintText: 'Title',
-          hintStyle: TextStyle(
+          hintText: hintText,
+          hintStyle: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
               color: Colors.grey),
@@ -420,7 +482,9 @@ class _FormattingToolbar extends StatelessWidget {
 }
 
 class _ImageEmbedBuilder extends EmbedBuilder {
-  const _ImageEmbedBuilder();
+  final QuillController controller;
+
+  const _ImageEmbedBuilder({required this.controller});
 
   @override
   String get key => BlockEmbed.imageType;
@@ -429,14 +493,45 @@ class _ImageEmbedBuilder extends EmbedBuilder {
   Widget build(BuildContext context, EmbedContext embedContext) {
     final imageUrl = embedContext.node.value.data as String;
     final file = File(imageUrl);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: ConstrainedBox(
-        constraints:
-            const BoxConstraints(maxWidth: 600, maxHeight: 400),
-        child: file.existsSync()
-            ? Image.file(file, fit: BoxFit.contain)
-            : Text('[Image not found: $imageUrl]'),
+    return GestureDetector(
+      onSecondaryTapUp: (details) async {
+        final result = await showMenu<String>(
+          context: context,
+          position: RelativeRect.fromLTRB(
+            details.globalPosition.dx,
+            details.globalPosition.dy,
+            details.globalPosition.dx + 1,
+            details.globalPosition.dy + 1,
+          ),
+          items: const [
+            PopupMenuItem(value: 'delete', child: Text('Delete image')),
+          ],
+        );
+        if (result == 'delete') {
+          final doc = controller.document;
+          final delta = doc.toDelta();
+          var offset = 0;
+          for (final op in delta.toList()) {
+            if (op.isInsert) {
+              final data = op.data;
+              if (data is Map && data['image'] == imageUrl) {
+                controller.replaceText(offset, 1, '', null);
+                break;
+              }
+              offset += op.length ?? 0;
+            }
+          }
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(maxWidth: 600, maxHeight: 400),
+          child: file.existsSync()
+              ? Image.file(file, fit: BoxFit.contain)
+              : Text('[Image not found: $imageUrl]'),
+        ),
       ),
     );
   }

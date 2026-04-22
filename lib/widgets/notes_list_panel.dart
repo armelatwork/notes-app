@@ -107,7 +107,7 @@ class _SearchBar extends ConsumerWidget {
             borderSide: BorderSide.none,
           ),
           filled: true,
-          fillColor: Colors.grey.shade200,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           contentPadding:
               const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         ),
