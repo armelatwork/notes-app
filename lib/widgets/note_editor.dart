@@ -12,12 +12,11 @@ import '../utils/note_utils.dart';
 import 'note_editor_widgets.dart';
 import 'note_image_handler.dart';
 import 'note_link_handler.dart';
+import 'note_tab_embed.dart';
 
 const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
-const _kTabIndent = '\u2003'; // EM SPACE (U+2003) — 1em wide, single cursor unit
-
 class _InsertTabIntent extends Intent {
   const _InsertTabIntent();
 }
@@ -71,7 +70,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   void _insertTab() {
     if (_controller == null) return;
     final sel = _controller!.selection;
-    _controller!.replaceText(sel.start, sel.end - sel.start, _kTabIndent, null);
+    if (!sel.isCollapsed) {
+      _controller!.replaceText(sel.start, sel.end - sel.start, '', null);
+    }
+    _controller!.document.insert(sel.start, const Embeddable(kTabEmbedType, ''));
   }
 
   void _loadNote(Note note) {
@@ -221,7 +223,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           config: QuillEditorConfig(
             placeholder: 'Start writing…',
             enableInteractiveSelection: true,
-            embedBuilders: [NoteImageEmbedBuilder(controller: _controller!)],
+            embedBuilders: [
+              NoteImageEmbedBuilder(controller: _controller!),
+              const NoteTabEmbedBuilder(),
+            ],
             onTapUp: (details, getPosition) {
               final pos = getPosition(details.localPosition);
               openLinkAtPosition(_controller!, pos.offset);

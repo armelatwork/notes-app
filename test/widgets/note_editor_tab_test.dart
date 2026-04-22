@@ -1,51 +1,32 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-// Mirrors the private constant in note_editor.dart.
-// U+2003 EM SPACE: visually 1em wide, a single character in the cursor model.
-const _kTabIndent = ' ';
+import 'package:notes_app/widgets/note_tab_embed.dart';
 
 void main() {
-  group('Tab key indent', () {
-    test('_kTabIndent_value_isEmSpace', () {
-      expect(_kTabIndent, equals(' '));
-      expect(_kTabIndent.length, equals(1));
-    });
-
-    test('replaceText_withTabIndent_atCursor_insertsOneEmSpaceCharacter', () {
+  group('Tab embed insert', () {
+    test('insert_tabEmbed_atCursor_addsEmbedToDocument', () {
       // Arrange
       final controller = QuillController(
         document: Document(),
         selection: const TextSelection.collapsed(offset: 0),
       );
 
-      // Act — simulate _onKeyEvent Tab branch (null selection = flutter_quill
-      // advances cursor naturally by the insertion length = 1)
-      controller.replaceText(0, 0, _kTabIndent, null);
+      // Act
+      controller.document.insert(0, const Embeddable(kTabEmbedType, ''));
 
-      // Assert — document starts with EM SPACE
-      expect(controller.document.toPlainText(), startsWith(_kTabIndent));
-    });
-
-    test('replaceText_withTabIndent_replacesSelection', () {
-      // Arrange
-      final doc = Document()..insert(0, 'hello');
-      final controller = QuillController(
-        document: doc,
-        selection: const TextSelection(baseOffset: 0, extentOffset: 5),
+      // Assert — delta contains a tab embed op
+      final ops = controller.document.toDelta().toList();
+      expect(
+        ops.any((op) =>
+            op.isInsert &&
+            op.data is Map &&
+            (op.data as Map).containsKey(kTabEmbedType)),
+        isTrue,
       );
-
-      // Act — Tab over selection replaces it with EM SPACE
-      controller.replaceText(0, 5, _kTabIndent, null);
-
-      // Assert
-      final text = controller.document.toPlainText();
-      expect(text, startsWith(_kTabIndent));
-      expect(text, isNot(contains('hello')));
     });
 
-    test('replaceText_withTabIndent_atMidDocumentPosition_insertsCorrectly', () {
+    test('insert_tabEmbed_atMidDocumentPosition_insertsCorrectly', () {
       // Arrange
       final doc = Document()..insert(0, 'ab');
       final controller = QuillController(
@@ -53,11 +34,42 @@ void main() {
         selection: const TextSelection.collapsed(offset: 1),
       );
 
-      // Act — insert EM SPACE between 'a' and 'b'
-      controller.replaceText(1, 0, _kTabIndent, null);
+      // Act — insert tab between 'a' and 'b'
+      controller.document.insert(1, const Embeddable(kTabEmbedType, ''));
 
-      // Assert — text is 'a<EM>b', one left-arrow goes to 1 (before EM SPACE)
-      expect(controller.document.toPlainText(), startsWith('a b'));
+      // Assert — plain text is 'a<obj>b\n' where obj is embed character
+      final plain = controller.document.toPlainText();
+      expect(plain, startsWith('a'));
+      expect(plain, contains('b'));
+    });
+
+    test('insert_tabEmbed_withSelection_replacesSelectionThenInsertsEmbed', () {
+      // Arrange
+      final doc = Document()..insert(0, 'hello');
+      final controller = QuillController(
+        document: doc,
+        selection: const TextSelection(baseOffset: 0, extentOffset: 5),
+      );
+
+      // Act — replicate _insertTab behaviour: delete selection, then embed
+      controller.replaceText(0, 5, '', null);
+      controller.document.insert(0, const Embeddable(kTabEmbedType, ''));
+
+      // Assert — 'hello' is gone, embed is present
+      final plain = controller.document.toPlainText();
+      expect(plain, isNot(contains('hello')));
+      final ops = controller.document.toDelta().toList();
+      expect(
+        ops.any((op) =>
+            op.isInsert &&
+            op.data is Map &&
+            (op.data as Map).containsKey(kTabEmbedType)),
+        isTrue,
+      );
+    });
+
+    test('kTabEmbedType_value_isTab', () {
+      expect(kTabEmbedType, equals('tab'));
     });
   });
 }
