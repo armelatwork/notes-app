@@ -30,7 +30,8 @@ class SecureStorageService {
       final content = await file.readAsString();
       final map = jsonDecode(content) as Map<String, dynamic>;
       return map.map((k, v) => MapEntry(k, v as String));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[SecureStorageService] failed to read storage file: $e');
       return {};
     }
   }
