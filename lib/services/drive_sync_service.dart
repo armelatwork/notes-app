@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import '../models/note.dart';
@@ -104,8 +105,8 @@ class DriveSyncService {
           uploadMedia: media,
         );
         return;
-      } catch (_) {
-        // File may have been deleted remotely — fall through to create
+      } catch (e) {
+        debugPrint('[DriveSyncService] update failed (will create): $e');
       }
     }
 

@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
 
+const _kSelectedTileOpacity = 0.12;
+const _kRecentDaysThreshold = 7;
+
 class NotesListPanel extends ConsumerWidget {
   const NotesListPanel({super.key});
 
@@ -134,7 +137,7 @@ class _NoteTile extends StatelessWidget {
     final diff = now.difference(dt);
     if (diff.inDays == 0) return DateFormat.jm().format(dt);
     if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return DateFormat.EEEE().format(dt);
+    if (diff.inDays < _kRecentDaysThreshold) return DateFormat.EEEE().format(dt);
     return DateFormat.yMd().format(dt);
   }
 
@@ -145,8 +148,10 @@ class _NoteTile extends StatelessWidget {
       child: ListTile(
         dense: true,
         selected: isSelected,
-        selectedTileColor:
-            Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+        selectedTileColor: Theme.of(context)
+                .colorScheme
+                .primary
+                .withValues(alpha: _kSelectedTileOpacity),
         onTap: onTap,
         title: Text(
           note.title.isEmpty ? 'New Note' : note.title,
