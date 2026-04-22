@@ -63,12 +63,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     if (event.logicalKey == LogicalKeyboardKey.tab) {
       final sel = _controller!.selection;
-      _controller!.replaceText(
-        sel.start,
-        sel.end - sel.start,
-        _kTabIndent,
-        TextSelection.collapsed(offset: sel.start + _kTabIndent.length),
-      );
+      _controller!.replaceText(sel.start, sel.end - sel.start, _kTabIndent, null);
       return true;
     }
 
