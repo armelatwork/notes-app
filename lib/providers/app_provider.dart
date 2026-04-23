@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/app_user.dart';
@@ -108,11 +109,20 @@ final foldersProvider =
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 
+const _kSyncDebounceMs = 5000;
+
 class NotesNotifier extends AsyncNotifier<List<Note>> {
   bool _creating = false;
+  @visibleForTesting
+  Timer? syncTimer;
+  @visibleForTesting
+  Note? pendingSyncNote;
 
   @override
-  Future<List<Note>> build() => _load();
+  Future<List<Note>> build() {
+    ref.onDispose(() => syncTimer?.cancel());
+    return _load();
+  }
 
   Future<List<Note>> _load() {
     final folderId = ref.watch(selectedFolderProvider);
@@ -160,14 +170,32 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     await reload();
     final appUser = ref.read(appUserProvider);
     if (appUser?.type == AuthType.google) {
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
-      DriveSyncService.instance.syncNote(note).then((_) {
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
-      }).catchError((e) {
-        debugPrint('[Drive sync] syncNote failed: $e');
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
-      });
+      pendingSyncNote = note;
+      syncTimer?.cancel();
+      syncTimer = Timer(
+        const Duration(milliseconds: _kSyncDebounceMs),
+        flushSync,
+      );
     }
+  }
+
+  @visibleForTesting
+  void flushSync() {
+    final note = pendingSyncNote;
+    if (note == null) return;
+    pendingSyncNote = null;
+    performSync(note);
+  }
+
+  // Overridable in tests to avoid real network calls.
+  void performSync(Note note) {
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+    DriveSyncService.instance.syncNote(note).then((_) {
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+    }).catchError((e) {
+      debugPrint('[Drive sync] syncNote failed: $e');
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+    });
   }
 
   Future<void> deleteNote(int id) async {
