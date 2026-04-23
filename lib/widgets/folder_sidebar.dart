@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/app_user.dart';
 import '../models/folder.dart';
 import '../providers/app_provider.dart';
+import '../screens/settings_screen.dart';
 import '../services/drive_sync_service.dart';
 
 extension _SyncSnackBar on BuildContext {
@@ -214,6 +215,14 @@ class _SidebarHeader extends ConsumerWidget {
                     }
                   }
                 }),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                tooltip: 'Settings',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.logout, size: 20),
                 tooltip: 'Sign out',

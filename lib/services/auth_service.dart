@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
@@ -16,7 +17,8 @@ class AuthService {
   Future<GoogleSignInAccount?> trySilentSignIn() async {
     try {
       return await _googleSignIn.signInSilently();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AuthService] silent sign-in failed: $e');
       return null;
     }
   }

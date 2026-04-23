@@ -98,6 +98,28 @@ class DatabaseService {
     });
   }
 
+  // Returns true when the DB is accessible and readable.
+  Future<bool> isHealthy() async {
+    try {
+      await getNotes(allNotes: true);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Inserts a note without updating updatedAt — used during Drive restore.
+  Future<int> restoreNote(Note note) async {
+    final isar = await db;
+    return isar.writeTxn(() => isar.notes.put(note));
+  }
+
+  // Inserts a folder without updating updatedAt — used during Drive restore.
+  Future<int> restoreFolder(Folder folder) async {
+    final isar = await db;
+    return isar.writeTxn(() => isar.folders.put(folder));
+  }
+
   Future<void> close() async {
     await _isar?.close();
     _isar = null;
