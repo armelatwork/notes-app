@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/app_user.dart';
 import '../models/note.dart';
 import '../models/folder.dart';
+import '../services/backup_settings_service.dart';
 import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../services/local_auth_service.dart';
 import '../services/encryption_service.dart';
 import '../services/drive_sync_service.dart';
 import '../utils/note_utils.dart';
+import 'backup_provider.dart';
 
 // ── Drive sync status ─────────────────────────────────────────────────────────
 
@@ -108,11 +111,19 @@ final foldersProvider =
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 
+const _kSyncDebounceMs = 5000;
+
 class NotesNotifier extends AsyncNotifier<List<Note>> {
   bool _creating = false;
 
+  @visibleForTesting Timer? syncTimer;
+  @visibleForTesting Note? pendingSyncNote;
+
   @override
-  Future<List<Note>> build() => _load();
+  Future<List<Note>> build() {
+    ref.onDispose(() => syncTimer?.cancel());
+    return _load();
+  }
 
   Future<List<Note>> _load() {
     final folderId = ref.watch(selectedFolderProvider);
@@ -160,19 +171,45 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     await reload();
     final appUser = ref.read(appUserProvider);
     if (appUser?.type == AuthType.google) {
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
-      DriveSyncService.instance.syncNote(note).then((_) {
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
-      }).catchError((e) {
-        debugPrint('[Drive sync] syncNote failed: $e');
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
-      });
+      final backupEnabled = ref.read(backupProvider).valueOrNull?.enabled ?? true;
+      if (!backupEnabled) return;
+      pendingSyncNote = note;
+      syncTimer?.cancel();
+      syncTimer = Timer(
+        const Duration(milliseconds: _kSyncDebounceMs),
+        flushSync,
+      );
     }
   }
 
+  @visibleForTesting
+  void flushSync() {
+    final note = pendingSyncNote;
+    if (note == null) return;
+    pendingSyncNote = null;
+    performSync(note);
+  }
+
+  void performSync(Note note) {
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+    DriveSyncService.instance.syncNote(note).then((_) async {
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+      await BackupSettingsService.instance.recordBackup();
+      ref.read(backupProvider.notifier).refreshLastBackupAt();
+    }).catchError((e) {
+      debugPrint('[Drive sync] syncNote failed: $e');
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+    });
+  }
+
   Future<void> deleteNote(int id) async {
+    final note = await DatabaseService.instance.getNote(id);
     await DatabaseService.instance.deleteNote(id);
     await reload();
+    final driveFileId = note?.driveFileId;
+    if (driveFileId != null && ref.read(appUserProvider)?.type == AuthType.google) {
+      DriveSyncService.instance.deleteNote(driveFileId);
+    }
   }
 }
 

@@ -60,9 +60,19 @@ The editor toolbar provides full text formatting:
 
 Available for Google accounts only:
 
-- Notes are automatically synced to Google Drive after every save, stored in a folder called *Notes app*.
+- Notes are automatically synced to Google Drive 5 seconds after the last edit, stored in a folder called *Notes app*.
 - A sync status icon in the sidebar header shows the current state: idle, syncing, success, or error.
 - Tap the sync icon to trigger a full manual sync at any time.
+
+### Backup & Restore
+
+Available for Google accounts only. Accessible via the **Settings** screen (gear icon in the sidebar):
+
+- **Automatic backup** — toggle backup on or off. When enabled, a backup is recorded every time a note syncs to Google Drive. Backup is on by default for Google accounts.
+- **Drive location** — read-only, always `Notes app/`.
+- **Last backup time** — shows how long ago the most recent backup completed.
+- **Back up now** — triggers an immediate full sync of all notes and folders to Google Drive.
+- **Automatic restore on startup** — if your local database is empty and your Google Drive backup contains notes, the app will prompt you to restore from the backup when you sign in.
 
 ### Encryption
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/app_user.dart';
 import '../providers/app_provider.dart';
 import '../services/database_service.dart';
+import '../services/drive_sync_service.dart';
 import '../services/persistence_service.dart';
 import '../widgets/folder_sidebar.dart';
 import '../widgets/notes_list_panel.dart';
@@ -27,10 +29,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_restored) return;
     _restored = true;
 
-    final lastFolderId =
-        await PersistenceService.instance.loadLastFolder();
-    final lastNoteId =
-        await PersistenceService.instance.loadLastNote();
+    final appUser = ref.read(appUserProvider);
+    final isHealthy = await DatabaseService.instance.isHealthy();
+    final notes = isHealthy
+        ? await DatabaseService.instance.getNotes(allNotes: true)
+        : <dynamic>[];
+
+    if (appUser?.type == AuthType.google && notes.isEmpty) {
+      final driveCount = await DriveSyncService.instance.countDriveNotes();
+      if (driveCount > 0 && mounted) {
+        await _showRestoreDialog(driveCount);
+      }
+    }
+
+    final lastFolderId = await PersistenceService.instance.loadLastFolder();
+    final lastNoteId = await PersistenceService.instance.loadLastNote();
 
     ref.read(selectedFolderProvider.notifier).state = lastFolderId;
 
@@ -38,6 +51,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final note = await DatabaseService.instance.getNote(lastNoteId);
       if (note != null && mounted) {
         ref.read(selectedNoteProvider.notifier).state = note;
+      }
+    }
+  }
+
+  Future<void> _showRestoreDialog(int driveCount) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore from backup?'),
+        content: Text(
+          'Your local notes are empty. We found $driveCount note${driveCount == 1 ? '' : 's'} '
+          'in your Google Drive backup. Would you like to restore them?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Skip'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Restoring from Google Drive…')),
+    );
+
+    try {
+      await DriveSyncService.instance.restoreAll();
+      ref.invalidate(notesProvider);
+      ref.invalidate(foldersProvider);
+      if (mounted) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Notes restored successfully.')),
+          );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('Restore failed: $e'),
+              backgroundColor: Colors.red[700],
+            ),
+          );
       }
     }
   }
