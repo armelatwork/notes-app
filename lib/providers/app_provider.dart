@@ -10,6 +10,7 @@ import '../services/auth_service.dart';
 import '../services/local_auth_service.dart';
 import '../services/encryption_service.dart';
 import '../services/drive_sync_service.dart';
+import '../services/persistence_service.dart';
 import '../utils/note_utils.dart';
 import 'backup_provider.dart';
 
@@ -29,7 +30,8 @@ class AppUserNotifier extends Notifier<AppUser?> {
   Future<void> tryRestore() async {
     final googleUser = await AuthService.instance.trySilentSignIn();
     if (googleUser != null) {
-      await EncryptionService.instance.initForGoogleUser(googleUser.id);
+      await initGoogleEncryptionKey(googleUser.id);
+      await _clearIfUserChanged(googleUser.id);
       state = AppUser(
         id: googleUser.id,
         displayName: googleUser.displayName ?? googleUser.email,
@@ -41,7 +43,43 @@ class AppUserNotifier extends Notifier<AppUser?> {
     // without the password, so there is no persistent local session).
   }
 
-  void setUser(AppUser user) => state = user;
+  Future<void> initGoogleEncryptionKey(String userId) async {
+    final enc = EncryptionService.instance;
+    // Drive is the source of truth — always prefer it so all devices share one key.
+    try {
+      final driveKey =
+          await DriveSyncService.instance.fetchEncryptionKeyBase64();
+      if (driveKey != null) {
+        await enc.initWithBase64Key(userId, driveKey);
+        return;
+      }
+    } catch (e) {
+      debugPrint('[AppUserNotifier] fetchEncryptionKey failed: $e');
+    }
+    // No Drive key yet — use local key if available, otherwise generate and upload.
+    if (await enc.tryInitFromLocalStorage(userId)) {
+      final localKey = await enc.exportCurrentKeyBase64();
+      await DriveSyncService.instance.uploadEncryptionKeyBase64(localKey);
+      return;
+    }
+    final newKey = await enc.generateAndStoreKey(userId);
+    await DriveSyncService.instance.uploadEncryptionKeyBase64(newKey);
+  }
+
+  Future<void> setUser(AppUser user) async {
+    await _clearIfUserChanged(user.id);
+    state = user;
+  }
+
+  Future<void> _clearIfUserChanged(String userId) async {
+    final lastId = await PersistenceService.instance.loadLastUserId();
+    await DatabaseService.instance.openForUser(userId);
+    await PersistenceService.instance.saveLastUserId(userId);
+    if (lastId != userId) {
+      ref.invalidate(notesProvider);
+      ref.invalidate(foldersProvider);
+    }
+  }
 
   Future<void> signOut() async {
     final current = state;

@@ -33,6 +33,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       );
     }
     final user = ref.watch(appUserProvider);
-    return user == null ? const AuthScreen() : const HomeScreen();
+    return user == null
+        ? const AuthScreen()
+        : HomeScreen(key: ValueKey(user.id));
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -103,6 +104,62 @@ void main() {
       const plaintext = 'sensitive data';
       final ciphertext = await enc.encrypt(plaintext);
       expect(ciphertext, isNot(contains('sensitive data')));
+    });
+  });
+
+  group('EncryptionService – Drive key methods', () {
+    test('tryInitFromLocalStorage_withNoKeyStored_returnsFalse', () async {
+      expect(await enc.tryInitFromLocalStorage('user1'), isFalse);
+      expect(enc.isInitialized, isFalse);
+    });
+
+    test('tryInitFromLocalStorage_afterGenerateAndStore_returnsTrue', () async {
+      await enc.generateAndStoreKey('user2');
+      enc.clear();
+      expect(await enc.tryInitFromLocalStorage('user2'), isTrue);
+      expect(enc.isInitialized, isTrue);
+    });
+
+    test('generateAndStoreKey_returnsBase64String', () async {
+      final key = await enc.generateAndStoreKey('user3');
+      expect(key, isNotEmpty);
+      expect(base64Decode(key).length, 32);
+    });
+
+    test('generateAndStoreKey_thenDecryptWithRestoredKey_succeeds', () async {
+      await enc.generateAndStoreKey('user4');
+      const plaintext = 'cross-device test';
+      final ciphertext = await enc.encrypt(plaintext);
+
+      enc.clear();
+      await enc.tryInitFromLocalStorage('user4');
+      expect(await enc.decrypt(ciphertext), plaintext);
+    });
+
+    test('initWithBase64Key_initializesWithProvidedKey', () async {
+      final key = await enc.generateAndStoreKey('user5');
+      enc.clear();
+
+      await enc.initWithBase64Key('user5_copy', key);
+      const plaintext = 'shared key test';
+      final ciphertext = await enc.encrypt(plaintext);
+
+      enc.clear();
+      await enc.tryInitFromLocalStorage('user5_copy');
+      expect(await enc.decrypt(ciphertext), plaintext);
+    });
+
+    test('initWithBase64Key_differentDevice_decryptsOtherDeviceCiphertext',
+        () async {
+      // Simulate macOS: generate key and encrypt
+      final key = await enc.generateAndStoreKey('shared_user');
+      const plaintext = 'note from macOS';
+      final ciphertext = await enc.encrypt(plaintext);
+      enc.clear();
+
+      // Simulate Android: receives key from Drive
+      await enc.initWithBase64Key('shared_user_android', key);
+      expect(await enc.decrypt(ciphertext), plaintext);
     });
   });
 

@@ -153,6 +153,7 @@ class _NoteTile extends StatelessWidget {
                 .primary
                 .withValues(alpha: _kSelectedTileOpacity),
         onTap: onTap,
+        onLongPress: () => _showDeleteConfirmation(context),
         title: Text(
           note.title.isEmpty ? 'New Note' : note.title,
           maxLines: 1,
@@ -178,6 +179,29 @@ class _NoteTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete note?'),
+        content: const Text('This note will be permanently deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onDelete();
+            },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

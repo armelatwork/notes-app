@@ -6,6 +6,11 @@ import '../models/folder.dart';
 class DatabaseService {
   static DatabaseService? _instance;
   static Isar? _isar;
+  static String _dbName = 'default';
+
+  // Overrideable in tests to avoid opening a real Isar database.
+  static Future<void> Function(String userId)? openForUserOverride;
+  static Future<void> Function()? clearAllOverride;
 
   DatabaseService._();
 
@@ -14,12 +19,25 @@ class DatabaseService {
     return _instance!;
   }
 
+  Future<void> openForUser(String userId) async {
+    if (openForUserOverride != null) {
+      await openForUserOverride!(userId);
+      return;
+    }
+    final sanitized = userId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+    if (_dbName == sanitized && _isar != null) return;
+    await _isar?.close();
+    _isar = null;
+    _dbName = sanitized;
+  }
+
   Future<Isar> get db async {
     if (_isar != null) return _isar!;
     final dir = await getApplicationDocumentsDirectory();
     _isar = await Isar.open(
       [NoteSchema, FolderSchema],
       directory: dir.path,
+      name: _dbName,
     );
     return _isar!;
   }
@@ -118,6 +136,18 @@ class DatabaseService {
   Future<int> restoreFolder(Folder folder) async {
     final isar = await db;
     return isar.writeTxn(() => isar.folders.put(folder));
+  }
+
+  Future<void> clearAll() async {
+    if (clearAllOverride != null) {
+      await clearAllOverride!();
+      return;
+    }
+    final isar = await db;
+    await isar.writeTxn(() async {
+      await isar.notes.clear();
+      await isar.folders.clear();
+    });
   }
 
   Future<void> close() async {

@@ -168,17 +168,10 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
                 setState(() => _page = 0);
               })
             : null,
-        actions: [
-          if (_page == 0)
-            Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
-              ),
-            ),
-        ],
       ),
-      drawer: const Drawer(child: FolderSidebar()),
+      drawer: Drawer(
+        child: SafeArea(child: FolderSidebar()),
+      ),
       body: _page == 0 ? const NotesListPanel() : const NoteEditor(),
     );
   }

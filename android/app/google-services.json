@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "45487484453",
+    "project_id": "notes-app-macos",
+    "storage_bucket": "notes-app-macos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45487484453:android:2de50259905bb4697399cc",
+        "android_client_info": {
+          "package_name": "com.mynotes.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "45487484453-dj4kvtsglpr3v36p4ed13t8m8i12ueg9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mynotes.app",
+            "certificate_hash": "a8bbc194c6a1aa486ee5716f97dadb067aa65c24"
+          }
+        },
+        {
+          "client_id": "45487484453-djlji5ut5l45rjp9032sobbc2l0lcugb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCS4NRucpF0s3qGmGneIXkEKqowMqvKAxs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "45487484453-djlji5ut5l45rjp9032sobbc2l0lcugb.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "45487484453-0o600hg1uoa7qkfkh64a2ql5c5bmt57r.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.armelchao.notesApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
