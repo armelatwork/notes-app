@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/models/folder.dart';
 import 'package:notes_app/models/note.dart';
 import 'package:notes_app/providers/app_provider.dart';
+import 'package:notes_app/services/database_service.dart';
 
 // ---------------------------------------------------------------------------
 // Fake notifiers — no real database required.
@@ -46,6 +47,21 @@ class _GuardedTestNotifier extends NotesNotifier {
     state = AsyncData(List.from(_store));
     createBlocked = false;
     return note;
+  }
+}
+
+/// A NotesNotifier whose reload() uses the in-memory store so moveNote can be
+/// tested without a real database.
+class _MoveTestNotifier extends NotesNotifier {
+  final List<Note> _store;
+  _MoveTestNotifier(this._store);
+
+  @override
+  Future<List<Note>> build() async => _store;
+
+  @override
+  Future<void> reload() async {
+    state = AsyncData(List.from(_store));
   }
 }
 
@@ -132,6 +148,52 @@ void main() {
 
       expect(noteA.id, isNot(equals(noteB.id)));
       expect(container.read(notesProvider).requireValue.length, 2);
+    });
+  });
+
+  group('NotesNotifier – moveNote', () {
+    setUp(() {
+      DatabaseService.saveNoteOverride = (_) async => 0;
+    });
+
+    tearDown(() {
+      DatabaseService.saveNoteOverride = null;
+    });
+
+    test('moveNote_toFolder_setsNoteFolderId', () async {
+      final note = Note.create(title: 'N', content: '{}', folderId: 1)..id = 1;
+      final notifier = _MoveTestNotifier([note]);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await container.read(notesProvider.notifier).moveNote(note, 5);
+
+      expect(note.folderId, 5);
+    });
+
+    test('moveNote_toNull_movesNoteToRoot', () async {
+      final note = Note.create(title: 'N', content: '{}', folderId: 3)..id = 1;
+      final notifier = _MoveTestNotifier([note]);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await container.read(notesProvider.notifier).moveNote(note, null);
+
+      expect(note.folderId, isNull);
+    });
+
+    test('moveNote_reloadsState', () async {
+      final note = Note.create(title: 'N', content: '{}')..id = 1;
+      final notifier = _MoveTestNotifier([note]);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await container.read(notesProvider.notifier).moveNote(note, 7);
+
+      expect(container.read(notesProvider).hasValue, isTrue);
     });
   });
 }

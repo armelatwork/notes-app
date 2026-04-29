@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/app_user.dart';
 import '../models/folder.dart';
+import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../screens/settings_screen.dart';
 import '../services/drive_sync_service.dart';
@@ -44,6 +45,8 @@ class FolderSidebar extends ConsumerWidget {
             label: 'Notes',
             isSelected: selectedFolder == null,
             onTap: () => ref.read(selectedFolderProvider.notifier).state = null,
+            onNoteDrop: (note) =>
+                ref.read(notesProvider.notifier).moveNote(note, null),
           ),
           const Divider(height: 1),
           Padding(
@@ -78,6 +81,9 @@ class FolderSidebar extends ConsumerWidget {
                         .state = folder.id,
                     onRename: () => _showRenameFolder(context, ref, folder),
                     onDelete: () => _confirmDeleteFolder(context, ref, folder),
+                    onNoteDrop: (note) => ref
+                        .read(notesProvider.notifier)
+                        .moveNote(note, folder.id),
                   );
                 },
               ),
@@ -340,18 +346,22 @@ class _SidebarItem extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
+  final void Function(Note note)? onNoteDrop;
 
   const _SidebarItem({
     required this.icon,
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.onNoteDrop,
   });
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildTile(BuildContext context, {bool isHovered = false}) {
     return ListTile(
       dense: true,
+      tileColor: isHovered
+          ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4)
+          : null,
       leading: Icon(icon,
           size: 18,
           color: isSelected
@@ -370,6 +380,16 @@ class _SidebarItem extends StatelessWidget {
       onTap: onTap,
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    if (onNoteDrop == null) return _buildTile(context);
+    return DragTarget<Note>(
+      builder: (ctx, candidateData, _) =>
+          _buildTile(context, isHovered: candidateData.isNotEmpty),
+      onAcceptWithDetails: (details) => onNoteDrop!(details.data),
+    );
+  }
 }
 
 class _FolderTile extends StatelessWidget {
@@ -378,6 +398,7 @@ class _FolderTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final void Function(Note note)? onNoteDrop;
 
   const _FolderTile({
     required this.folder,
@@ -385,12 +406,15 @@ class _FolderTile extends StatelessWidget {
     required this.onTap,
     required this.onRename,
     required this.onDelete,
+    this.onNoteDrop,
   });
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildTile(BuildContext context, {bool isHovered = false}) {
     return ListTile(
       dense: true,
+      tileColor: isHovered
+          ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4)
+          : null,
       leading: Icon(Icons.folder_outlined,
           size: 18,
           color: isSelected
@@ -418,6 +442,16 @@ class _FolderTile extends StatelessWidget {
           Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       onTap: onTap,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (onNoteDrop == null) return _buildTile(context);
+    return DragTarget<Note>(
+      builder: (ctx, candidateData, _) =>
+          _buildTile(context, isHovered: candidateData.isNotEmpty),
+      onAcceptWithDetails: (details) => onNoteDrop!(details.data),
     );
   }
 }

@@ -240,6 +240,12 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     });
   }
 
+  Future<void> moveNote(Note note, int? folderId) async {
+    note.folderId = folderId;
+    await DatabaseService.instance.saveNote(note);
+    await reload();
+  }
+
   Future<void> deleteNote(int id) async {
     final note = await DatabaseService.instance.getNote(id);
     await DatabaseService.instance.deleteNote(id);
