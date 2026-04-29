@@ -11,6 +11,7 @@ class DatabaseService {
   // Overrideable in tests to avoid opening a real Isar database.
   static Future<void> Function(String userId)? openForUserOverride;
   static Future<void> Function()? clearAllOverride;
+  static Future<int> Function(Note note)? saveNoteOverride;
 
   DatabaseService._();
 
@@ -61,6 +62,7 @@ class DatabaseService {
   }
 
   Future<int> saveNote(Note note) async {
+    if (saveNoteOverride != null) return saveNoteOverride!(note);
     final isar = await db;
     note.updatedAt = DateTime.now();
     return isar.writeTxn(() => isar.notes.put(note));

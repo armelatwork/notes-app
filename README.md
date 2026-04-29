@@ -19,7 +19,7 @@ Two sign-in methods are available on the login screen:
 - Notes are sorted by last-modified date (most recent first).
 - New notes get unique auto-incremented default titles: *New Note*, *New Note 2*, *New Note 3*, and so on — visible in the list immediately without opening the note.
 - A preview of the note body is shown beneath each title in the list.
-- Right-click (macOS) or long-press (Android) a note in the list to delete it.
+- **Move to folder** — right-click (macOS) or long-press (Android) a note to open a context menu with **Move to Folder** and **Delete** options. On macOS you can also drag a note from the list and drop it onto any folder or the Notes inbox in the sidebar.
 - Search across all notes using the search bar at the top of the notes panel. Results match on title and body preview.
 
 ### Rich Text Editor
