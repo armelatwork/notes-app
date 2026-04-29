@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -17,6 +18,11 @@ import 'note_tab_embed.dart';
 const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
+const _kDesktopPlatforms = {
+  TargetPlatform.macOS,
+  TargetPlatform.windows,
+  TargetPlatform.linux,
+};
 
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
@@ -167,6 +173,34 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final content = Stack(
+      children: [
+        Column(
+          children: [
+            NoteTitleField(
+              controller: _titleController,
+              hintText: _hintTitle,
+              onChanged: _scheduleSave,
+            ),
+            NoteFormattingToolbar(
+              quillController: _controller!,
+              onInsertImage: _pickAndInsertImage,
+              onInsertLink: _onInsertLink,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: _buildEditor(),
+              ),
+            ),
+          ],
+        ),
+        if (_dragging) _DragOverlay(),
+      ],
+    );
+
+    if (!_kDesktopPlatforms.contains(defaultTargetPlatform)) return content;
+
     return DropTarget(
       onDragEntered: (_) => setState(() => _dragging = true),
       onDragExited: (_) => setState(() => _dragging = false),
@@ -179,31 +213,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         }
         if (mounted) setState(() {});
       },
-      child: Stack(
-        children: [
-          Column(
-            children: [
-              NoteTitleField(
-                controller: _titleController,
-                hintText: _hintTitle,
-                onChanged: _scheduleSave,
-              ),
-              NoteFormattingToolbar(
-                quillController: _controller!,
-                onInsertImage: _pickAndInsertImage,
-                onInsertLink: _onInsertLink,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                  child: _buildEditor(),
-                ),
-              ),
-            ],
-          ),
-          if (_dragging) _DragOverlay(),
-        ],
-      ),
+      child: content,
     );
   }
 

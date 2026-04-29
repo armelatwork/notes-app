@@ -1,4 +1,4 @@
-# Notes
+# My Notes
 
 A cross-platform rich text notes app for macOS and Android with folder organisation, Google Drive sync, and end-to-end encryption.
 
@@ -19,7 +19,7 @@ Two sign-in methods are available on the login screen:
 - Notes are sorted by last-modified date (most recent first).
 - New notes get unique auto-incremented default titles: *New Note*, *New Note 2*, *New Note 3*, and so on — visible in the list immediately without opening the note.
 - A preview of the note body is shown beneath each title in the list.
-- Right-click a note in the list to delete it.
+- Right-click (macOS) or long-press (Android) a note in the list to delete it.
 - Search across all notes using the search bar at the top of the notes panel. Results match on title and body preview.
 
 ### Rich Text Editor
@@ -78,7 +78,7 @@ Available for Google accounts only. Accessible via the **Settings** screen (gear
 
 All note content is encrypted at rest using **AES-256-GCM**:
 
-- **Google accounts** — a random 256-bit key is generated on first sign-in and stored in the app's sandboxed support directory (inaccessible to other processes on macOS).
+- **Google accounts** — a random 256-bit key is generated on first sign-in, stored in the app's sandboxed support directory, and uploaded to Google Drive so all your devices share the same key automatically.
 - **Local accounts** — the encryption key is derived from your password using **PBKDF2** and never written to disk. Your password is required to unlock your notes each session.
 
 ---
@@ -96,9 +96,10 @@ All note content is encrypted at rest using **AES-256-GCM**:
 
 | Data | Location |
 |---|---|
-| Notes and folders | Isar local database in the app's documents directory |
+| Notes and folders | Per-user Isar database in the app's documents directory |
 | Embedded images | `note_images/` folder inside the app's documents directory |
-| Encryption keys (Google) | App sandboxed support directory |
+| Encryption keys (Google) | App sandboxed support directory + Google Drive |
+| Encryption keys (local) | App sandboxed support directory (derived from password) |
 | Last open folder / note | Shared preferences (restored on next launch) |
 
 ---

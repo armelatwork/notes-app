@@ -15,19 +15,45 @@ class EncryptionService {
 
   bool get isInitialized => _secretKey != null;
 
-  Future<void> initForGoogleUser(String userId) async {
-    final storageKey = 'enc_key_$userId';
-    var keyBase64 = await _storage.read(storageKey);
-    if (keyBase64 == null) {
-      final keyBytes = _randomBytes(32);
-      keyBase64 = base64Encode(keyBytes);
-      await _storage.write(storageKey, keyBase64);
-    }
+  // Returns true if a key was found in local storage and initialized.
+  // Returns false when no local key exists — caller should check Drive.
+  Future<bool> tryInitFromLocalStorage(String userId) async {
+    final keyBase64 = await _storage.read('enc_key_$userId');
+    if (keyBase64 == null) return false;
     _secretKey = SecretKey(base64Decode(keyBase64));
+    return true;
+  }
+
+  // Uses a key retrieved from Drive. Stores it locally for future use.
+  Future<void> initWithBase64Key(String userId, String keyBase64) async {
+    await _storage.write('enc_key_$userId', keyBase64);
+    _secretKey = SecretKey(base64Decode(keyBase64));
+  }
+
+  // First-ever sign-in: generates, stores locally, and initializes.
+  // Returns the base64 key so the caller can upload it to Drive.
+  Future<String> generateAndStoreKey(String userId) async {
+    final keyBytes = _randomBytes(32);
+    final keyBase64 = base64Encode(keyBytes);
+    await _storage.write('enc_key_$userId', keyBase64);
+    _secretKey = SecretKey(keyBytes);
+    return keyBase64;
+  }
+
+  Future<void> initForGoogleUser(String userId) async {
+    if (!await tryInitFromLocalStorage(userId)) {
+      await generateAndStoreKey(userId);
+    }
   }
 
   void initWithKey(Uint8List keyBytes) {
     _secretKey = SecretKey(keyBytes);
+  }
+
+  Future<String> exportCurrentKeyBase64() async {
+    final key = _secretKey;
+    if (key == null) throw StateError('EncryptionService not initialized');
+    return base64Encode(await key.extractBytes());
   }
 
   void clear() => _secretKey = null;

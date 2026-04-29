@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/app_user.dart';
 import '../providers/app_provider.dart';
 import '../services/auth_service.dart';
+import '../services/encryption_service.dart';
 import '../services/local_auth_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../services/encryption_service.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -60,8 +60,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       setState(() { _loading = false; _error = 'Sign-in cancelled.' ; });
       return;
     }
-    await EncryptionService.instance.initForGoogleUser(googleUser.id);
-    ref.read(appUserProvider.notifier).setUser(AppUser(
+    await ref.read(appUserProvider.notifier).initGoogleEncryptionKey(googleUser.id);
+    await ref.read(appUserProvider.notifier).setUser(AppUser(
       id: googleUser.id,
       displayName: googleUser.displayName ?? googleUser.email,
       email: googleUser.email,
@@ -101,7 +101,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final keyBytes = await LocalAuthService.instance.deriveEncryptionKey(password);
     EncryptionService.instance.initWithKey(keyBytes);
     if (!mounted) return;
-    ref.read(appUserProvider.notifier).setUser(user);
+    await ref.read(appUserProvider.notifier).setUser(user);
   }
 
   @override

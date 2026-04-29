@@ -86,6 +86,8 @@ class FolderSidebar extends ConsumerWidget {
                 child: Center(child: CircularProgressIndicator())),
             error: (e, _) => Expanded(child: Center(child: Text('$e'))),
           ),
+          const Divider(height: 1),
+          _UserMenuFooter(appUser: appUser),
         ],
       ),
     );
@@ -215,34 +217,90 @@ class _SidebarHeader extends ConsumerWidget {
                     }
                   }
                 }),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined, size: 20),
-                tooltip: 'Settings',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.logout, size: 20),
-                tooltip: 'Sign out',
-                onPressed: () => ref.read(appUserProvider.notifier).signOut(),
-              ),
             ],
           ),
         ),
-        if (appUser != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: Text(
-              appUser!.email ?? appUser!.displayName,
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
         const Divider(height: 1),
       ],
+    );
+  }
+}
+
+class _UserMenuFooter extends ConsumerWidget {
+  final AppUser? appUser;
+  const _UserMenuFooter({required this.appUser});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (appUser == null) return const SizedBox.shrink();
+
+    return PopupMenuButton<String>(
+      offset: const Offset(0, -8),
+      position: PopupMenuPosition.over,
+      onSelected: (value) {
+        if (value == 'settings') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          );
+        } else if (value == 'signout') {
+          ref.read(appUserProvider.notifier).signOut();
+        }
+      },
+      itemBuilder: (_) => [
+        const PopupMenuItem(
+          value: 'settings',
+          child: Row(
+            children: [
+              Icon(Icons.settings_outlined, size: 18),
+              SizedBox(width: 10),
+              Text('Settings'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'signout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 18),
+              SizedBox(width: 10),
+              Text('Sign out'),
+            ],
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.account_circle_outlined, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    appUser!.displayName,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (appUser!.email != null)
+                    Text(
+                      appUser!.email!,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.unfold_more, size: 16, color: Colors.grey[500]),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -27,6 +27,7 @@ class DriveSyncService {
 
   static const _appFolderName = 'Notes app';
   static const _notesMimeType = 'application/json';
+  static const _keyFileName = 'encryption_key.b64';
 
   Future<drive.DriveApi?> _getApi() async {
     final headers = await AuthService.instance.getAuthHeaders();
@@ -134,6 +135,62 @@ class DriveSyncService {
     return true;
   }
 
+  Future<String?> fetchEncryptionKeyBase64() async {
+    try {
+      final api = await _getApi();
+      if (api == null) return null;
+      final folderId = await _getOrCreateAppFolder(api);
+      final result = await api.files.list(
+        q: "name='$_keyFileName' and '$folderId' in parents and trashed=false",
+        spaces: 'drive',
+        $fields: 'files(id)',
+      );
+      if (result.files == null || result.files!.isEmpty) return null;
+      final media = await api.files.get(
+        result.files!.first.id!,
+        downloadOptions: drive.DownloadOptions.fullMedia,
+      ) as drive.Media;
+      return _readMedia(media);
+    } catch (e) {
+      debugPrint('[DriveSyncService] fetchEncryptionKey failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> uploadEncryptionKeyBase64(String keyBase64) async {
+    try {
+      final api = await _getApi();
+      if (api == null) return;
+      final folderId = await _getOrCreateAppFolder(api);
+      final bytes = utf8.encode(keyBase64);
+      final media = drive.Media(Stream.value(bytes), bytes.length,
+          contentType: 'text/plain');
+      final existing = await api.files.list(
+        q: "name='$_keyFileName' and '$folderId' in parents and trashed=false",
+        spaces: 'drive',
+        $fields: 'files(id)',
+      );
+      final existingId = existing.files?.firstOrNull?.id;
+      if (existingId != null) {
+        await api.files.update(
+          drive.File()..name = _keyFileName,
+          existingId,
+          uploadMedia: media,
+        );
+      } else {
+        await api.files.create(
+          drive.File()
+            ..name = _keyFileName
+            ..parents = [folderId]
+            ..mimeType = 'text/plain',
+          uploadMedia: media,
+        );
+      }
+    } catch (e) {
+      debugPrint('[DriveSyncService] uploadEncryptionKey failed: $e');
+    }
+  }
+
   Future<void> deleteNote(String driveFileId) async {
     try {
       final api = await _getApi();
@@ -167,6 +224,7 @@ class DriveSyncService {
     final enc = EncryptionService.instance;
     if (!enc.isInitialized) throw 'Encryption not initialised';
     final folderId = await _getOrCreateAppFolder(api);
+    await DatabaseService.instance.clearAll();
     await _restoreFolders(api, folderId);
     await _restoreNotes(api, folderId, enc);
   }

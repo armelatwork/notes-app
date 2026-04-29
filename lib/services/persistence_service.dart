@@ -6,6 +6,7 @@ class PersistenceService {
 
   static const _folderKey = 'last_folder_id';
   static const _noteKey = 'last_note_id';
+  static const _userKey = 'last_user_id';
 
   // -1 means "All Notes", null means "No folder selected (root)"
   Future<void> saveLastFolder(int? folderId) async {
@@ -34,5 +35,15 @@ class PersistenceService {
   Future<int?> loadLastNote() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_noteKey);
+  }
+
+  Future<String?> loadLastUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userKey);
+  }
+
+  Future<void> saveLastUserId(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_userKey, userId);
   }
 }
