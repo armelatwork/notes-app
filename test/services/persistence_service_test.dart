@@ -10,8 +10,8 @@ void main() {
   });
 
   group('PersistenceService – folder', () {
-    test('loadLastFolder returns null when nothing saved', () async {
-      expect(await persistence.loadLastFolder(), isNull);
+    test('loadLastFolder returns -1 (All Notes) when nothing saved', () async {
+      expect(await persistence.loadLastFolder(), -1);
     });
 
     test('saveLastFolder then loadLastFolder round-trips a value', () async {
@@ -19,13 +19,13 @@ void main() {
       expect(await persistence.loadLastFolder(), 42);
     });
 
-    test('saveLastFolder with null clears the stored value', () async {
+    test('saveLastFolder with null round-trips to null (Inbox)', () async {
       await persistence.saveLastFolder(42);
       await persistence.saveLastFolder(null);
       expect(await persistence.loadLastFolder(), isNull);
     });
 
-    test('saveLastFolder with -1 (All Notes sentinel) round-trips', () async {
+    test('saveLastFolder with -1 (All Notes) round-trips', () async {
       await persistence.saveLastFolder(-1);
       expect(await persistence.loadLastFolder(), -1);
     });

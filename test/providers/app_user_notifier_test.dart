@@ -98,7 +98,7 @@ void main() {
       expect(container.read(selectedNoteProvider), isNull);
     });
 
-    test('signOut clears selectedFolder', () async {
+    test('signOut resets selectedFolder to All Notes', () async {
       final container = _makeContainer();
       addTearDown(container.dispose);
 
@@ -106,7 +106,7 @@ void main() {
       await container.read(appUserProvider.notifier).setUser(
           const AppUser(id: 'a', displayName: 'a', type: AuthType.local));
       await container.read(appUserProvider.notifier).signOut();
-      expect(container.read(selectedFolderProvider), isNull);
+      expect(container.read(selectedFolderProvider), -1);
     });
   });
 

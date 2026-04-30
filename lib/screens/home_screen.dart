@@ -36,9 +36,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : <dynamic>[];
 
     if (appUser?.type == AuthType.google && notes.isEmpty) {
-      final driveCount = await DriveSyncService.instance.countDriveNotes();
-      if (driveCount > 0 && mounted) {
-        await _showRestoreDialog(driveCount);
+      ref.read(restoreCheckInProgressProvider.notifier).state = true;
+      try {
+        final driveCount = await DriveSyncService.instance.countDriveNotes();
+        if (driveCount > 0 && mounted) {
+          await _showRestoreDialog(driveCount);
+        }
+      } finally {
+        if (mounted) {
+          ref.read(restoreCheckInProgressProvider.notifier).state = false;
+        }
       }
     }
 
