@@ -191,6 +191,14 @@ class DriveSyncService {
     }
   }
 
+  Future<void> syncFolderIndex() async {
+    final api = await _getApi();
+    if (api == null) return;
+    final folderId = await _getOrCreateAppFolder(api);
+    final folders = await DatabaseService.instance.getFolders();
+    await _uploadFolderIndex(api, folderId, folders);
+  }
+
   Future<void> deleteNote(String driveFileId) async {
     try {
       final api = await _getApi();

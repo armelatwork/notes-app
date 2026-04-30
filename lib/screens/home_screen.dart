@@ -96,6 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await DriveSyncService.instance.restoreAll();
       ref.invalidate(notesProvider);
       ref.invalidate(foldersProvider);
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
       if (mounted) {
         messenger
           ..hideCurrentSnackBar()
@@ -104,6 +105,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           );
       }
     } catch (e) {
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
       if (mounted) {
         messenger
           ..hideCurrentSnackBar()

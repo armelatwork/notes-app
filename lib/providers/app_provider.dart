@@ -21,6 +21,37 @@ enum SyncStatus { idle, syncing, success, error }
 final syncStatusProvider =
     StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 
+// Runs a Drive operation and reflects the result in syncStatusProvider.
+// onSuccess fires after the status is set to success (for side-effects like
+// recording the backup timestamp).
+void _driveSync(
+  Ref ref,
+  Future<void> Function() operation, {
+  String tag = 'DriveSync',
+  Future<void> Function()? onSuccess,
+}) {
+  ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+  operation().then((_) async {
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+    await onSuccess?.call();
+  }).catchError((Object e) {
+    debugPrint('[$tag] failed: $e');
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+  });
+}
+
+// Cancels any existing timer, marks status as idle (pending changes), and
+// starts a new debounce timer.
+Timer _scheduleSync(
+  Ref ref,
+  Timer? existingTimer,
+  void Function() onFire,
+) {
+  existingTimer?.cancel();
+  ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+  return Timer(const Duration(milliseconds: _kSyncDebounceMs), onFire);
+}
+
 // ── Drive restore check in progress ──────────────────────────────────────────
 
 final restoreCheckInProgressProvider = StateProvider<bool>((ref) => false);
@@ -42,6 +73,9 @@ class AppUserNotifier extends Notifier<AppUser?> {
         email: googleUser.email,
         type: AuthType.google,
       );
+      // Session was silently restored, so Drive was in sync when the app last
+      // closed. Show green until the user makes a change.
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
     }
     // Local accounts always require password on restart (key can't be re-derived
     // without the password, so there is no persistent local session).
@@ -88,9 +122,30 @@ class AppUserNotifier extends Notifier<AppUser?> {
   Future<void> signOut() async {
     final current = state;
     if (current?.type == AuthType.google) {
+      // Only sync the note that was waiting in the debounce timer, not all
+      // notes. syncAll() on every logout is far too slow.
+      final pending = ref.read(notesProvider.notifier).cancelPendingSync();
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+      var synced = false;
+      try {
+        if (pending != null) {
+          await DriveSyncService.instance.syncNote(pending);
+        }
+        // Always upload the folder index — folder-only changes are not
+        // captured by the note debounce and would otherwise be lost.
+        await DriveSyncService.instance.syncFolderIndex();
+        synced = true;
+      } catch (e) {
+        debugPrint('[AppUserNotifier] pre-signout sync failed: $e');
+      }
+      // Keep success state so the next login opens with the green icon.
+      // On failure reset to idle — don't show red while logging out.
+      ref.read(syncStatusProvider.notifier).state =
+          synced ? SyncStatus.success : SyncStatus.idle;
       await AuthService.instance.signOut();
     } else if (current?.type == AuthType.local) {
       await LocalAuthService.instance.signOut();
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     }
     EncryptionService.instance.clear();
     ref.invalidate(notesProvider);
@@ -119,8 +174,13 @@ final searchQueryProvider = StateProvider<String>((ref) => '');
 // ── Folders ───────────────────────────────────────────────────────────────────
 
 class FoldersNotifier extends AsyncNotifier<List<Folder>> {
+  Timer? _syncTimer;
+
   @override
-  Future<List<Folder>> build() => DatabaseService.instance.getFolders();
+  Future<List<Folder>> build() {
+    ref.onDispose(() => _syncTimer?.cancel());
+    return DatabaseService.instance.getFolders();
+  }
 
   Future<void> reload() async {
     state = const AsyncLoading();
@@ -133,6 +193,7 @@ class FoldersNotifier extends AsyncNotifier<List<Folder>> {
     final id = await DatabaseService.instance.saveFolder(folder);
     folder.id = id;
     await reload();
+    _scheduleFolderSync();
     return folder;
   }
 
@@ -140,11 +201,23 @@ class FoldersNotifier extends AsyncNotifier<List<Folder>> {
     folder.name = newName;
     await DatabaseService.instance.saveFolder(folder);
     await reload();
+    _scheduleFolderSync();
   }
 
   Future<void> deleteFolder(int id) async {
     await DatabaseService.instance.deleteFolder(id);
     await reload();
+    _scheduleFolderSync();
+  }
+
+  void _scheduleFolderSync() {
+    if (ref.read(appUserProvider)?.type != AuthType.google) return;
+    _syncTimer = _scheduleSync(ref, _syncTimer, _flushFolderSync);
+  }
+
+  void _flushFolderSync() {
+    _driveSync(ref, DriveSyncService.instance.syncFolderIndex,
+        tag: 'FoldersNotifier');
   }
 }
 
@@ -163,7 +236,10 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
 
   @override
   Future<List<Note>> build() {
-    ref.onDispose(() => syncTimer?.cancel());
+    // Do NOT cancel syncTimer here. ref.onDispose fires on every rebuild
+    // (e.g. when selectedFolderProvider changes), which would silently drop
+    // a pending sync after a note move. Cancellation is handled explicitly
+    // by cancelPendingSync() on sign-out.
     return _load();
   }
 
@@ -216,12 +292,17 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
       final backupEnabled = ref.read(backupProvider).valueOrNull?.enabled ?? true;
       if (!backupEnabled) return;
       pendingSyncNote = note;
-      syncTimer?.cancel();
-      syncTimer = Timer(
-        const Duration(milliseconds: _kSyncDebounceMs),
-        flushSync,
-      );
+      syncTimer = _scheduleSync(ref, syncTimer, flushSync);
     }
+  }
+
+  // Cancels the debounce timer and returns the note that was waiting, if any.
+  Note? cancelPendingSync() {
+    syncTimer?.cancel();
+    syncTimer = null;
+    final note = pendingSyncNote;
+    pendingSyncNote = null;
+    return note;
   }
 
   @visibleForTesting
@@ -229,25 +310,28 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     final note = pendingSyncNote;
     if (note == null) return;
     pendingSyncNote = null;
-    performSync(note);
+    try {
+      performSync(note);
+    } catch (_) {
+      // Notifier was disposed before the timer fired — safe to ignore.
+    }
   }
 
   void performSync(Note note) {
-    ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
-    DriveSyncService.instance.syncNote(note).then((_) async {
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
-      await BackupSettingsService.instance.recordBackup();
-      ref.read(backupProvider.notifier).refreshLastBackupAt();
-    }).catchError((e) {
-      debugPrint('[Drive sync] syncNote failed: $e');
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
-    });
+    _driveSync(
+      ref,
+      () => DriveSyncService.instance.syncNote(note),
+      tag: 'NotesNotifier',
+      onSuccess: () async {
+        await BackupSettingsService.instance.recordBackup();
+        ref.read(backupProvider.notifier).refreshLastBackupAt();
+      },
+    );
   }
 
   Future<void> moveNote(Note note, int? folderId) async {
     note.folderId = folderId;
-    await DatabaseService.instance.saveNote(note);
-    await reload();
+    await saveNote(note);
   }
 
   Future<void> deleteNote(int id) async {
@@ -256,7 +340,10 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     await reload();
     final driveFileId = note?.driveFileId;
     if (driveFileId != null && ref.read(appUserProvider)?.type == AuthType.google) {
-      DriveSyncService.instance.deleteNote(driveFileId);
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+      DriveSyncService.instance.deleteNote(driveFileId).whenComplete(() {
+        ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+      });
     }
   }
 }

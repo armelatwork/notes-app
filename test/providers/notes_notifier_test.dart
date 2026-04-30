@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notes_app/models/app_user.dart';
 import 'package:notes_app/models/folder.dart';
 import 'package:notes_app/models/note.dart';
 import 'package:notes_app/providers/app_provider.dart';
+import 'package:notes_app/providers/backup_provider.dart';
 import 'package:notes_app/services/database_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -65,10 +67,32 @@ class _MoveTestNotifier extends NotesNotifier {
   }
 }
 
+class _FakeGoogleUserNotifier extends AppUserNotifier {
+  @override
+  AppUser? build() => const AppUser(
+        id: 'test-google',
+        displayName: 'Test Google',
+        type: AuthType.google,
+      );
+}
+
+class _FakeEnabledBackupNotifier extends BackupNotifier {
+  @override
+  Future<BackupState> build() async => const BackupState(enabled: true);
+}
+
 ProviderContainer _makeContainer(NotesNotifier notesNotifier) =>
     ProviderContainer(overrides: [
       notesProvider.overrideWith(() => notesNotifier),
       foldersProvider.overrideWith(_FakeFoldersNotifier.new),
+    ]);
+
+ProviderContainer _makeContainerWithGoogle(NotesNotifier notesNotifier) =>
+    ProviderContainer(overrides: [
+      notesProvider.overrideWith(() => notesNotifier),
+      foldersProvider.overrideWith(_FakeFoldersNotifier.new),
+      appUserProvider.overrideWith(_FakeGoogleUserNotifier.new),
+      backupProvider.overrideWith(_FakeEnabledBackupNotifier.new),
     ]);
 
 // ---------------------------------------------------------------------------
@@ -194,6 +218,86 @@ void main() {
       await container.read(notesProvider.notifier).moveNote(note, 7);
 
       expect(container.read(notesProvider).hasValue, isTrue);
+    });
+  });
+
+  group('NotesNotifier – cancelPendingSync', () {
+    test('cancelPendingSync_withPendingNote_returnsNoteAndClearsIt', () async {
+      final notifier = _GuardedTestNotifier();
+      notifier._unblock.complete();
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      final note = Note.create(title: 'T', content: '{}')..id = 42;
+      container.read(notesProvider.notifier).pendingSyncNote = note;
+
+      final result = container.read(notesProvider.notifier).cancelPendingSync();
+
+      expect(result, note);
+      expect(container.read(notesProvider.notifier).pendingSyncNote, isNull);
+    });
+
+    test('cancelPendingSync_withoutPendingNote_returnsNull', () async {
+      final notifier = _GuardedTestNotifier();
+      notifier._unblock.complete();
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      expect(container.read(notesProvider.notifier).cancelPendingSync(), isNull);
+    });
+
+    test('cancelPendingSync_cancelsActiveTimer', () async {
+      final notifier = _GuardedTestNotifier();
+      notifier._unblock.complete();
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      container.read(notesProvider.notifier).syncTimer =
+          Timer(const Duration(seconds: 60), () {});
+      container.read(notesProvider.notifier).cancelPendingSync();
+
+      expect(
+        container.read(notesProvider.notifier).syncTimer?.isActive ?? false,
+        isFalse,
+      );
+    });
+  });
+
+  group('NotesNotifier – sync icon status', () {
+    setUp(() {
+      DatabaseService.saveNoteOverride = (_) async => 0;
+    });
+    tearDown(() {
+      DatabaseService.saveNoteOverride = null;
+    });
+
+    test('saveNote_forGoogleAccount_immediatelySetsStatusToIdle', () async {
+      final notifier = _MoveTestNotifier([]);
+      final container = _makeContainerWithGoogle(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      container.read(syncStatusProvider.notifier).state = SyncStatus.success;
+      final note = Note.create(title: 'N', content: '{}')..id = 1;
+      await container.read(notesProvider.notifier).saveNote(note);
+
+      expect(container.read(syncStatusProvider), SyncStatus.idle);
+    });
+
+    test('saveNote_forLocalAccount_doesNotChangeSyncStatus', () async {
+      final notifier = _MoveTestNotifier([]);
+      final container = _makeContainer(notifier); // no Google user
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      container.read(syncStatusProvider.notifier).state = SyncStatus.success;
+      final note = Note.create(title: 'N', content: '{}')..id = 1;
+      await container.read(notesProvider.notifier).saveNote(note);
+
+      expect(container.read(syncStatusProvider), SyncStatus.success);
     });
   });
 }
