@@ -343,6 +343,7 @@ class _PanelFooter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final checkingRestore = ref.watch(restoreCheckInProgressProvider);
     return Container(
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: Colors.grey.shade300)),
@@ -351,16 +352,24 @@ class _PanelFooter extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            tooltip: 'New Note',
-            onPressed: () async {
-              final folderId =
-                  selectedFolder == -1 ? null : selectedFolder;
-              final note = await ref
-                  .read(notesProvider.notifier)
-                  .createNote(folderId: folderId);
-              ref.read(selectedNoteProvider.notifier).state = note;
-            },
+            icon: checkingRestore
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.add_circle_outline),
+            tooltip:
+                checkingRestore ? 'Checking Drive backup…' : 'New Note',
+            onPressed: checkingRestore
+                ? null
+                : () async {
+                    final folderId =
+                        selectedFolder == -1 ? null : selectedFolder;
+                    final note = await ref
+                        .read(notesProvider.notifier)
+                        .createNote(folderId: folderId);
+                    ref.read(selectedNoteProvider.notifier).state = note;
+                  },
           ),
         ],
       ),
@@ -374,6 +383,20 @@ class _EmptyState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final checkingRestore = ref.watch(restoreCheckInProgressProvider);
+    if (checkingRestore) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text('Checking Drive for backup…',
+                style: TextStyle(color: Colors.grey[500])),
+          ],
+        ),
+      );
+    }
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,

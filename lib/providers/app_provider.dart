@@ -21,6 +21,10 @@ enum SyncStatus { idle, syncing, success, error }
 final syncStatusProvider =
     StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 
+// ── Drive restore check in progress ──────────────────────────────────────────
+
+final restoreCheckInProgressProvider = StateProvider<bool>((ref) => false);
+
 // ── Current authenticated user ────────────────────────────────────────────────
 
 class AppUserNotifier extends Notifier<AppUser?> {
@@ -92,7 +96,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);
     ref.read(selectedNoteProvider.notifier).state = null;
-    ref.read(selectedFolderProvider.notifier).state = null;
+    ref.read(selectedFolderProvider.notifier).state = -1;
     state = null;
   }
 }
@@ -102,7 +106,7 @@ final appUserProvider =
 
 // ── Selected folder (null = root/unfiled, -1 = All Notes) ────────────────────
 
-final selectedFolderProvider = StateProvider<int?>((ref) => null);
+final selectedFolderProvider = StateProvider<int?>((ref) => -1);
 
 // ── Selected note ─────────────────────────────────────────────────────────────
 

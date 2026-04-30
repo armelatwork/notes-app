@@ -8,19 +8,21 @@ class PersistenceService {
   static const _noteKey = 'last_note_id';
   static const _userKey = 'last_user_id';
 
+  // 0 is a sentinel for null (Inbox) since Isar IDs start at 1.
+  // Absent key means the user has never set a preference → default to All Notes.
+  static const _kInboxSentinel = 0;
+
   // -1 means "All Notes", null means "No folder selected (root)"
   Future<void> saveLastFolder(int? folderId) async {
     final prefs = await SharedPreferences.getInstance();
-    if (folderId == null) {
-      await prefs.remove(_folderKey);
-    } else {
-      await prefs.setInt(_folderKey, folderId);
-    }
+    await prefs.setInt(_folderKey, folderId ?? _kInboxSentinel);
   }
 
   Future<int?> loadLastFolder() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_folderKey);
+    if (!prefs.containsKey(_folderKey)) return -1; // first login → All Notes
+    final raw = prefs.getInt(_folderKey)!;
+    return raw == _kInboxSentinel ? null : raw;
   }
 
   Future<void> saveLastNote(int? noteId) async {
