@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/backup_settings_service.dart';
 import '../services/drive_sync_service.dart';
+import 'app_provider.dart';
 
 enum BackupStatus { idle, syncing, success, error }
 
@@ -50,6 +51,7 @@ class BackupNotifier extends AsyncNotifier<BackupState> {
     final current = state.valueOrNull;
     if (current == null) return;
     state = AsyncData(current.copyWith(status: BackupStatus.syncing));
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
     try {
       await DriveSyncService.instance.syncAll();
       await BackupSettingsService.instance.recordBackup();
@@ -58,8 +60,10 @@ class BackupNotifier extends AsyncNotifier<BackupState> {
         status: BackupStatus.success,
         lastBackupAt: lastBackupAt,
       ));
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
     } catch (e) {
       state = AsyncData(current.copyWith(status: BackupStatus.error));
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
     }
   }
 
