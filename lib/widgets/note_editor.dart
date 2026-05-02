@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
+import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
 import 'note_editor_widgets.dart';
 import 'note_image_handler.dart';
@@ -33,6 +34,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _dragging = false;
   bool _isDirty = false;
   String _hintTitle = 'New Note';
+  // Images present when the note was loaded — used to detect deletions on save.
+  List<String> _imagesAtLoad = [];
 
   @override
   void initState() {
@@ -81,6 +84,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _saveCurrentNote();
     _currentNote = note;
     _isDirty = false;
+    _imagesAtLoad = extractImageFilenames(note.content);
 
     if (isDefaultNoteTitle(note.title)) {
       _hintTitle = note.title;
@@ -135,7 +139,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         ? preview.substring(0, _kPreviewMaxLength)
         : preview;
 
-    await ref.read(notesProvider.notifier).saveNote(note);
+    final currentImages = extractImageFilenames(contentJson);
+    final deletedImages =
+        _imagesAtLoad.where((f) => !currentImages.contains(f)).toList();
+    _imagesAtLoad = currentImages;
+
+    await ref.read(notesProvider.notifier).saveNote(note,
+        deletedImageFilenames: deletedImages);
   }
 
   Future<void> _pickAndInsertImage() async {
