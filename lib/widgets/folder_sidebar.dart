@@ -6,6 +6,11 @@ import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../screens/settings_screen.dart';
 
+void _closeDrawer(BuildContext context) {
+  final scaffold = Scaffold.maybeOf(context);
+  if (scaffold?.isDrawerOpen == true) scaffold!.closeDrawer();
+}
+
 class FolderSidebar extends ConsumerWidget {
   const FolderSidebar({super.key});
 
@@ -27,15 +32,19 @@ class FolderSidebar extends ConsumerWidget {
             icon: Icons.notes,
             label: 'All Notes',
             isSelected: selectedFolder == -1,
-            onTap: () =>
-                ref.read(selectedFolderProvider.notifier).state = -1,
+            onTap: () {
+              ref.read(selectedFolderProvider.notifier).state = -1;
+              _closeDrawer(context);
+            },
           ),
           _SidebarItem(
             icon: Icons.inbox,
             label: 'Notes',
             isSelected: selectedFolder == null,
-            onTap: () =>
-                ref.read(selectedFolderProvider.notifier).state = null,
+            onTap: () {
+              ref.read(selectedFolderProvider.notifier).state = null;
+              _closeDrawer(context);
+            },
             onNoteDrop: (note) =>
                 ref.read(notesProvider.notifier).moveNote(note, null),
           ),
@@ -65,9 +74,11 @@ class FolderSidebar extends ConsumerWidget {
                 itemBuilder: (_, i) => _FolderTile(
                   folder: folders[i],
                   isSelected: selectedFolder == folders[i].id,
-                  onTap: () => ref
-                      .read(selectedFolderProvider.notifier)
-                      .state = folders[i].id,
+                  onTap: () {
+                    ref.read(selectedFolderProvider.notifier).state =
+                        folders[i].id;
+                    _closeDrawer(context);
+                  },
                   onRename: () =>
                       _renameFolderDialog(context, ref, folders[i]),
                   onDelete: () =>
