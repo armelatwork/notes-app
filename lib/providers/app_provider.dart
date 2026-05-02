@@ -221,6 +221,9 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   Note? pendingNote;
   @visibleForTesting
   List<String> pendingDeletedImages = [];
+  // Batches rapid move operations; resets on each new move within the window.
+  final List<Note> _pendingMoves = [];
+  Timer? _moveTimer;
   // Serializes concurrent push operations so they never race on sync_log.json.
   Future<void> _pushQueue = Future.value();
 
@@ -277,7 +280,19 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     await reload();
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
     ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
-    _run(() => _pushNoteAndImages(note, []));
+    _pendingMoves.removeWhere((n) => n.id == note.id);
+    _pendingMoves.add(note);
+    _moveTimer?.cancel();
+    _moveTimer = Timer(
+        const Duration(milliseconds: _kFastPushDebounceMs), _flushMoves);
+  }
+
+  void _flushMoves() {
+    final notes = List<Note>.from(_pendingMoves);
+    _pendingMoves.clear();
+    for (final note in notes) {
+      _run(() => _pushNoteAndImages(note, []));
+    }
   }
 
   Future<void> deleteNote(int id) async {
@@ -295,6 +310,9 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   Note? cancelPendingPush() {
     pushTimer?.cancel();
     pushTimer = null;
+    _moveTimer?.cancel();
+    _moveTimer = null;
+    _pendingMoves.clear();
     final note = pendingNote;
     pendingNote = null;
     pendingDeletedImages = [];
