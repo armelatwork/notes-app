@@ -31,7 +31,9 @@ class AuthService {
 
   // Throws on error so callers can surface the message to the user.
   Future<GoogleSignInAccount?> signIn() async {
-    // disconnect() revokes any cached token so a fresh consent screen runs.
+    // signOut clears the local credential cache; disconnect revokes server-side.
+    // Both are fire-and-forget — errors are non-fatal.
+    await _googleSignIn.signOut().catchError((_) => null);
     await _googleSignIn.disconnect().catchError((_) => null);
     final user = await _googleSignIn.signIn();
     if (user == null) return null;

@@ -225,7 +225,9 @@ class _NoteTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onSecondaryTapUp: (details) => _showContextMenu(context, details),
+      onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+          ? (details) => _showContextMenu(context, details)
+          : null,
       child: ListTile(
         dense: true,
         selected: isSelected,

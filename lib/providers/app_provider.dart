@@ -144,13 +144,13 @@ class FoldersNotifier extends AsyncNotifier<List<Folder>> {
     ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     _pushTimer?.cancel();
     _pushTimer = Timer(
-        const Duration(milliseconds: _kPushDebounceMs), _flushIndexPush);
+        const Duration(milliseconds: _kFastPushDebounceMs), _flushIndexPush);
   }
 
   void _scheduleCascadePush(int deletedFolderId) {
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
     _pushTimer?.cancel();
-    _pushTimer = Timer(const Duration(milliseconds: _kPushDebounceMs),
+    _pushTimer = Timer(const Duration(milliseconds: _kFastPushDebounceMs),
         () => _flushCascadePush(deletedFolderId));
   }
 
@@ -211,7 +211,8 @@ final foldersProvider =
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 
-const _kPushDebounceMs = 15000;
+const _kPushDebounceMs = 15000;     // note editing — batches rapid keystrokes
+const _kFastPushDebounceMs = 5000; // discrete actions — move/folder ops
 
 class NotesNotifier extends AsyncNotifier<List<Note>> {
   @visibleForTesting
@@ -270,7 +271,11 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
 
   Future<void> moveNote(Note note, int? folderId) async {
     note.folderId = folderId;
-    await saveNote(note);
+    await DatabaseService.instance.saveNote(note);
+    await reload();
+    if (ref.read(appUserProvider)?.type != AuthType.google) return;
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+    _run(() => _pushNoteAndImages(note, []));
   }
 
   Future<void> deleteNote(int id) async {
