@@ -139,10 +139,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _pollCycle() async {
     final user = ref.read(appUserProvider);
     if (user?.type != AuthType.google) return;
+    if (mounted) {
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+    }
     try {
       final drv = DriveSyncService.instance;
       final api = await drv.getApi();
-      if (api == null) return;
+      if (api == null) {
+        if (mounted) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+        }
+        return;
+      }
       final appFolderId = await drv.getOrCreateAppFolder(api);
       final userId = user!.id;
 
@@ -150,7 +158,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           await SyncLogService.instance.loadLogModTime(userId);
       final currentModTime =
           await SyncLogService.instance.fetchLogModifiedTime(api, appFolderId);
-      if (currentModTime == null || currentModTime == lastModTime) return;
+      if (currentModTime == null || currentModTime == lastModTime) {
+        if (mounted) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+        }
+        return;
+      }
 
       final lastSeq = await SyncLogService.instance.loadLastSeq(userId);
       final hasGap = await SyncLogService.instance
@@ -164,7 +177,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final myDeviceId = await DeviceService.instance.id;
       final result = await SyncLogService.instance
           .fetchEntriesSince(api, appFolderId, lastSeq, myDeviceId);
-      if (result == null) return;
+      if (result == null) {
+        if (mounted) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+        }
+        return;
+      }
 
       if (result.entries.isNotEmpty) {
         await _applyEntries(api, appFolderId, result.entries);
@@ -176,8 +194,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
       await SyncLogService.instance.saveLastSeq(userId, result.maxSeq);
       await SyncLogService.instance.saveLogModTime(userId, currentModTime);
+      if (mounted) {
+        ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+      }
     } catch (e) {
       debugPrint('[HomeScreen] poll failed: $e');
+      if (mounted) {
+        ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+      }
     }
   }
 

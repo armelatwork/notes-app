@@ -210,7 +210,7 @@ final foldersProvider =
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
 
-const _kPushDebounceMs = 5000;
+const _kPushDebounceMs = 15000;
 
 class NotesNotifier extends AsyncNotifier<List<Note>> {
   @visibleForTesting
@@ -253,7 +253,7 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     return note;
   }
 
-  /// Saves locally and schedules a 5 s push. Tracks images deleted this edit.
+  /// Saves locally and schedules a 15 s push. Tracks images deleted this edit.
   Future<void> saveNote(Note note,
       {List<String> deletedImageFilenames = const []}) async {
     await DatabaseService.instance.saveNote(note);

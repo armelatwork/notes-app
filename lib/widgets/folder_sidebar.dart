@@ -14,7 +14,9 @@ class FolderSidebar extends ConsumerWidget {
     final selectedFolder = ref.watch(selectedFolderProvider);
     final appUser = ref.watch(appUserProvider);
 
-    return Container(
+    return SafeArea(
+      bottom: false,
+      child: Container(
       width: 220,
       color: Theme.of(context).colorScheme.surfaceContainerHigh,
       child: Column(
@@ -78,6 +80,7 @@ class FolderSidebar extends ConsumerWidget {
           const Divider(height: 1),
           _UserMenuFooter(appUser: appUser),
         ],
+      ),
       ),
     );
   }
