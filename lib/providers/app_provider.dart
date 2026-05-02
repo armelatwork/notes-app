@@ -141,6 +141,7 @@ class FoldersNotifier extends AsyncNotifier<List<Folder>> {
 
   void _scheduleIndexPush() {
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     _pushTimer?.cancel();
     _pushTimer = Timer(
         const Duration(milliseconds: _kPushDebounceMs), _flushIndexPush);
@@ -259,6 +260,7 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     await DatabaseService.instance.saveNote(note);
     await reload();
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     pendingNote = note;
     pendingDeletedImages = [...pendingDeletedImages, ...deletedImageFilenames];
     pushTimer?.cancel();
@@ -278,6 +280,7 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     await reload();
     if (note?.driveFileId != null &&
         ref.read(appUserProvider)?.type == AuthType.google) {
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
       _run(() => _pushDelete(note!));
     }
   }

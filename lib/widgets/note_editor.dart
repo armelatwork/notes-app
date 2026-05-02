@@ -259,9 +259,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         ContextMenuButtonItem(
           label: hasLink ? 'Edit Link' : 'Insert Link',
           onPressed: () {
+            // Capture selection before the context menu dismissal collapses it.
+            final savedSelection = _controller!.selection;
             ContextMenuController.removeAny();
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _onInsertLink();
+              if (!mounted || _controller == null) return;
+              _controller!.updateSelection(savedSelection, ChangeSource.local);
+              _onInsertLink();
             });
           },
         ),
