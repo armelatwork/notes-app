@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/app_user.dart';
 import '../models/folder.dart';
 import '../providers/app_provider.dart';
+import '../screens/settings_screen.dart';
 
 class FolderSidebar extends ConsumerWidget {
   const FolderSidebar({super.key});
@@ -18,7 +19,7 @@ class FolderSidebar extends ConsumerWidget {
       color: Theme.of(context).colorScheme.surfaceContainerHigh,
       child: Column(
         children: [
-          _Header(appUser: appUser),
+          _SidebarHeader(appUser: appUser),
           _SidebarItem(
             icon: Icons.notes,
             label: 'All Notes',
@@ -74,6 +75,8 @@ class FolderSidebar extends ConsumerWidget {
             error: (e, _) =>
                 Expanded(child: Center(child: Text('$e'))),
           ),
+          const Divider(height: 1),
+          _UserMenuFooter(appUser: appUser),
         ],
       ),
     );
@@ -162,9 +165,9 @@ class FolderSidebar extends ConsumerWidget {
 
 // ── Header with sync button ───────────────────────────────────────────────────
 
-class _Header extends ConsumerWidget {
+class _SidebarHeader extends ConsumerWidget {
   final AppUser? appUser;
-  const _Header({required this.appUser});
+  const _SidebarHeader({required this.appUser});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -187,7 +190,6 @@ class _Header extends ConsumerWidget {
                 _SyncIconButton(
                   status: syncStatus,
                   onPressed: () {
-                    // Flush pending push + trigger immediate poll cycle.
                     ref.read(pollTriggerProvider.notifier).state++;
                   },
                 ),
@@ -230,7 +232,88 @@ class _SyncIconButton extends StatelessWidget {
   }
 }
 
-// ── Sidebar item / folder tile ────────────────────────────────���────────────────
+// ── User menu footer ──────────────────────────────────────────────────────────
+
+class _UserMenuFooter extends ConsumerWidget {
+  final AppUser? appUser;
+  const _UserMenuFooter({required this.appUser});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (appUser == null) return const SizedBox.shrink();
+
+    return PopupMenuButton<String>(
+      offset: const Offset(0, -8),
+      position: PopupMenuPosition.over,
+      onSelected: (value) {
+        if (value == 'settings') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          );
+        } else if (value == 'signout') {
+          ref.read(appUserProvider.notifier).signOut();
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(
+          value: 'settings',
+          child: Row(
+            children: [
+              Icon(Icons.settings_outlined, size: 18),
+              SizedBox(width: 10),
+              Text('Settings'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'signout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, size: 18),
+              SizedBox(width: 10),
+              Text('Sign out'),
+            ],
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.account_circle_outlined, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    appUser!.displayName,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (appUser!.email != null)
+                    Text(
+                      appUser!.email!,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            Icon(Icons.unfold_more, size: 16, color: Colors.grey[500]),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sidebar item / folder tile ────────────────────────────────────────────────
 
 class _SidebarItem extends StatelessWidget {
   final IconData icon;
