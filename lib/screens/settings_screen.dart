@@ -28,12 +28,6 @@ class SettingsScreen extends ConsumerWidget {
               title: const Text('Drive location'),
               subtitle: const Text('Notes app/'),
             ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('Sync now'),
-              subtitle: const Text(
-                  'Use the sync button in the sidebar to push and pull changes.'),
-            ),
           ],
           const Divider(),
           ListTile(
