@@ -60,13 +60,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       setState(() { _loading = false; _error = 'Sign-in cancelled.' ; });
       return;
     }
-    await EncryptionService.instance.initForGoogleUser(googleUser.id);
-    ref.read(appUserProvider.notifier).setUser(AppUser(
-      id: googleUser.id,
-      displayName: googleUser.displayName ?? googleUser.email,
-      email: googleUser.email,
-      type: AuthType.google,
-    ));
+    await ref.read(appUserProvider.notifier).setGoogleUser(googleUser);
   }
 
   Future<void> _submitLocal() async {
@@ -101,7 +95,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final keyBytes = await LocalAuthService.instance.deriveEncryptionKey(password);
     EncryptionService.instance.initWithKey(keyBytes);
     if (!mounted) return;
-    ref.read(appUserProvider.notifier).setUser(user);
+    ref.read(appUserProvider.notifier).setLocalUser(user);
   }
 
   @override

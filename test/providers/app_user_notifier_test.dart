@@ -57,7 +57,7 @@ void main() {
         displayName: 'alice',
         type: AuthType.local,
       );
-      container.read(appUserProvider.notifier).setUser(user);
+      container.read(appUserProvider.notifier).setLocalUser(user);
       expect(container.read(appUserProvider), user);
     });
 
@@ -67,8 +67,8 @@ void main() {
 
       const userA = AppUser(id: 'a', displayName: 'A', type: AuthType.local);
       const userB = AppUser(id: 'b', displayName: 'B', type: AuthType.local);
-      container.read(appUserProvider.notifier).setUser(userA);
-      container.read(appUserProvider.notifier).setUser(userB);
+      container.read(appUserProvider.notifier).setLocalUser(userA);
+      container.read(appUserProvider.notifier).setLocalUser(userB);
       expect(container.read(appUserProvider), userB);
     });
 
@@ -77,7 +77,7 @@ void main() {
       addTearDown(container.dispose);
 
       const user = AppUser(id: 'alice', displayName: 'alice', type: AuthType.local);
-      container.read(appUserProvider.notifier).setUser(user);
+      container.read(appUserProvider.notifier).setLocalUser(user);
       await container.read(appUserProvider.notifier).signOut();
       expect(container.read(appUserProvider), isNull);
     });
@@ -89,7 +89,7 @@ void main() {
       final note = Note.create(
           title: 'Test', content: '{"ops":[{"insert":"\\n"}]}');
       container.read(selectedNoteProvider.notifier).state = note;
-      container.read(appUserProvider.notifier).setUser(
+      container.read(appUserProvider.notifier).setLocalUser(
           const AppUser(id: 'a', displayName: 'a', type: AuthType.local));
       await container.read(appUserProvider.notifier).signOut();
       expect(container.read(selectedNoteProvider), isNull);
@@ -100,7 +100,7 @@ void main() {
       addTearDown(container.dispose);
 
       container.read(selectedFolderProvider.notifier).state = 5;
-      container.read(appUserProvider.notifier).setUser(
+      container.read(appUserProvider.notifier).setLocalUser(
           const AppUser(id: 'a', displayName: 'a', type: AuthType.local));
       await container.read(appUserProvider.notifier).signOut();
       expect(container.read(selectedFolderProvider), isNull);

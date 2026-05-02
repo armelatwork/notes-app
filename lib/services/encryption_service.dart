@@ -61,6 +61,13 @@ class EncryptionService {
     return utf8.decode(plaintext);
   }
 
+  Future<String> exportCurrentKeyBase64() async {
+    final key = _secretKey;
+    if (key == null) throw StateError('EncryptionService not initialized');
+    final bytes = await key.extractBytes();
+    return base64Encode(bytes);
+  }
+
   Uint8List _randomBytes(int length) {
     final random = Random.secure();
     return Uint8List.fromList(List.generate(length, (_) => random.nextInt(256)));

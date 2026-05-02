@@ -98,6 +98,26 @@ class DatabaseService {
     });
   }
 
+  /// Inserts or replaces a note WITHOUT updating updatedAt — used during sync.
+  Future<void> upsertNote(Note note) async {
+    final isar = await db;
+    await isar.writeTxn(() => isar.notes.put(note));
+  }
+
+  /// Inserts or replaces a folder WITHOUT updating updatedAt — used during sync.
+  Future<void> upsertFolder(Folder folder) async {
+    final isar = await db;
+    await isar.writeTxn(() => isar.folders.put(folder));
+  }
+
+  Future<void> clearAll() async {
+    final isar = await db;
+    await isar.writeTxn(() async {
+      await isar.notes.clear();
+      await isar.folders.clear();
+    });
+  }
+
   Future<void> close() async {
     await _isar?.close();
     _isar = null;
