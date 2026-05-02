@@ -124,7 +124,21 @@ class SyncLogService {
       int? entityId,
       String? filename,
       required String deviceId,
-      required String modifiedTime}) async {
+      required String modifiedTime}) =>
+      appendEntries(api, appFolderId, [(
+        op: op, type: type, entityId: entityId,
+        filename: filename, deviceId: deviceId, modifiedTime: modifiedTime,
+      )]);
+
+  /// Appends multiple entries in a single read-modify-write cycle and returns
+  /// the highest seq assigned. Use this for batch operations (e.g. bulk moves)
+  /// so all entries land in one Drive write and the receiving device sees them
+  /// all on its next poll.
+  Future<int> appendEntries(
+      drive.DriveApi api,
+      String appFolderId,
+      List<({String op, String type, int? entityId, String? filename,
+             String deviceId, String modifiedTime})> batch) async {
     final fileId = await _ensureFileId(api, appFolderId);
     Map<String, dynamic> log;
     if (fileId != null) {
@@ -144,18 +158,20 @@ class SyncLogService {
     } else {
       log = {'nextSeq': 1, 'entries': <dynamic>[]};
     }
-    final seq = log['nextSeq'] as int;
-    log['nextSeq'] = seq + 1;
+    int seq = log['nextSeq'] as int;
     final entries = log['entries'] as List<dynamic>;
-    entries.add(SyncLogEntry(
-      seq: seq, op: op, type: type, entityId: entityId,
-      filename: filename, deviceId: deviceId, modifiedTime: modifiedTime,
-    ).toJson());
+    for (final e in batch) {
+      entries.add(SyncLogEntry(
+        seq: seq++, op: e.op, type: e.type, entityId: e.entityId,
+        filename: e.filename, deviceId: e.deviceId, modifiedTime: e.modifiedTime,
+      ).toJson());
+    }
+    log['nextSeq'] = seq;
     if (entries.length > _kMaxEntries) {
       entries.removeRange(0, entries.length - _kMaxEntries);
     }
     await _writeLog(api, appFolderId, fileId, log);
-    return seq;
+    return seq - 1; // highest seq assigned
   }
 
   Future<void> _writeLog(drive.DriveApi api, String appFolderId,

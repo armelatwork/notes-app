@@ -290,9 +290,32 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   void _flushMoves() {
     final notes = List<Note>.from(_pendingMoves);
     _pendingMoves.clear();
-    for (final note in notes) {
-      _run(() => _pushNoteAndImages(note, []));
-    }
+    if (notes.isEmpty) return;
+    _run(() => _pushMovedNotes(notes));
+  }
+
+  /// Uploads all moved notes in parallel then writes all log entries in one
+  /// read-modify-write cycle so the receiving device sees the full batch on its
+  /// next poll instead of picking them up one per poll cycle.
+  Future<void> _pushMovedNotes(List<Note> notes) async {
+    final drv = DriveSyncService.instance;
+    final api = await drv.getApi();
+    if (api == null) return;
+    final appFolderId = await drv.getOrCreateAppFolder(api);
+    final modTimes = await Future.wait(
+      notes.map((n) => drv.uploadNote(api, appFolderId, n)),
+    );
+    final deviceId = await DeviceService.instance.id;
+    final userId = ref.read(appUserProvider)?.id;
+    if (userId == null) return;
+    final lastSeq = await SyncLogService.instance.appendEntries(
+      api, appFolderId,
+      [for (var i = 0; i < notes.length; i++)
+        (op: 'upsert', type: 'note', entityId: notes[i].id,
+         filename: null as String?, deviceId: deviceId,
+         modifiedTime: modTimes[i])],
+    );
+    await SyncLogService.instance.saveLastSeq(userId, lastSeq);
   }
 
   Future<void> deleteNote(int id) async {
