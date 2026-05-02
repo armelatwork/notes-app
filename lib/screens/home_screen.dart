@@ -80,7 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final lastFolderId = await PersistenceService.instance.loadLastFolder();
     final lastNoteId = await PersistenceService.instance.loadLastNote();
-    ref.read(selectedFolderProvider.notifier).state = lastFolderId;
+    ref.read(selectedFolderProvider.notifier).state = lastFolderId ?? -1;
     if (lastNoteId != null) {
       final note = await DatabaseService.instance.getNote(lastNoteId);
       if (note != null && mounted) {
