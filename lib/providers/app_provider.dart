@@ -221,6 +221,8 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   Note? pendingNote;
   @visibleForTesting
   List<String> pendingDeletedImages = [];
+  // Serializes concurrent push operations so they never race on sync_log.json.
+  Future<void> _pushQueue = Future.value();
 
   @override
   Future<List<Note>> build() => _load();
@@ -321,7 +323,7 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
 
   void _run(Future<void> Function() task) {
     ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
-    task().then((_) {
+    _pushQueue = _pushQueue.then((_) => task()).then((_) {
       ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
     }).catchError((Object e) {
       debugPrint('[NotesNotifier] push failed: $e');
