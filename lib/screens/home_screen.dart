@@ -198,9 +198,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
       }
     } catch (e) {
-      debugPrint('[HomeScreen] poll failed: $e');
-      if (mounted) {
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+      final isNetworkHiccup = e.toString().contains('Connection reset') ||
+          e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused') ||
+          e.toString().contains('Network is unreachable');
+      if (isNetworkHiccup) {
+        // Transient connectivity drop — next poll will retry silently.
+        debugPrint('[HomeScreen] poll skipped (network): $e');
+        if (mounted) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+        }
+      } else {
+        debugPrint('[HomeScreen] poll failed: $e');
+        if (mounted) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+        }
       }
     }
   }
