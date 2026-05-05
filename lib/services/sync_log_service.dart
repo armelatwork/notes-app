@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'app_logger.dart';
 
 class SyncLogEntry {
   final int seq;
@@ -75,7 +75,7 @@ class SyncLogService {
       _cachedFileId = r.files!.first.id;
       return r.files!.first.modifiedTime?.toIso8601String();
     } catch (e) {
-      debugPrint('[SyncLogService] fetchLogModifiedTime failed: $e');
+      AppLogger.instance.error('SyncLogService', 'fetchLogModifiedTime failed', e);
       return null;
     }
   }
@@ -109,7 +109,7 @@ class SyncLogService {
       final maxSeq = all.isEmpty ? lastSeq : all.map((e) => e.seq).reduce((a, b) => a > b ? a : b);
       return (entries: newer, maxSeq: maxSeq);
     } catch (e) {
-      debugPrint('[SyncLogService] fetchEntriesSince failed: $e');
+      AppLogger.instance.error('SyncLogService', 'fetchEntriesSince failed', e);
       return null;
     }
   }

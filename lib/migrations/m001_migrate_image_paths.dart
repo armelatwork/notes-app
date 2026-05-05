@@ -1,5 +1,5 @@
 import '../services/database_service.dart';
-import '../utils/image_utils.dart';
+import '../utils/image_utils.dart' show migrateImageContent;
 
 /// Converts old absolute-path image references in note content to portable
 /// UUID filenames, copying the image file to the new location.

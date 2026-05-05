@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:path/path.dart' as p;
+import '../services/app_logger.dart';
 import '../services/drive_sync_service.dart';
 import '../utils/image_utils.dart';
 
@@ -34,7 +34,7 @@ Future<void> pasteImageFromClipboard(QuillController controller) async {
     await File(dest).writeAsBytes(bytes);
     _embed(controller, filename);
   } catch (e) {
-    debugPrint('[NoteImageHandler] clipboard paste failed: $e');
+    AppLogger.instance.error('NoteImageHandler', 'clipboard paste failed', e);
   }
 }
 
@@ -99,7 +99,7 @@ class _ImageTileState extends State<_ImageTile> {
       }
       if (mounted) setState(() { _localPath = path; _loading = false; });
     } catch (e) {
-      debugPrint('[_ImageTile] download failed: $e');
+      AppLogger.instance.error('ImageTile', 'download failed', e);
       if (mounted) setState(() { _loading = false; _notOnDrive = false; });
     }
   }

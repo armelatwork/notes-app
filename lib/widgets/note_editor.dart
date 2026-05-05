@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
+import '../services/app_logger.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
 import 'note_editor_widgets.dart';
@@ -99,7 +100,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       final json = jsonDecode(note.content) as List;
       doc = Document.fromJson(json);
     } catch (e) {
-      debugPrint('[NoteEditor] failed to parse note content: $e');
+      AppLogger.instance.warn('NoteEditor', 'failed to parse note content', e);
       doc = Document();
     }
 

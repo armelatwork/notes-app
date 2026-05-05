@@ -7,6 +7,7 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import '../models/app_user.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
+import '../services/app_logger.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/device_service.dart';

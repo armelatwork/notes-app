@@ -78,7 +78,7 @@ class FoldersNotifier extends AsyncNotifier<List<Folder>> {
     task().then((_) {
       ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
     }).catchError((Object e) {
-      debugPrint('[FoldersNotifier] push failed: $e');
+      AppLogger.instance.error('FoldersNotifier', 'push failed', e);
       ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
     });
   }

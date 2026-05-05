@@ -9,6 +9,7 @@ import '../services/database_service.dart';
 import '../services/device_service.dart';
 import '../services/drive_sync_service.dart';
 import '../services/encryption_service.dart';
+import '../services/app_logger.dart';
 import '../services/persistence_service.dart';
 import '../services/sync_log_service.dart';
 import '../utils/image_utils.dart';
@@ -105,7 +106,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final count = await drv.countNotes(api, appFolderId);
       if (count > 0 && mounted) await _showFirstSyncDialog(count);
     } catch (e) {
-      debugPrint('[HomeScreen] first-sync check failed: $e');
+      AppLogger.instance.error('HomeScreen', 'first-sync check failed', e);
     }
   }
 
@@ -204,12 +205,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           e.toString().contains('Network is unreachable');
       if (isNetworkHiccup) {
         // Transient connectivity drop — next poll will retry silently.
-        debugPrint('[HomeScreen] poll skipped (network): $e');
+        AppLogger.instance.warn('HomeScreen', 'poll skipped (network)', e);
         if (mounted) {
           ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
         }
       } else {
-        debugPrint('[HomeScreen] poll failed: $e');
+        AppLogger.instance.error('HomeScreen', 'poll failed', e);
         if (mounted) {
           ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
         }
@@ -231,7 +232,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             await _applyImage(drv, entry);
         }
       } catch (e) {
-        debugPrint('[HomeScreen] entry ${entry.seq} (${entry.type}) failed: $e');
+        AppLogger.instance.error('HomeScreen', 'entry ${entry.seq} (${entry.type}) failed', e);
       }
     }
   }
@@ -306,7 +307,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(noteReloadTriggerProvider.notifier).state++;
       }
     } catch (e) {
-      debugPrint('[HomeScreen] fullSync failed: $e');
+      AppLogger.instance.error('HomeScreen', 'fullSync failed', e);
       if (mounted) {
         ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
       }

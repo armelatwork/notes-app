@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import '../models/folder.dart';
 import '../models/note.dart';
+import 'app_logger.dart';
 import 'auth_service.dart';
 import 'database_service.dart';
 import 'encryption_service.dart';
@@ -89,7 +89,7 @@ class DriveSyncService {
       ) as drive.Media;
       return _readMedia(media);
     } catch (e) {
-      debugPrint('[DriveSyncService] fetchEncryptionKey failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'fetchEncryptionKey failed', e);
       return null;
     }
   }
@@ -185,7 +185,7 @@ class DriveSyncService {
       note.updatedAt = DateTime.parse(json['updatedAt'] as String);
       return note;
     } catch (e) {
-      debugPrint('[DriveSyncService] downloadNote $noteId failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'downloadNote $noteId failed', e);
       return null;
     }
   }
@@ -193,7 +193,7 @@ class DriveSyncService {
     try {
       await api.files.delete(driveFileId);
     } catch (e) {
-      debugPrint('[DriveSyncService] deleteNoteFile failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'deleteNoteFile failed', e);
     }
   }
 
@@ -264,7 +264,7 @@ class DriveSyncService {
         return folder;
       }).toList();
     } catch (e) {
-      debugPrint('[DriveSyncService] downloadFolderIndex failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'downloadFolderIndex failed', e);
       return null;
     }
   }
@@ -298,7 +298,7 @@ class DriveSyncService {
       }
       return result.modifiedTime?.toIso8601String();
     } catch (e) {
-      debugPrint('[DriveSyncService] uploadImage $filename failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'uploadImage $filename failed', e);
       return null;
     }
   }
@@ -339,7 +339,7 @@ class DriveSyncService {
       final id = r.files?.firstOrNull?.id;
       if (id != null) await api.files.delete(id);
     } catch (e) {
-      debugPrint('[DriveSyncService] deleteImageFile $filename failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'deleteImageFile $filename failed', e);
     }
   }
   // ── Utilities ──────────────────────────────────────────────────────────────
@@ -376,7 +376,7 @@ class DriveSyncService {
       note.updatedAt = DateTime.parse(json['updatedAt'] as String);
       return note;
     } catch (e) {
-      debugPrint('[DriveSyncService] downloadNoteById failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'downloadNoteById failed', e);
       return null;
     }
   }
