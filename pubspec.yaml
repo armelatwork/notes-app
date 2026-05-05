@@ -25,6 +25,10 @@ dependencies:
   uuid: ^4.5.1
 
 
+  # Firebase
+  firebase_core: ^3.13.0
+  cloud_firestore: ^5.6.6
+
   # Google auth & Drive
   google_sign_in: ^6.2.2
   googleapis: ^13.2.0
