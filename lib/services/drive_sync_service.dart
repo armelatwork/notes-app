@@ -9,6 +9,8 @@ import 'auth_service.dart';
 import 'database_service.dart';
 import 'encryption_service.dart';
 
+const _kRequestTimeout = Duration(seconds: 30);
+
 class _AuthClient extends http.BaseClient {
   final Map<String, String> _headers;
   final http.Client _inner = http.Client();
@@ -17,7 +19,7 @@ class _AuthClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) {
     request.headers.addAll(_headers);
-    return _inner.send(request);
+    return _inner.send(request).timeout(_kRequestTimeout);
   }
 }
 
@@ -340,7 +342,6 @@ class DriveSyncService {
       debugPrint('[DriveSyncService] deleteImageFile $filename failed: $e');
     }
   }
-
   // ── Utilities ──────────────────────────────────────────────────────────────
   /// Returns all Drive file IDs for note files in the app folder.
   Future<List<String>> listNoteFileIds(
