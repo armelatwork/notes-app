@@ -1,3 +1,6 @@
+# Build distribution artifacts
+dist/
+
 # Miscellaneous
 *.class
 *.log
