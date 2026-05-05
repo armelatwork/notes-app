@@ -32,7 +32,6 @@ class DriveSyncService {
   static const _jsonMime = 'application/json';
 
   // ── Auth ───────────────────────────────────────────────────────────────────
-
   Future<drive.DriveApi?> getApi() async {
     final headers = await AuthService.instance.getAuthHeaders();
     if (headers == null) return null;
@@ -40,7 +39,6 @@ class DriveSyncService {
   }
 
   // ── Folder helpers ─────────────────────────────────────────────────────────
-
   Future<String> getOrCreateAppFolder(drive.DriveApi api) async {
     final r = await api.files.list(
       q: "name='$_appFolderName' and "
@@ -56,7 +54,6 @@ class DriveSyncService {
     );
     return f.id!;
   }
-
   Future<String> _getOrCreateImagesFolder(
       drive.DriveApi api, String appFolderId) async {
     final r = await api.files.list(
@@ -76,7 +73,6 @@ class DriveSyncService {
   }
 
   // ── Encryption key ─────────────────────────────────────────────────────────
-
   Future<String?> fetchEncryptionKey(drive.DriveApi api, String appFolderId) async {
     try {
       final r = await api.files.list(
@@ -95,7 +91,6 @@ class DriveSyncService {
       return null;
     }
   }
-
   Future<void> uploadEncryptionKey(
       drive.DriveApi api, String appFolderId, String keyBase64) async {
     final bytes = utf8.encode(keyBase64);
@@ -118,7 +113,6 @@ class DriveSyncService {
   }
 
   // ── Notes ──────────────────────────────────────────────────────────────────
-
   /// Uploads a note to Drive. Returns the Drive server modifiedTime.
   Future<String> uploadNote(
       drive.DriveApi api, String appFolderId, Note note) async {
@@ -193,7 +187,6 @@ class DriveSyncService {
       return null;
     }
   }
-
   Future<void> deleteNoteFile(drive.DriveApi api, String driveFileId) async {
     try {
       await api.files.delete(driveFileId);
@@ -203,7 +196,6 @@ class DriveSyncService {
   }
 
   // ── Folder index ───────────────────────────────────────────────────────────
-
   /// Uploads the full folder list. Returns Drive server modifiedTime.
   Future<String> uploadFolderIndex(
       drive.DriveApi api, String appFolderId, List<Folder> folders) async {
@@ -276,7 +268,6 @@ class DriveSyncService {
   }
 
   // ── Images ─────────────────────────────────────────────────────────────────
-
   /// Uploads an image file to Drive. Returns Drive server modifiedTime, or null.
   Future<String?> uploadImage(
       drive.DriveApi api, String appFolderId, String filename,
@@ -351,7 +342,6 @@ class DriveSyncService {
   }
 
   // ── Utilities ──────────────────────────────────────────────────────────────
-
   /// Returns all Drive file IDs for note files in the app folder.
   Future<List<String>> listNoteFileIds(
       drive.DriveApi api, String appFolderId) async {
