@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'services/app_logger.dart';
 import 'widgets/auth_gate.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppLogger.instance.init();
   runApp(const ProviderScope(child: NotesApp()));
 }
 

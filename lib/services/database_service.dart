@@ -7,6 +7,8 @@ class DatabaseService {
   static DatabaseService? _instance;
   static Isar? _isar;
 
+  static Future<void> Function()? clearAllOverride;
+
   DatabaseService._();
 
   static DatabaseService get instance {

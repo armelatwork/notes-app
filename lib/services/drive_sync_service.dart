@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import '../models/folder.dart';
 import '../models/note.dart';
+import 'app_logger.dart';
 import 'auth_service.dart';
 import 'database_service.dart';
 import 'encryption_service.dart';
+
+const _kRequestTimeout = Duration(seconds: 30);
 
 class _AuthClient extends http.BaseClient {
   final Map<String, String> _headers;
@@ -17,7 +19,7 @@ class _AuthClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) {
     request.headers.addAll(_headers);
-    return _inner.send(request);
+    return _inner.send(request).timeout(_kRequestTimeout);
   }
 }
 
@@ -32,7 +34,6 @@ class DriveSyncService {
   static const _jsonMime = 'application/json';
 
   // ── Auth ───────────────────────────────────────────────────────────────────
-
   Future<drive.DriveApi?> getApi() async {
     final headers = await AuthService.instance.getAuthHeaders();
     if (headers == null) return null;
@@ -40,7 +41,6 @@ class DriveSyncService {
   }
 
   // ── Folder helpers ─────────────────────────────────────────────────────────
-
   Future<String> getOrCreateAppFolder(drive.DriveApi api) async {
     final r = await api.files.list(
       q: "name='$_appFolderName' and "
@@ -56,7 +56,6 @@ class DriveSyncService {
     );
     return f.id!;
   }
-
   Future<String> _getOrCreateImagesFolder(
       drive.DriveApi api, String appFolderId) async {
     final r = await api.files.list(
@@ -76,7 +75,6 @@ class DriveSyncService {
   }
 
   // ── Encryption key ─────────────────────────────────────────────────────────
-
   Future<String?> fetchEncryptionKey(drive.DriveApi api, String appFolderId) async {
     try {
       final r = await api.files.list(
@@ -91,11 +89,10 @@ class DriveSyncService {
       ) as drive.Media;
       return _readMedia(media);
     } catch (e) {
-      debugPrint('[DriveSyncService] fetchEncryptionKey failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'fetchEncryptionKey failed', e);
       return null;
     }
   }
-
   Future<void> uploadEncryptionKey(
       drive.DriveApi api, String appFolderId, String keyBase64) async {
     final bytes = utf8.encode(keyBase64);
@@ -118,7 +115,6 @@ class DriveSyncService {
   }
 
   // ── Notes ──────────────────────────────────────────────────────────────────
-
   /// Uploads a note to Drive. Returns the Drive server modifiedTime.
   Future<String> uploadNote(
       drive.DriveApi api, String appFolderId, Note note) async {
@@ -189,21 +185,19 @@ class DriveSyncService {
       note.updatedAt = DateTime.parse(json['updatedAt'] as String);
       return note;
     } catch (e) {
-      debugPrint('[DriveSyncService] downloadNote $noteId failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'downloadNote $noteId failed', e);
       return null;
     }
   }
-
   Future<void> deleteNoteFile(drive.DriveApi api, String driveFileId) async {
     try {
       await api.files.delete(driveFileId);
     } catch (e) {
-      debugPrint('[DriveSyncService] deleteNoteFile failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'deleteNoteFile failed', e);
     }
   }
 
   // ── Folder index ───────────────────────────────────────────────────────────
-
   /// Uploads the full folder list. Returns Drive server modifiedTime.
   Future<String> uploadFolderIndex(
       drive.DriveApi api, String appFolderId, List<Folder> folders) async {
@@ -270,13 +264,12 @@ class DriveSyncService {
         return folder;
       }).toList();
     } catch (e) {
-      debugPrint('[DriveSyncService] downloadFolderIndex failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'downloadFolderIndex failed', e);
       return null;
     }
   }
 
   // ── Images ─────────────────────────────────────────────────────────────────
-
   /// Uploads an image file to Drive. Returns Drive server modifiedTime, or null.
   Future<String?> uploadImage(
       drive.DriveApi api, String appFolderId, String filename,
@@ -305,7 +298,7 @@ class DriveSyncService {
       }
       return result.modifiedTime?.toIso8601String();
     } catch (e) {
-      debugPrint('[DriveSyncService] uploadImage $filename failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'uploadImage $filename failed', e);
       return null;
     }
   }
@@ -346,12 +339,10 @@ class DriveSyncService {
       final id = r.files?.firstOrNull?.id;
       if (id != null) await api.files.delete(id);
     } catch (e) {
-      debugPrint('[DriveSyncService] deleteImageFile $filename failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'deleteImageFile $filename failed', e);
     }
   }
-
   // ── Utilities ──────────────────────────────────────────────────────────────
-
   /// Returns all Drive file IDs for note files in the app folder.
   Future<List<String>> listNoteFileIds(
       drive.DriveApi api, String appFolderId) async {
@@ -385,7 +376,7 @@ class DriveSyncService {
       note.updatedAt = DateTime.parse(json['updatedAt'] as String);
       return note;
     } catch (e) {
-      debugPrint('[DriveSyncService] downloadNoteById failed: $e');
+      AppLogger.instance.error('DriveSyncService', 'downloadNoteById failed', e);
       return null;
     }
   }

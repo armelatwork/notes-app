@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'app_logger.dart';
 
 // Stores key-value pairs as JSON in the app's sandboxed support directory.
 // On macOS the sandbox blocks all other processes from reading this file.
@@ -31,7 +32,7 @@ class SecureStorageService {
       final map = jsonDecode(content) as Map<String, dynamic>;
       return map.map((k, v) => MapEntry(k, v as String));
     } catch (e) {
-      debugPrint('[SecureStorageService] failed to read storage file: $e');
+      AppLogger.instance.error('SecureStorageService', 'failed to read storage file', e);
       return {};
     }
   }

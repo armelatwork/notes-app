@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'app_logger.dart';
 
 class AuthService {
   static final AuthService instance = AuthService._();
@@ -24,7 +24,7 @@ class AuthService {
       if (auth.accessToken == null) return null;
       return user;
     } catch (e) {
-      debugPrint('[AuthService] silent sign-in failed: $e');
+      AppLogger.instance.warn('AuthService', 'silent sign-in failed', e);
       return null;
     }
   }

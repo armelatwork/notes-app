@@ -28,6 +28,42 @@ bool isNewImageRef(String value) =>
     !value.contains('/') &&
     !value.contains('\\');
 
+/// Scans [content] (Quill delta JSON) for legacy absolute-path image refs,
+/// copies each file to the note_images directory under a new UUID name, and
+/// returns the updated JSON. Returns null if no migration was needed.
+Future<String?> migrateImageContent(String content) async {
+  try {
+    final dynamic raw = jsonDecode(content);
+    final List<dynamic> ops;
+    if (raw is List) {
+      ops = raw;
+    } else if (raw is Map) {
+      ops = (raw['ops'] as List<dynamic>?) ?? [];
+    } else {
+      return null;
+    }
+    var changed = false;
+    final migrated = <dynamic>[];
+    for (final op in ops) {
+      if (op is! Map<String, dynamic>) { migrated.add(op); continue; }
+      final insert = op['insert'];
+      if (insert is! Map<String, dynamic>) { migrated.add(op); continue; }
+      final ref = insert['image'] as String?;
+      if (ref == null || isNewImageRef(ref)) { migrated.add(op); continue; }
+      final src = File(ref);
+      if (!await src.exists()) { migrated.add(op); continue; }
+      final newFilename = generateImageFilename(ref);
+      final dest = await imageLocalPath(newFilename);
+      await src.copy(dest);
+      migrated.add({...op, 'insert': {...insert, 'image': newFilename}});
+      changed = true;
+    }
+    return changed ? jsonEncode(migrated) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Parses a Quill delta JSON string and returns all UUID image filenames.
 List<String> extractImageFilenames(String content) {
   try {
