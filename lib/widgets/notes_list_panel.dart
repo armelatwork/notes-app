@@ -45,9 +45,16 @@ class NotesListPanel extends ConsumerWidget {
                       itemBuilder: (context, i) {
                         final note = notes[i];
                         final isSelected = selectedNote?.id == note.id;
+                        final isWideLayout =
+                            MediaQuery.of(context).size.width >= 800;
+                        final supportsDrag =
+                            defaultTargetPlatform == TargetPlatform.macOS ||
+                            (defaultTargetPlatform == TargetPlatform.android &&
+                                isWideLayout);
                         final tile = _NoteTile(
                           note: note,
                           isSelected: isSelected,
+                          isDragMode: supportsDrag,
                           onTap: () => ref
                               .read(selectedNoteProvider.notifier)
                               .state = note,
@@ -56,16 +63,8 @@ class NotesListPanel extends ConsumerWidget {
                           onMoveToFolder: () =>
                               _showFolderPicker(context, ref, note),
                         );
-                        final isWideLayout =
-                            MediaQuery.of(context).size.width >= 800;
-                        final supportsDrag =
-                            defaultTargetPlatform == TargetPlatform.macOS ||
-                            (defaultTargetPlatform == TargetPlatform.android &&
-                                isWideLayout);
-                        if (!supportsDrag) {
-                          return tile;
-                        }
-                        return LongPressDraggable<Note>(
+                        if (!supportsDrag) return tile;
+                        final draggable = LongPressDraggable<Note>(
                           data: note,
                           feedback: Material(
                             elevation: 4,
@@ -81,6 +80,21 @@ class NotesListPanel extends ConsumerWidget {
                           ),
                           childWhenDragging: Opacity(opacity: 0.4, child: tile),
                           child: tile,
+                        );
+                        return Dismissible(
+                          key: ValueKey(note.id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            color: Colors.red,
+                            child: const Icon(Icons.delete_outline,
+                                color: Colors.white),
+                          ),
+                          onDismissed: (_) => ref
+                              .read(notesProvider.notifier)
+                              .deleteNote(note.id),
+                          child: draggable,
                         );
                       },
                     ),
