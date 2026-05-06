@@ -58,6 +58,7 @@ Future<void> _showFolderPicker(
 class _NoteTile extends StatelessWidget {
   final Note note;
   final bool isSelected;
+  final bool isDragMode;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onMoveToFolder;
@@ -65,6 +66,7 @@ class _NoteTile extends StatelessWidget {
   const _NoteTile({
     required this.note,
     required this.isSelected,
+    required this.isDragMode,
     required this.onTap,
     required this.onDelete,
     required this.onMoveToFolder,
@@ -93,7 +95,7 @@ class _NoteTile extends StatelessWidget {
             .primary
             .withValues(alpha: _kSelectedTileOpacity),
         onTap: onTap,
-        onLongPress: () => _showLongPressActions(context),
+        onLongPress: isDragMode ? null : () => _showLongPressActions(context),
         title: Text(
           note.title.isEmpty ? 'New Note' : note.title,
           maxLines: 1,

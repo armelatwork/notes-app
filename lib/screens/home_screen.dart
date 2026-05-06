@@ -30,6 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   bool _sessionRestored = false;
   Timer? _pollTimer;
+  bool _pollRunning = false;
 
   @override
   void initState() {
@@ -98,20 +99,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _checkDriveForFirstSync() async {
+    final user = ref.read(appUserProvider);
+    if (user?.type != AuthType.google) return;
+    final lastModTime =
+        await SyncLogService.instance.loadLogModTime(user!.id);
+    if (lastModTime != null) return; // Already synced before — poll handles it.
     final drv = DriveSyncService.instance;
     final api = await drv.getApi();
     if (api == null || !mounted) return;
     try {
       final appFolderId = await drv.getOrCreateAppFolder(api);
       final count = await drv.countNotes(api, appFolderId);
-      if (count > 0 && mounted) await _showFirstSyncDialog(count);
+      if (count == 0 || !mounted) return;
+      final syncNow = await _showFirstSyncDialog(count);
+      if (syncNow == true && mounted) {
+        // Reuse api + appFolderId — skip redundant poll-cycle overhead.
+        await _fullSync(api, appFolderId, user.id);
+        final modTime = await SyncLogService.instance
+            .fetchLogModifiedTime(api, appFolderId);
+        if (modTime != null) {
+          await SyncLogService.instance.saveLogModTime(user.id, modTime);
+        }
+      }
     } catch (e) {
       AppLogger.instance.error('HomeScreen', 'first-sync check failed', e);
     }
   }
 
-  Future<void> _showFirstSyncDialog(int count) async {
-    final syncNow = await showDialog<bool>(
+  Future<bool?> _showFirstSyncDialog(int count) {
+    return showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
@@ -132,26 +148,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ],
       ),
     );
-    if (syncNow == true && mounted) _pollCycle();
   }
 
   // ── Poll cycle ────────────────────────────────────────────────────────────
 
   Future<void> _pollCycle() async {
+    if (_pollRunning) return;
+    _pollRunning = true;
     final user = ref.read(appUserProvider);
-    if (user?.type != AuthType.google) return;
-    if (mounted) {
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
-    }
+    if (user?.type != AuthType.google) { _pollRunning = false; return; }
     try {
       final drv = DriveSyncService.instance;
       final api = await drv.getApi();
-      if (api == null) {
-        if (mounted) {
-          ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
-        }
-        return;
-      }
+      if (api == null) return;
       final appFolderId = await drv.getOrCreateAppFolder(api);
       final userId = user!.id;
 
@@ -160,10 +169,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final currentModTime =
           await SyncLogService.instance.fetchLogModifiedTime(api, appFolderId);
       if (currentModTime == null || currentModTime == lastModTime) {
-        if (mounted) {
-          ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
-        }
+        // Nothing changed on Drive — stay green, no spinner.
         return;
+      }
+
+      // Changes detected — show spinner now.
+      if (mounted) {
+        ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
       }
 
       final lastSeq = await SyncLogService.instance.loadLastSeq(userId);
@@ -215,6 +227,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
         }
       }
+    } finally {
+      _pollRunning = false;
     }
   }
 
@@ -290,14 +304,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
     try {
       await DatabaseService.instance.clearAll();
-      final folders =
-          await drv.downloadFolderIndex(api, appFolderId) ?? [];
+      final foldersFuture = drv.downloadFolderIndex(api, appFolderId);
+      final fileIdsFuture = drv.listNoteFileIds(api, appFolderId);
+      final folders = (await foldersFuture) ?? [];
+      final fileIds = await fileIdsFuture;
       for (final f in folders) {
         await DatabaseService.instance.upsertFolder(f);
       }
-      final fileIds = await drv.listNoteFileIds(api, appFolderId);
-      for (final fileId in fileIds) {
-        final note = await drv.downloadNoteById(api, fileId);
+      final notes = await Future.wait(
+        fileIds.map((id) => drv.downloadNoteById(api, id)),
+      );
+      for (final note in notes) {
         if (note != null) await DatabaseService.instance.upsertNote(note);
       }
       if (mounted) {
@@ -341,7 +358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       return const Scaffold(
         body: Row(children: [
           FolderSidebar(),
-          NotesListPanel(),
+          SizedBox(width: 260, child: NotesListPanel()),
           Expanded(child: NoteEditor()),
         ]),
       );

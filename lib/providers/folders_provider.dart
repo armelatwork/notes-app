@@ -2,7 +2,7 @@ part of 'app_provider.dart';
 
 // ── Push debounce constants ────────────────────────────────────────────────────
 
-const _kPushDebounceMs = 15000;     // note editing — batches rapid keystrokes
+const _kPushDebounceMs = 10000;     // note editing — batches rapid keystrokes
 const _kFastPushDebounceMs = 5000;  // discrete actions — move/folder ops
 
 // ── Folders ───────────────────────────────────────────────────────────────────

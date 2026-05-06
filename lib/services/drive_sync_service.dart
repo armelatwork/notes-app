@@ -25,6 +25,8 @@ class _AuthClient extends http.BaseClient {
 class DriveSyncService {
   static final DriveSyncService instance = DriveSyncService._();
   DriveSyncService._();
+  String? _cachedAppFolderId;
+  void clearCache() => _cachedAppFolderId = null;
   static const _appFolderName = 'Notes app';
   static const _imagesFolderName = 'images';
   static const _keyFileName = 'encryption_key.b64';
@@ -38,19 +40,22 @@ class DriveSyncService {
   }
   // ── Folder helpers ─────────────────────────────────────────────────────────
   Future<String> getOrCreateAppFolder(drive.DriveApi api) async {
+    if (_cachedAppFolderId != null) return _cachedAppFolderId!;
     final r = await api.files.list(
       q: "name='$_appFolderName' and "
           "mimeType='application/vnd.google-apps.folder' and trashed=false",
       spaces: 'drive',
       $fields: 'files(id)',
     );
-    if (r.files?.isNotEmpty == true) return r.files!.first.id!;
+    if (r.files?.isNotEmpty == true) {
+      return _cachedAppFolderId = r.files!.first.id!;
+    }
     final f = await api.files.create(
       drive.File()
         ..name = _appFolderName
         ..mimeType = 'application/vnd.google-apps.folder',
     );
-    return f.id!;
+    return _cachedAppFolderId = f.id!;
   }
   Future<String> _getOrCreateImagesFolder(
       drive.DriveApi api, String appFolderId) async {
