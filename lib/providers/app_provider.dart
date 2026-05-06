@@ -71,6 +71,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
 
   Future<void> signOut() async {
     final current = state;
+    DriveSyncService.instance.clearCache();
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
     if (current?.type == AuthType.google) {

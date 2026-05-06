@@ -99,20 +99,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _checkDriveForFirstSync() async {
+    final user = ref.read(appUserProvider);
+    if (user?.type != AuthType.google) return;
+    final lastModTime =
+        await SyncLogService.instance.loadLogModTime(user!.id);
+    if (lastModTime != null) return; // Already synced before — poll handles it.
     final drv = DriveSyncService.instance;
     final api = await drv.getApi();
     if (api == null || !mounted) return;
     try {
       final appFolderId = await drv.getOrCreateAppFolder(api);
       final count = await drv.countNotes(api, appFolderId);
-      if (count > 0 && mounted) await _showFirstSyncDialog(count);
+      if (count == 0 || !mounted) return;
+      final syncNow = await _showFirstSyncDialog(count);
+      if (syncNow == true && mounted) {
+        // Reuse api + appFolderId — skip redundant poll-cycle overhead.
+        await _fullSync(api, appFolderId, user.id);
+        final modTime = await SyncLogService.instance
+            .fetchLogModifiedTime(api, appFolderId);
+        if (modTime != null) {
+          await SyncLogService.instance.saveLogModTime(user.id, modTime);
+        }
+      }
     } catch (e) {
       AppLogger.instance.error('HomeScreen', 'first-sync check failed', e);
     }
   }
 
-  Future<void> _showFirstSyncDialog(int count) async {
-    final syncNow = await showDialog<bool>(
+  Future<bool?> _showFirstSyncDialog(int count) {
+    return showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
@@ -133,7 +148,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ],
       ),
     );
-    if (syncNow == true && mounted) _pollCycle();
   }
 
   // ── Poll cycle ────────────────────────────────────────────────────────────
@@ -290,12 +304,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
     try {
       await DatabaseService.instance.clearAll();
-      final folders =
-          await drv.downloadFolderIndex(api, appFolderId) ?? [];
+      final foldersFuture = drv.downloadFolderIndex(api, appFolderId);
+      final fileIdsFuture = drv.listNoteFileIds(api, appFolderId);
+      final folders = (await foldersFuture) ?? [];
+      final fileIds = await fileIdsFuture;
       for (final f in folders) {
         await DatabaseService.instance.upsertFolder(f);
       }
-      final fileIds = await drv.listNoteFileIds(api, appFolderId);
       final notes = await Future.wait(
         fileIds.map((id) => drv.downloadNoteById(api, id)),
       );
