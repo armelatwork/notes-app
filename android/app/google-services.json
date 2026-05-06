@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:45487484453:android:2de50259905bb4697399cc",
+        "mobilesdk_app_id": "1:45487484453:android:8cef7036ceeced517399cc",
         "android_client_info": {
-          "package_name": "com.mynotes.app"
+          "package_name": "io.mynotes.app"
         }
       },
       "oauth_client": [
@@ -17,8 +17,8 @@
           "client_id": "45487484453-dj4kvtsglpr3v36p4ed13t8m8i12ueg9.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.mynotes.app",
-            "certificate_hash": "a8bbc194c6a1aa486ee5716f97dadb067aa65c24"
+            "package_name": "io.mynotes.app",
+            "certificate_hash": "5dd00d21487238d24a72e4b256c89777b841abe1"
           }
         },
         {
@@ -42,7 +42,7 @@
               "client_id": "45487484453-0o600hg1uoa7qkfkh64a2ql5c5bmt57r.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.armelchao.notesApp"
+                "bundle_id": "com.mynotes.app"
               }
             }
           ]

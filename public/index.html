@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Notes — Private &amp; Encrypted</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fafafa;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 3rem 2.5rem;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+    .icon { font-size: 4rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .tagline { color: #666; margin-bottom: 2rem; font-size: 1rem; line-height: 1.5; }
+    .features {
+      text-align: left;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .feature { display: flex; align-items: center; gap: 0.6rem; font-size: 0.95rem; color: #444; }
+    .buttons { display: flex; flex-direction: column; gap: 0.75rem; }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.85rem 1.5rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-android { background: #1a73e8; color: #fff; }
+    .btn-macos { background: #1a1a1a; color: #fff; }
+    .footer { margin-top: 1.5rem; font-size: 0.8rem; color: #999; }
+    .footer a { color: #666; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📝</div>
+    <h1>My Notes</h1>
+    <p class="tagline">A private, encrypted notes app with Google Drive sync — available on Android and macOS.</p>
+    <div class="features">
+      <div class="feature"><span>🔒</span><span>End-to-end encrypted notes stored in your own Google Drive</span></div>
+      <div class="feature"><span>📁</span><span>Organise with folders, rich text editing, and image support</span></div>
+      <div class="feature"><span>🔄</span><span>Automatic sync across all your devices</span></div>
+    </div>
+    <div class="buttons">
+      <a class="btn btn-android" href="https://github.com/armelatwork/notes-app/releases/download/v1.0.0/app-release.apk">⬇ Download for Android (.apk)</a>
+      <a class="btn btn-macos" href="https://github.com/armelatwork/notes-app/releases/download/v1.0.0/MyNotes-1.0.0.dmg">⬇ Download for macOS (.dmg)</a>
+    </div>
+    <div class="footer">
+      <p>Version 1.0.0 &nbsp;·&nbsp; <a href="/privacy.html">Privacy Policy</a></p>
+      <p style="margin-top:0.4rem;">macOS: right-click the app → Open on first launch.</p>
+    </div>
+  </div>
+</body>
+</html>

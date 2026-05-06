@@ -1,5 +1,32 @@
 part of 'folder_sidebar.dart';
 
+Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete account'),
+      content: const Text(
+        'This will permanently delete all your notes, folders, and your '
+        'Drive backup. This cannot be undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Delete everything'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    await ref.read(appUserProvider.notifier).deleteAccount();
+  }
+}
+
 // ── User menu footer ──────────────────────────────────────────────────────────
 
 class _UserMenuFooter extends ConsumerWidget {
@@ -13,7 +40,7 @@ class _UserMenuFooter extends ConsumerWidget {
     return PopupMenuButton<String>(
       offset: const Offset(0, -8),
       position: PopupMenuPosition.over,
-      onSelected: (value) {
+      onSelected: (value) async {
         if (value == 'settings') {
           Navigator.push(
             context,
@@ -21,10 +48,12 @@ class _UserMenuFooter extends ConsumerWidget {
           );
         } else if (value == 'signout') {
           ref.read(appUserProvider.notifier).signOut();
+        } else if (value == 'delete_account') {
+          await _confirmDeleteAccount(context, ref);
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
+      itemBuilder: (_) => <PopupMenuEntry<String>>[
+        const PopupMenuItem(
           value: 'settings',
           child: Row(children: [
             Icon(Icons.settings_outlined, size: 18),
@@ -32,12 +61,21 @@ class _UserMenuFooter extends ConsumerWidget {
             Text('Settings'),
           ]),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: 'signout',
           child: Row(children: [
             Icon(Icons.logout, size: 18),
             SizedBox(width: 10),
             Text('Sign out'),
+          ]),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'delete_account',
+          child: Row(children: const [
+            Icon(Icons.delete_forever_outlined, size: 18, color: Colors.red),
+            SizedBox(width: 10),
+            Text('Delete account', style: TextStyle(color: Colors.red)),
           ]),
         ),
       ],
