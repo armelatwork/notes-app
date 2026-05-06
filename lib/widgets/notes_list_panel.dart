@@ -57,7 +57,13 @@ class NotesListPanel extends ConsumerWidget {
                           onMoveToFolder: () =>
                               _showFolderPicker(context, ref, note),
                         );
-                        if (defaultTargetPlatform != TargetPlatform.macOS) {
+                        final isWideLayout =
+                            MediaQuery.of(context).size.width > 600;
+                        final supportsDrag =
+                            defaultTargetPlatform == TargetPlatform.macOS ||
+                            (defaultTargetPlatform == TargetPlatform.android &&
+                                isWideLayout);
+                        if (!supportsDrag) {
                           return tile;
                         }
                         return Draggable<Note>(
