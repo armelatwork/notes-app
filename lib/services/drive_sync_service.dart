@@ -8,7 +8,6 @@ import 'app_logger.dart';
 import 'auth_service.dart';
 import 'database_service.dart';
 import 'encryption_service.dart';
-
 const _kRequestTimeout = Duration(seconds: 30);
 
 class _AuthClient extends http.BaseClient {
@@ -26,20 +25,17 @@ class _AuthClient extends http.BaseClient {
 class DriveSyncService {
   static final DriveSyncService instance = DriveSyncService._();
   DriveSyncService._();
-
   static const _appFolderName = 'Notes app';
   static const _imagesFolderName = 'images';
   static const _keyFileName = 'encryption_key.b64';
   static const _folderIndexName = 'folders_index.json';
   static const _jsonMime = 'application/json';
-
   // ── Auth ───────────────────────────────────────────────────────────────────
   Future<drive.DriveApi?> getApi() async {
     final headers = await AuthService.instance.getAuthHeaders();
     if (headers == null) return null;
     return drive.DriveApi(_AuthClient(headers));
   }
-
   // ── Folder helpers ─────────────────────────────────────────────────────────
   Future<String> getOrCreateAppFolder(drive.DriveApi api) async {
     final r = await api.files.list(
@@ -73,7 +69,6 @@ class DriveSyncService {
     );
     return f.id!;
   }
-
   // ── Encryption key ─────────────────────────────────────────────────────────
   Future<String?> fetchEncryptionKey(drive.DriveApi api, String appFolderId) async {
     try {
@@ -113,7 +108,6 @@ class DriveSyncService {
       );
     }
   }
-
   // ── Notes ──────────────────────────────────────────────────────────────────
   /// Uploads a note to Drive. Returns the Drive server modifiedTime.
   Future<String> uploadNote(
@@ -196,7 +190,6 @@ class DriveSyncService {
       AppLogger.instance.error('DriveSyncService', 'deleteNoteFile failed', e);
     }
   }
-
   // ── Folder index ───────────────────────────────────────────────────────────
   /// Uploads the full folder list. Returns Drive server modifiedTime.
   Future<String> uploadFolderIndex(
@@ -268,7 +261,6 @@ class DriveSyncService {
       return null;
     }
   }
-
   // ── Images ─────────────────────────────────────────────────────────────────
   /// Uploads an image file to Drive. Returns Drive server modifiedTime, or null.
   Future<String?> uploadImage(
@@ -390,6 +382,14 @@ class DriveSyncService {
     return r.files?.length ?? 0;
   }
 
+  Future<void> deleteAppData(drive.DriveApi api) async {
+    final r = await api.files.list(
+      q: "name='$_appFolderName' and "
+          "mimeType='application/vnd.google-apps.folder' and trashed=false",
+      spaces: 'drive', $fields: 'files(id)',
+    );
+    if (r.files?.isNotEmpty == true) await api.files.delete(r.files!.first.id!);
+  }
   Future<String> _readMedia(drive.Media media) async {
     final chunks = <int>[];
     await for (final chunk in media.stream) {

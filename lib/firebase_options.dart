@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCS4NRucpF0s3qGmGneIXkEKqowMqvKAxs',
-    appId: '1:45487484453:android:2de50259905bb4697399cc',
+    appId: '1:45487484453:android:8cef7036ceeced517399cc',
     messagingSenderId: '45487484453',
     projectId: 'notes-app-macos',
     storageBucket: 'notes-app-macos.firebasestorage.app',

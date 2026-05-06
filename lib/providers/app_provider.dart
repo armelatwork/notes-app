@@ -85,6 +85,28 @@ class AppUserNotifier extends Notifier<AppUser?> {
     ref.read(selectedFolderProvider.notifier).state = null;
     state = null;
   }
+
+  Future<void> deleteAccount() async {
+    final current = state;
+    ref.read(notesProvider.notifier).cancelPendingPush();
+    ref.read(foldersProvider.notifier).cancelPendingPush();
+    await DatabaseService.instance.clearAll();
+    if (current?.type == AuthType.google) {
+      final api = await DriveSyncService.instance.getApi();
+      if (api != null) {
+        await DriveSyncService.instance.deleteAppData(api);
+      }
+      await AuthService.instance.signOut();
+    } else if (current?.type == AuthType.local) {
+      await LocalAuthService.instance.signOut();
+    }
+    EncryptionService.instance.clear();
+    ref.invalidate(notesProvider);
+    ref.invalidate(foldersProvider);
+    ref.read(selectedNoteProvider.notifier).state = null;
+    ref.read(selectedFolderProvider.notifier).state = null;
+    state = null;
+  }
 }
 
 final appUserProvider =

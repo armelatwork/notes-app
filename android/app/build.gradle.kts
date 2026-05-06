@@ -12,7 +12,7 @@ val keyPropsFile = rootProject.file("key.properties")
 if (keyPropsFile.exists()) keyProps.load(keyPropsFile.inputStream())
 
 android {
-    namespace = "com.mynotes.app"
+    namespace = "io.mynotes.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -35,7 +35,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.mynotes.app"
+        applicationId = "io.mynotes.app"
         minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode
