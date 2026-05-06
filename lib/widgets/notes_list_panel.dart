@@ -65,7 +65,7 @@ class NotesListPanel extends ConsumerWidget {
                         if (!supportsDrag) {
                           return tile;
                         }
-                        return Draggable<Note>(
+                        return LongPressDraggable<Note>(
                           data: note,
                           feedback: Material(
                             elevation: 4,
