@@ -57,7 +57,7 @@ class NotesListPanel extends ConsumerWidget {
                               _showFolderPicker(context, ref, note),
                         );
                         final isWideLayout =
-                            MediaQuery.of(context).size.width > 600;
+                            MediaQuery.of(context).size.width >= 800;
                         final supportsDrag =
                             defaultTargetPlatform == TargetPlatform.macOS ||
                             (defaultTargetPlatform == TargetPlatform.android &&
