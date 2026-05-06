@@ -44,9 +44,13 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     return note;
   }
 
-  /// Saves locally and schedules a 15 s push. Tracks images deleted this edit.
+  /// Saves locally and schedules a push. Title changes use 5 s; content edits 15 s.
   Future<void> saveNote(Note note,
       {List<String> deletedImageFilenames = const []}) async {
+    final previousTitle = state.valueOrNull
+        ?.firstWhere((n) => n.id == note.id, orElse: () => note)
+        .title;
+    final titleChanged = previousTitle != null && previousTitle != note.title;
     await DatabaseService.instance.saveNote(note);
     await reload();
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
@@ -54,8 +58,8 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     pendingNote = note;
     pendingDeletedImages = [...pendingDeletedImages, ...deletedImageFilenames];
     pushTimer?.cancel();
-    pushTimer = Timer(
-        const Duration(milliseconds: _kPushDebounceMs), _flushPush);
+    final debounce = titleChanged ? _kFastPushDebounceMs : _kPushDebounceMs;
+    pushTimer = Timer(Duration(milliseconds: debounce), _flushPush);
   }
 
   Future<void> moveNote(Note note, int? folderId) async {
