@@ -30,6 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   bool _sessionRestored = false;
   Timer? _pollTimer;
+  bool _pollRunning = false;
 
   @override
   void initState() {
@@ -138,8 +139,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   // ── Poll cycle ────────────────────────────────────────────────────────────
 
   Future<void> _pollCycle() async {
+    if (_pollRunning) return;
+    _pollRunning = true;
     final user = ref.read(appUserProvider);
-    if (user?.type != AuthType.google) return;
+    if (user?.type != AuthType.google) { _pollRunning = false; return; }
     try {
       final drv = DriveSyncService.instance;
       final api = await drv.getApi();
@@ -210,6 +213,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
         }
       }
+    } finally {
+      _pollRunning = false;
     }
   }
 
