@@ -358,7 +358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       return const Scaffold(
         body: Row(children: [
           FolderSidebar(),
-          NotesListPanel(),
+          SizedBox(width: 260, child: NotesListPanel()),
           Expanded(child: NoteEditor()),
         ]),
       );

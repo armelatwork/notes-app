@@ -21,7 +21,6 @@ class NotesListPanel extends ConsumerWidget {
     final selectedFolder = ref.watch(selectedFolderProvider);
 
     return Container(
-      width: 260,
       decoration: BoxDecoration(
         border: Border(
           right: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
