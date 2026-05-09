@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +35,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   QuillController? _controller;
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _titleController = TextEditingController();
+  final ContextMenuController _contextMenuController = ContextMenuController();
   Note? _currentNote;
   bool _saving = false;
   bool _dragging = false;
@@ -51,6 +53,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
+    _contextMenuController.remove();
     _controller?.dispose();
     _focusNode.dispose();
     _titleController.dispose();
@@ -226,7 +229,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditor() {
-    return QuillEditor.basic(
+    final editor = QuillEditor.basic(
       controller: _controller!,
       focusNode: _focusNode,
       config: QuillEditorConfig(
@@ -257,10 +260,104 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           final uri = Uri.tryParse(url);
           if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
         },
-        contextMenuBuilder: (ctx, rawEditorState) =>
-            _buildContextMenu(ctx, rawEditorState),
+        // contextMenuBuilder is only wired on non-macOS: flutter_quill never
+        // triggers it on macOS (no secondary-tap handler). macOS right-click
+        // is handled by the Listener below.
+        contextMenuBuilder: defaultTargetPlatform == TargetPlatform.macOS
+            ? null
+            : (ctx, rawEditorState) => _buildContextMenu(ctx, rawEditorState),
       ),
     );
+
+    if (defaultTargetPlatform != TargetPlatform.macOS) return editor;
+
+    return Listener(
+      onPointerDown: (event) {
+        if (event.buttons == kSecondaryMouseButton) {
+          _showMacContextMenu(event.position);
+        }
+      },
+      child: editor,
+    );
+  }
+
+  // ── macOS context menu ───────────────────────────────────────────────────────
+
+  void _showMacContextMenu(Offset globalPosition) {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    final sel = ctrl.selection;
+    final hasSelection = sel.isValid && !sel.isCollapsed;
+    final hasLink = getLinkAtSelection(ctrl) != null;
+
+    _contextMenuController.show(
+      context: context,
+      contextMenuBuilder: (ctx) => AdaptiveTextSelectionToolbar.buttonItems(
+        anchors: TextSelectionToolbarAnchors(primaryAnchor: globalPosition),
+        buttonItems: [
+          if (hasSelection)
+            ContextMenuButtonItem(
+              label: 'Cut',
+              onPressed: () {
+                _contextMenuController.remove();
+                _copySelectionToClipboard(ctrl);
+                ctrl.replaceText(
+                    sel.start, sel.end - sel.start, '', null);
+              },
+            ),
+          if (hasSelection)
+            ContextMenuButtonItem(
+              label: 'Copy',
+              onPressed: () {
+                _contextMenuController.remove();
+                _copySelectionToClipboard(ctrl);
+              },
+            ),
+          ContextMenuButtonItem(
+            label: 'Paste',
+            onPressed: () {
+              _contextMenuController.remove();
+              // ignore: experimental_member_use
+              ctrl.clipboardPaste();
+            },
+          ),
+          ContextMenuButtonItem(
+            label: 'Select All',
+            onPressed: () {
+              _contextMenuController.remove();
+              ctrl.updateSelection(
+                TextSelection(
+                    baseOffset: 0,
+                    extentOffset: ctrl.document.length - 1),
+                ChangeSource.local,
+              );
+            },
+          ),
+          ContextMenuButtonItem(
+            label: hasLink ? 'Edit Link' : 'Insert Link',
+            onPressed: () {
+              final savedSel = ctrl.selection;
+              _contextMenuController.remove();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || _controller == null) return;
+                _controller!.updateSelection(savedSel, ChangeSource.local);
+                _onInsertLink();
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copySelectionToClipboard(QuillController ctrl) {
+    final sel = ctrl.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
+    final fullText = ctrl.document.toPlainText();
+    final start = sel.start.clamp(0, fullText.length);
+    final end = sel.end.clamp(0, fullText.length);
+    if (start >= end) return;
+    Clipboard.setData(ClipboardData(text: fullText.substring(start, end)));
   }
 
   Widget _buildContextMenu(
@@ -274,7 +371,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         ContextMenuButtonItem(
           label: hasLink ? 'Edit Link' : 'Insert Link',
           onPressed: () {
-            // Capture selection before the context menu dismissal collapses it.
             final savedSelection = _controller!.selection;
             ContextMenuController.removeAny();
             WidgetsBinding.instance.addPostFrameCallback((_) {
