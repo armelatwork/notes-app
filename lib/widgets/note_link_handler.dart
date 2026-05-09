@@ -14,7 +14,7 @@ void openLinkAtPosition(QuillController controller, int docOffset) {
       node.node!.style.attributes[Attribute.link.key]?.value as String?;
   if (url == null) return;
   final uri = Uri.tryParse(url);
-  if (uri != null) launchUrl(uri);
+  if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 void showInsertLinkDialog(BuildContext context, QuillController controller) {

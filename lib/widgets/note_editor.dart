@@ -38,6 +38,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _saving = false;
   bool _dragging = false;
   bool _isDirty = false;
+  bool _secondaryButtonActive = false;
   String _hintTitle = 'New Note';
   List<String> _imagesAtLoad = [];
 
@@ -255,12 +256,21 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         },
         onTapUp: (details, getPosition) {
           final pos = getPosition(details.localPosition);
-          openLinkAtPosition(_controller!, pos.offset);
+          if (defaultTargetPlatform == TargetPlatform.macOS) {
+            // Cmd+click opens link; plain click just positions the cursor.
+            if (HardwareKeyboard.instance.isMetaPressed) {
+              openLinkAtPosition(_controller!, pos.offset);
+            }
+          } else {
+            openLinkAtPosition(_controller!, pos.offset);
+          }
           return false;
         },
         onLaunchUrl: (url) async {
           final uri = Uri.tryParse(url);
-          if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
+          if (uri != null && await canLaunchUrl(uri)) {
+            launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
         },
         contextMenuBuilder: defaultTargetPlatform == TargetPlatform.macOS
             ? null
@@ -275,11 +285,19 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return Listener(
       onPointerDown: (event) {
         if (event.buttons == kSecondaryMouseButton) {
-          final pos = event.position;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _showMacContextMenu(pos);
-          });
+          _secondaryButtonActive = true;
         }
+      },
+      onPointerUp: (event) {
+        if (!_secondaryButtonActive) return;
+        _secondaryButtonActive = false;
+        // Fire on pointer-UP, not pointer-DOWN, so that flutter_quill's
+        // onSecondarySingleTapUp has already moved the cursor to the
+        // right-click position before we check for a link there.
+        final pos = event.position;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showMacContextMenu(pos);
+        });
       },
       child: editor,
     );
@@ -293,7 +311,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     final sel = ctrl.selection;
     final hasSelection = sel.isValid && !sel.isCollapsed;
-    final hasLink = getLinkAtSelection(ctrl) != null;
+    // Cursor is now at the right-click position (moved by flutter_quill's
+    // onSecondarySingleTapUp before this post-frame callback fired).
+    final linkUrl = getLinkAtSelection(ctrl);
+    final hasLink = linkUrl != null;
 
     final overlayBox =
         Overlay.of(context).context.findRenderObject()! as RenderBox;
@@ -306,6 +327,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       context: context,
       position: position,
       items: [
+        if (hasLink) ...[
+          const PopupMenuItem(
+              height: 32,
+              value: _MacMenuAction.openLink,
+              child: Text('Open Link')),
+          const PopupMenuDivider(height: 8),
+        ],
         if (hasSelection)
           const PopupMenuItem(
               height: 32, value: _MacMenuAction.cut, child: Text('Cut')),
@@ -329,6 +357,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (!mounted || choice == null) return;
 
     switch (choice) {
+      case _MacMenuAction.openLink:
+        final uri = Uri.tryParse(linkUrl ?? '');
+        if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
       case _MacMenuAction.cut:
         _copyToClipboard(ctrl);
         ctrl.replaceText(sel.start, sel.end - sel.start, '', null);
@@ -417,7 +448,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 }
 
-enum _MacMenuAction { cut, copy, paste, selectAll, link }
+enum _MacMenuAction { openLink, cut, copy, paste, selectAll, link }
 
 class _DragOverlay extends StatelessWidget {
   @override
