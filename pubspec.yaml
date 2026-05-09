@@ -1,7 +1,7 @@
 name: notes_app
 description: A cross-platform notes app for macOS and Android with Google Drive sync.
 publish_to: 'none'
-version: 1.1.0+3
+version: 1.2.0+4
 
 environment:
   sdk: ^3.11.5
