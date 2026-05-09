@@ -1,15 +1,28 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase_options.dart';
 import 'services/app_logger.dart';
+import 'utils/font_utils.dart';
 import 'widgets/auth_gate.dart';
+
+Future<void> _loadBundledFonts() async {
+  for (final entry in kBundledFontAssets.entries) {
+    final loader = FontLoader(entry.key);
+    for (final path in entry.value) {
+      loader.addFont(rootBundle.load(path));
+    }
+    await loader.load();
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await AppLogger.instance.init();
+  await _loadBundledFonts();
   runApp(const ProviderScope(child: NotesApp()));
 }
 

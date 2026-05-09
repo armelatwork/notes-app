@@ -14,7 +14,7 @@ void openLinkAtPosition(QuillController controller, int docOffset) {
       node.node!.style.attributes[Attribute.link.key]?.value as String?;
   if (url == null) return;
   final uri = Uri.tryParse(url);
-  if (uri != null) launchUrl(uri);
+  if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 void showInsertLinkDialog(BuildContext context, QuillController controller) {
@@ -55,11 +55,10 @@ void showInsertLinkDialog(BuildContext context, QuillController controller) {
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () {
+              final (start, end) =
+                  _fullLinkRange(controller, selStart, existingUrl);
               controller.formatText(
-                selStart,
-                selLength > 0 ? selLength : 1,
-                const LinkAttribute(null),
-              );
+                  start, end - start, const LinkAttribute(null));
               Navigator.pop(ctx);
             },
             child: const Text('Remove link'),
@@ -83,6 +82,33 @@ void showInsertLinkDialog(BuildContext context, QuillController controller) {
       ],
     ),
   );
+}
+
+/// Returns the [start, end) document range of the contiguous run of ops
+/// that share [url] as their link attribute and contains [offset].
+(int, int) _fullLinkRange(QuillController ctrl, int offset, String url) {
+  int pos = 0;
+  int? start;
+  int end = 0;
+  bool passedOffset = false;
+
+  for (final op in ctrl.document.toDelta().toList()) {
+    final len = op.length ?? 0;
+    final opUrl = op.attributes?['link'] as String?;
+
+    if (opUrl == url) {
+      start ??= pos;
+      end = pos + len;
+      if (pos <= offset && offset < pos + len) passedOffset = true;
+    } else {
+      if (passedOffset) break;
+      start = null;
+      end = 0;
+    }
+    pos += len;
+  }
+
+  return (start ?? offset, end > 0 ? end : offset + 1);
 }
 
 void _applyLink(

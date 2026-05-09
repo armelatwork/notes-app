@@ -1,7 +1,7 @@
 name: notes_app
 description: A cross-platform notes app for macOS and Android with Google Drive sync.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+3
 
 environment:
   sdk: ^3.11.5
@@ -75,6 +75,28 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+  fonts:
+    - family: nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Regular.ttf
+        - asset: assets/fonts/Nunito-Italic.ttf
+          style: italic
+    - family: pacifico
+      fonts:
+        - asset: assets/fonts/Pacifico-Regular.ttf
+    - family: roboto-mono
+      fonts:
+        - asset: assets/fonts/RobotoMono-Regular.ttf
+        - asset: assets/fonts/RobotoMono-Italic.ttf
+          style: italic
+    - family: ibarra-real-nova
+      fonts:
+        - asset: assets/fonts/IbarraRealNova-Regular.ttf
+        - asset: assets/fonts/IbarraRealNova-Italic.ttf
+          style: italic
+    - family: square-peg
+      fonts:
+        - asset: assets/fonts/SquarePeg-Regular.ttf
 
 flutter_launcher_icons:
   android: "ic_launcher"
