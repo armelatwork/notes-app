@@ -201,7 +201,7 @@ class NoteFormattingToolbar extends StatelessWidget {
   }
 }
 
-// ── macOS: full scrollable toolbar at top ──────────────────────────────────────
+// ── macOS: Basic Font inline + group icons for the rest ───────────────────────
 
 class _MacOSToolbar extends StatelessWidget {
   final QuillController controller;
@@ -213,6 +213,13 @@ class _MacOSToolbar extends StatelessWidget {
     required this.onInsertLink,
   });
 
+  void _openGroup(BuildContext context, _ToolbarGroup group) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => group.content(ctx),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -223,31 +230,38 @@ class _MacOSToolbar extends StatelessWidget {
         ),
         color: Theme.of(context).colorScheme.surfaceContainerLow,
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: QuillSimpleToolbar(
-          controller: controller,
-          config: _cfg(
-            undo: true, redo: true,
-            bold: true, italic: true, underline: true,
-            header: true, fontFamily: true, fontSize: true,
-            color: true, background: true, clearFormat: true,
-            alignment: true, indent: true,
-            numberedList: true, bulletList: true, checkList: true,
-            customButtons: [
-              QuillToolbarCustomButtonOptions(
-                icon: const Icon(Icons.link, size: 18),
-                tooltip: 'Insert / edit link',
-                onPressed: onInsertLink,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // All groups minus Basic Font (shown inline instead)
+          final groups = _buildGroups(
+                  constraints.maxWidth, controller, onInsertLink, onInsertImage)
+              .where((g) => g.tooltip != 'Text style')
+              .toList();
+          return Row(
+            children: [
+              // Basic Font buttons shown directly — no grouping
+              QuillSimpleToolbar(
+                controller: controller,
+                config: _cfg(
+                  bold: true, italic: true, underline: true,
+                  inlineCode: true, subscript: true, superscript: true,
+                ),
               ),
-              QuillToolbarCustomButtonOptions(
-                icon: const Icon(Icons.image_outlined, size: 18),
-                tooltip: 'Insert image',
-                onPressed: onInsertImage,
+              VerticalDivider(
+                width: 1,
+                indent: 8,
+                endIndent: 8,
+                color: Theme.of(context).colorScheme.outlineVariant,
               ),
+              // Remaining groups as icons
+              ...groups.map((g) => IconButton(
+                    icon: Icon(g.icon, size: 22),
+                    tooltip: g.tooltip,
+                    onPressed: () => _openGroup(context, g),
+                  )),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
