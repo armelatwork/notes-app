@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,7 +22,6 @@ const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
 
-
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
 
@@ -35,13 +33,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   QuillController? _controller;
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _titleController = TextEditingController();
-  final ContextMenuController _contextMenuController = ContextMenuController();
   Note? _currentNote;
   bool _saving = false;
   bool _dragging = false;
   bool _isDirty = false;
   String _hintTitle = 'New Note';
-  // Images present when the note was loaded — used to detect deletions on save.
   List<String> _imagesAtLoad = [];
 
   @override
@@ -53,7 +49,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
-    _contextMenuController.remove();
     _controller?.dispose();
     _focusNode.dispose();
     _titleController.dispose();
@@ -229,7 +224,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditor() {
-    final editor = QuillEditor.basic(
+    return QuillEditor.basic(
       controller: _controller!,
       focusNode: _focusNode,
       config: QuillEditorConfig(
@@ -260,145 +255,56 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           final uri = Uri.tryParse(url);
           if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
         },
-        // On macOS, disable flutter_quill's built-in selection toolbar entirely
-        // so its defaultContextMenuBuilder never fires. Right-click is handled
-        // by the Listener below via ContextMenuController.
-        enableSelectionToolbar:
-            defaultTargetPlatform != TargetPlatform.macOS,
-        contextMenuBuilder: defaultTargetPlatform == TargetPlatform.macOS
-            ? null
-            : (ctx, rawEditorState) => _buildContextMenu(ctx, rawEditorState),
+        contextMenuBuilder: (ctx, rawEditorState) =>
+            _buildContextMenu(ctx, rawEditorState),
       ),
     );
-
-    if (defaultTargetPlatform != TargetPlatform.macOS) return editor;
-
-    return Listener(
-      onPointerDown: (event) {
-        if (event.buttons == kSecondaryMouseButton) {
-          // Defer to a post-frame callback so we run after flutter_quill's own
-          // onSecondarySingleTapUp post-frame callback. removeAny() clears
-          // whatever was shown first, then we show our menu exactly once.
-          final position = event.position;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            ContextMenuController.removeAny();
-            _showMacContextMenu(position);
-          });
-        }
-      },
-      child: editor,
-    );
-  }
-
-  // ── macOS context menu ───────────────────────────────────────────────────────
-
-  void _showMacContextMenu(Offset globalPosition) {
-    final ctrl = _controller;
-    if (ctrl == null) return;
-    final sel = ctrl.selection;
-    final hasSelection = sel.isValid && !sel.isCollapsed;
-    final hasLink = getLinkAtSelection(ctrl) != null;
-
-    _contextMenuController.show(
-      context: context,
-      contextMenuBuilder: (ctx) => Stack(
-        children: [
-          // Full-screen dismiss barrier. Positioned below the menu in the
-          // Stack so the menu buttons (opaque hit test) win first. Only
-          // clicks that miss every button fall through here.
-          Positioned.fill(
-            child: Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: (_) => _contextMenuController.remove(),
-            ),
-          ),
-          AdaptiveTextSelectionToolbar.buttonItems(
-            anchors: TextSelectionToolbarAnchors(primaryAnchor: globalPosition),
-            buttonItems: [
-          if (hasSelection)
-            ContextMenuButtonItem(
-              label: 'Cut',
-              onPressed: () {
-                _contextMenuController.remove();
-                _copySelectionToClipboard(ctrl);
-                ctrl.replaceText(
-                    sel.start, sel.end - sel.start, '', null);
-              },
-            ),
-          if (hasSelection)
-            ContextMenuButtonItem(
-              label: 'Copy',
-              onPressed: () {
-                _contextMenuController.remove();
-                _copySelectionToClipboard(ctrl);
-              },
-            ),
-          ContextMenuButtonItem(
-            label: 'Paste',
-            onPressed: () {
-              _contextMenuController.remove();
-              // ignore: experimental_member_use
-              ctrl.clipboardPaste();
-            },
-          ),
-          ContextMenuButtonItem(
-            label: 'Select All',
-            onPressed: () {
-              _contextMenuController.remove();
-              ctrl.updateSelection(
-                TextSelection(
-                    baseOffset: 0,
-                    extentOffset: ctrl.document.length - 1),
-                ChangeSource.local,
-              );
-            },
-          ),
-          ContextMenuButtonItem(
-            label: hasLink ? 'Edit Link' : 'Insert Link',
-            onPressed: () {
-              final savedSel = ctrl.selection;
-              _contextMenuController.remove();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted || _controller == null) return;
-                _controller!.updateSelection(savedSel, ChangeSource.local);
-                _onInsertLink();
-              });
-            },
-          ),
-        ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _copySelectionToClipboard(QuillController ctrl) {
-    final sel = ctrl.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    final fullText = ctrl.document.toPlainText();
-    final start = sel.start.clamp(0, fullText.length);
-    final end = sel.end.clamp(0, fullText.length);
-    if (start >= end) return;
-    Clipboard.setData(ClipboardData(text: fullText.substring(start, end)));
   }
 
   Widget _buildContextMenu(
       BuildContext ctx, QuillRawEditorState rawEditorState) {
+    final sel = rawEditorState.textEditingValue.selection;
+    final hasSelection = sel.isValid && !sel.isCollapsed;
     final hasLink = _controller != null &&
         getLinkAtSelection(_controller!) != null;
+
     return AdaptiveTextSelectionToolbar.buttonItems(
       anchors: rawEditorState.contextMenuAnchors,
       buttonItems: [
-        ...rawEditorState.contextMenuButtonItems,
+        if (hasSelection)
+          ContextMenuButtonItem(
+            label: 'Cut',
+            onPressed: () =>
+                rawEditorState.cutSelection(SelectionChangedCause.toolbar),
+          ),
+        if (hasSelection)
+          ContextMenuButtonItem(
+            label: 'Copy',
+            onPressed: () =>
+                rawEditorState.copySelection(SelectionChangedCause.toolbar),
+          ),
+        ContextMenuButtonItem(
+          label: 'Paste',
+          // ignore: experimental_member_use
+          onPressed: () =>
+              rawEditorState.pasteText(SelectionChangedCause.toolbar),
+        ),
+        ContextMenuButtonItem(
+          label: 'Select All',
+          onPressed: () =>
+              rawEditorState.selectAll(SelectionChangedCause.toolbar),
+        ),
         ContextMenuButtonItem(
           label: hasLink ? 'Edit Link' : 'Insert Link',
           onPressed: () {
             final savedSelection = _controller!.selection;
-            ContextMenuController.removeAny();
+            // cutSelection/copySelection/selectAll call hideToolbar()
+            // internally; for Insert Link we need to dismiss manually.
+            rawEditorState.hideToolbar();
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _controller == null) return;
-              _controller!.updateSelection(savedSelection, ChangeSource.local);
+              _controller!.updateSelection(
+                  savedSelection, ChangeSource.local);
               _onInsertLink();
             });
           },
