@@ -302,9 +302,20 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
     _contextMenuController.show(
       context: context,
-      contextMenuBuilder: (ctx) => AdaptiveTextSelectionToolbar.buttonItems(
-        anchors: TextSelectionToolbarAnchors(primaryAnchor: globalPosition),
-        buttonItems: [
+      contextMenuBuilder: (ctx) => Stack(
+        children: [
+          // Full-screen dismiss barrier. Positioned below the menu in the
+          // Stack so the menu buttons (opaque hit test) win first. Only
+          // clicks that miss every button fall through here.
+          Positioned.fill(
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (_) => _contextMenuController.remove(),
+            ),
+          ),
+          AdaptiveTextSelectionToolbar.buttonItems(
+            anchors: TextSelectionToolbarAnchors(primaryAnchor: globalPosition),
+            buttonItems: [
           if (hasSelection)
             ContextMenuButtonItem(
               label: 'Cut',
@@ -354,6 +365,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
                 _onInsertLink();
               });
             },
+          ),
+        ],
           ),
         ],
       ),
