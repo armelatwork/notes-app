@@ -260,9 +260,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           final uri = Uri.tryParse(url);
           if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
         },
-        // contextMenuBuilder is only wired on non-macOS: flutter_quill never
-        // triggers it on macOS (no secondary-tap handler). macOS right-click
-        // is handled by the Listener below.
+        // On macOS, disable flutter_quill's built-in selection toolbar entirely
+        // so its defaultContextMenuBuilder never fires. Right-click is handled
+        // by the Listener below via ContextMenuController.
+        enableSelectionToolbar:
+            defaultTargetPlatform != TargetPlatform.macOS,
         contextMenuBuilder: defaultTargetPlatform == TargetPlatform.macOS
             ? null
             : (ctx, rawEditorState) => _buildContextMenu(ctx, rawEditorState),
