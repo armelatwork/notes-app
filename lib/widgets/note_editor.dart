@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../services/app_logger.dart';
+import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
 import 'note_editor_widgets.dart';
@@ -20,6 +21,8 @@ import 'note_tab_embed.dart';
 const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
 const _kDragOverlayOpacity = 0.12;
+
+
 class NoteEditor extends ConsumerStatefulWidget {
   const NoteEditor({super.key});
 
@@ -229,6 +232,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       config: QuillEditorConfig(
         placeholder: 'Start writing…',
         enableInteractiveSelection: true,
+        customStyleBuilder: defaultTargetPlatform == TargetPlatform.macOS
+            ? macFontStyleBuilder
+            : null,
         embedBuilders: [
           NoteImageEmbedBuilder(controller: _controller!),
           const NoteTabEmbedBuilder(),

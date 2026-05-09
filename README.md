@@ -37,7 +37,7 @@ The editor toolbar provides full text formatting:
 
 | Format | Controls |
 |---|---|
-| Font | Family, size |
+| Font | Family (Sans Serif, Serif, Monospace, Nunito, Pacifico, Roboto Mono, Ibarra Real Nova, Square Peg), size |
 | Style | Bold, italic, underline |
 | Colour | Text colour, highlight colour |
 | Alignment | Left, centre, right |

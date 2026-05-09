@@ -36,17 +36,22 @@ QuillSimpleToolbarConfig _cfg({
 class _ToolbarGroup {
   final IconData icon;
   final String tooltip;
-  final Widget Function(BuildContext context) content;
+  // Android: wrapped in bottom sheet chrome
+  final Widget Function(BuildContext) content;
+  // macOS: raw widget for the dropdown card, receives a close callback
+  final Widget Function(BuildContext, VoidCallback close) macContent;
+
   const _ToolbarGroup({
     required this.icon,
     required this.tooltip,
     required this.content,
+    required this.macContent,
   });
 }
 
-// ── Group sheet builders ───────────────────────────────────────────────────────
+// ── Android sheet helpers ──────────────────────────────────────────────────────
 
-Widget _quillSheet(BuildContext context, QuillController ctrl, QuillSimpleToolbarConfig cfg) =>
+Widget _quillSheet(BuildContext _, QuillController ctrl, QuillSimpleToolbarConfig cfg) =>
     SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -57,8 +62,7 @@ Widget _quillSheet(BuildContext context, QuillController ctrl, QuillSimpleToolba
       ),
     );
 
-// Header rendered first, then the rest — overrides QuillSimpleToolbar's internal order.
-Widget _headerFirstSheet(BuildContext context, QuillController ctrl,
+Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
     QuillSimpleToolbarConfig restCfg) =>
     SafeArea(
       child: Padding(
@@ -76,7 +80,7 @@ Widget _headerFirstSheet(BuildContext context, QuillController ctrl,
       ),
     );
 
-Widget _insertSheet(BuildContext context, VoidCallback onLink, VoidCallback onImage) =>
+Widget _insertSheet(BuildContext ctx, VoidCallback onLink, VoidCallback onImage) =>
     SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -84,12 +88,51 @@ Widget _insertSheet(BuildContext context, VoidCallback onLink, VoidCallback onIm
           ListTile(
             leading: const Icon(Icons.link),
             title: const Text('Insert link'),
-            onTap: () { Navigator.pop(context); onLink(); },
+            onTap: () { Navigator.pop(ctx); onLink(); },
           ),
           ListTile(
             leading: const Icon(Icons.image_outlined),
             title: const Text('Insert image'),
-            onTap: () { Navigator.pop(context); onImage(); },
+            onTap: () { Navigator.pop(ctx); onImage(); },
+          ),
+        ],
+      ),
+    );
+
+// ── macOS dropdown helpers (no sheet chrome) ───────────────────────────────────
+
+Widget _macQuill(QuillController ctrl, QuillSimpleToolbarConfig cfg) =>
+    SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: QuillSimpleToolbar(controller: ctrl, config: cfg),
+    );
+
+Widget _macHeaderFirst(QuillController ctrl, QuillSimpleToolbarConfig restCfg) =>
+    SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          QuillSimpleToolbar(controller: ctrl, config: _cfg(header: true)),
+          QuillSimpleToolbar(controller: ctrl, config: restCfg),
+        ],
+      ),
+    );
+
+Widget _macInsert(VoidCallback close, VoidCallback onLink, VoidCallback onImage) =>
+    IntrinsicWidth(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.link),
+            title: const Text('Insert link'),
+            onTap: () { close(); onLink(); },
+          ),
+          ListTile(
+            leading: const Icon(Icons.image_outlined),
+            title: const Text('Insert image'),
+            onTap: () { close(); onImage(); },
           ),
         ],
       ),
@@ -103,68 +146,76 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
   final paragraphSplit = width >= 700;
   return [
     _ToolbarGroup(
-      icon: Icons.history,
-      tooltip: 'History',
+      icon: Icons.history, tooltip: 'History',
       content: (ctx) => _quillSheet(ctx, ctrl,
+          _cfg(undo: true, redo: true, search: true)),
+      macContent: (_, _) => _macQuill(ctrl,
           _cfg(undo: true, redo: true, search: true)),
     ),
     _ToolbarGroup(
-      icon: Icons.format_bold,
-      tooltip: 'Text style',
+      icon: Icons.format_bold, tooltip: 'Text style',
       content: (ctx) => _quillSheet(ctx, ctrl, _cfg(
+          bold: true, italic: true, underline: true,
+          inlineCode: true, subscript: true, superscript: true)),
+      macContent: (_, _) => _macQuill(ctrl, _cfg(
           bold: true, italic: true, underline: true,
           inlineCode: true, subscript: true, superscript: true)),
     ),
     if (fontsSplit) ...[
       _ToolbarGroup(
-        icon: Icons.text_fields,
-        tooltip: 'Text',
+        icon: Icons.text_fields, tooltip: 'Text',
         content: (ctx) => _headerFirstSheet(ctx, ctrl,
+            _cfg(fontFamily: true, fontSize: true)),
+        macContent: (_, _) => _macHeaderFirst(ctrl,
             _cfg(fontFamily: true, fontSize: true)),
       ),
       _ToolbarGroup(
-        icon: Icons.palette_outlined,
-        tooltip: 'Colors',
+        icon: Icons.palette_outlined, tooltip: 'Colors',
         content: (ctx) => _quillSheet(ctx, ctrl,
+            _cfg(color: true, background: true, clearFormat: true)),
+        macContent: (_, _) => _macQuill(ctrl,
             _cfg(color: true, background: true, clearFormat: true)),
       ),
     ] else
       _ToolbarGroup(
-        icon: Icons.text_format,
-        tooltip: 'Fonts',
+        icon: Icons.text_format, tooltip: 'Fonts',
         content: (ctx) => _headerFirstSheet(ctx, ctrl, _cfg(
-          fontFamily: true, fontSize: true,
-          color: true, background: true, clearFormat: true,
-        )),
+            fontFamily: true, fontSize: true,
+            color: true, background: true, clearFormat: true)),
+        macContent: (_, _) => _macHeaderFirst(ctrl, _cfg(
+            fontFamily: true, fontSize: true,
+            color: true, background: true, clearFormat: true)),
       ),
     if (paragraphSplit) ...[
       _ToolbarGroup(
-        icon: Icons.format_align_left,
-        tooltip: 'Alignment',
+        icon: Icons.format_align_left, tooltip: 'Alignment',
         content: (ctx) => _quillSheet(ctx, ctrl, _cfg(alignment: true)),
+        macContent: (_, _) => _macQuill(ctrl, _cfg(alignment: true)),
       ),
       _ToolbarGroup(
-        icon: Icons.format_indent_increase,
-        tooltip: 'Indent',
+        icon: Icons.format_indent_increase, tooltip: 'Indent',
         content: (ctx) => _quillSheet(ctx, ctrl, _cfg(indent: true)),
+        macContent: (_, _) => _macQuill(ctrl, _cfg(indent: true)),
       ),
     ] else
       _ToolbarGroup(
-        icon: Icons.segment,
-        tooltip: 'Paragraph',
-        content: (ctx) =>
-            _quillSheet(ctx, ctrl, _cfg(alignment: true, indent: true)),
+        icon: Icons.segment, tooltip: 'Paragraph',
+        content: (ctx) => _quillSheet(ctx, ctrl,
+            _cfg(alignment: true, indent: true)),
+        macContent: (_, _) => _macQuill(ctrl,
+            _cfg(alignment: true, indent: true)),
       ),
     _ToolbarGroup(
-      icon: Icons.format_list_bulleted,
-      tooltip: 'Lists',
+      icon: Icons.format_list_bulleted, tooltip: 'Lists',
       content: (ctx) => _quillSheet(ctx, ctrl,
+          _cfg(numberedList: true, bulletList: true, checkList: true)),
+      macContent: (_, _) => _macQuill(ctrl,
           _cfg(numberedList: true, bulletList: true, checkList: true)),
     ),
     _ToolbarGroup(
-      icon: Icons.add_photo_alternate_outlined,
-      tooltip: 'Insert',
+      icon: Icons.add_photo_alternate_outlined, tooltip: 'Insert',
       content: (ctx) => _insertSheet(ctx, onLink, onImage),
+      macContent: (_, close) => _macInsert(close, onLink, onImage),
     ),
   ];
 }
@@ -201,7 +252,7 @@ class NoteFormattingToolbar extends StatelessWidget {
   }
 }
 
-// ── macOS: Basic Font inline + group icons for the rest ───────────────────────
+// ── macOS: Basic Font inline + dropdown icons for the rest ─────────────────────
 
 class _MacOSToolbar extends StatelessWidget {
   final QuillController controller;
@@ -213,16 +264,10 @@ class _MacOSToolbar extends StatelessWidget {
     required this.onInsertLink,
   });
 
-  void _openGroup(BuildContext context, _ToolbarGroup group) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => group.content(ctx),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
@@ -232,37 +277,119 @@ class _MacOSToolbar extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // All groups minus Basic Font (shown inline instead)
-          final groups = _buildGroups(
-                  constraints.maxWidth, controller, onInsertLink, onInsertImage)
-              .where((g) => g.tooltip != 'Text style')
+          final groups = _buildGroups(constraints.maxWidth, controller,
+                  onInsertLink, onInsertImage)
+              .where((g) =>
+                  g.tooltip != 'History' &&
+                  g.tooltip != 'Text style' &&
+                  g.tooltip != 'Text' &&
+                  g.tooltip != 'Fonts')
               .toList();
-          return Row(
-            children: [
-              // Basic Font buttons shown directly — no grouping
-              QuillSimpleToolbar(
-                controller: controller,
-                config: _cfg(
-                  bold: true, italic: true, underline: true,
-                  inlineCode: true, subscript: true, superscript: true,
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                QuillSimpleToolbar(
+                  controller: controller,
+                  config: _cfg(undo: true, redo: true),
                 ),
-              ),
-              VerticalDivider(
-                width: 1,
-                indent: 8,
-                endIndent: 8,
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-              // Remaining groups as icons
-              ...groups.map((g) => IconButton(
-                    icon: Icon(g.icon, size: 22),
-                    tooltip: g.tooltip,
-                    onPressed: () => _openGroup(context, g),
-                  )),
-            ],
+                VerticalDivider(
+                  width: 1, indent: 8, endIndent: 8,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                QuillSimpleToolbar(
+                  controller: controller,
+                  config: _cfg(
+                    bold: true, italic: true, underline: true,
+                    inlineCode: true, subscript: true, superscript: true,
+                  ),
+                ),
+                QuillSimpleToolbar(
+                  controller: controller,
+                  config: _cfg(header: true),
+                ),
+                QuillSimpleToolbar(
+                  controller: controller,
+                  config: _cfg(fontFamily: true, fontSize: true),
+                ),
+                VerticalDivider(
+                  width: 1, indent: 8, endIndent: 8,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                ...groups.map((g) => _MacOSGroupButton(group: g)),
+              ],
+            ),
           );
         },
       ),
+    );
+  }
+}
+
+// ── macOS dropdown button ──────────────────────────────────────────────────────
+
+class _MacOSGroupButton extends StatefulWidget {
+  final _ToolbarGroup group;
+  const _MacOSGroupButton({required this.group});
+
+  @override
+  State<_MacOSGroupButton> createState() => _MacOSGroupButtonState();
+}
+
+class _MacOSGroupButtonState extends State<_MacOSGroupButton> {
+  OverlayEntry? _entry;
+  final _key = GlobalKey();
+
+  @override
+  void dispose() {
+    _entry?.remove();
+    super.dispose();
+  }
+
+  void _close() {
+    _entry?.remove();
+    _entry = null;
+  }
+
+  void _toggle() {
+    if (_entry != null) { _close(); return; }
+    final box = _key.currentContext!.findRenderObject()! as RenderBox;
+    final pos = box.localToGlobal(Offset.zero);
+    final size = box.size;
+    _entry = OverlayEntry(
+      builder: (_) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _close,
+            ),
+          ),
+          Positioned(
+            left: pos.dx,
+            top: pos.dy + size.height + 2,
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: widget.group.macContent(context, _close),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    Overlay.of(context).insert(_entry!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: _key,
+      icon: Icon(widget.group.icon, size: 22),
+      tooltip: widget.group.tooltip,
+      onPressed: _toggle,
     );
   }
 }
@@ -272,13 +399,6 @@ class _MacOSToolbar extends StatelessWidget {
 class _AndroidGroupBar extends StatelessWidget {
   final List<_ToolbarGroup> groups;
   const _AndroidGroupBar({required this.groups});
-
-  void _openGroup(BuildContext context, _ToolbarGroup group) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => group.content(ctx),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -296,7 +416,10 @@ class _AndroidGroupBar extends StatelessWidget {
             .map((g) => IconButton(
                   icon: Icon(g.icon, size: 22),
                   tooltip: g.tooltip,
-                  onPressed: () => _openGroup(context, g),
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    builder: (ctx) => g.content(ctx),
+                  ),
                 ))
             .toList(),
       ),
