@@ -274,7 +274,15 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return Listener(
       onPointerDown: (event) {
         if (event.buttons == kSecondaryMouseButton) {
-          _showMacContextMenu(event.position);
+          // Defer to a post-frame callback so we run after flutter_quill's own
+          // onSecondarySingleTapUp post-frame callback. removeAny() clears
+          // whatever was shown first, then we show our menu exactly once.
+          final position = event.position;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ContextMenuController.removeAny();
+            _showMacContextMenu(position);
+          });
         }
       },
       child: editor,
