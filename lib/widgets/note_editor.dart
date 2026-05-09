@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -188,29 +189,36 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       },
       child: Stack(
         children: [
-          Column(
-            children: [
-              NoteTitleField(
-                controller: _titleController,
-                hintText: _hintTitle,
-                onChanged: _scheduleSave,
-              ),
-              NoteFormattingToolbar(
-                quillController: _controller!,
-                onInsertImage: _pickAndInsertImage,
-                onInsertLink: _onInsertLink,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                  child: _buildEditor(),
-                ),
-              ),
-            ],
-          ),
+          _buildEditorLayout(),
           if (_dragging) _DragOverlay(),
         ],
       ),
+    );
+  }
+
+  Widget _buildEditorLayout() {
+    final toolbar = NoteFormattingToolbar(
+      quillController: _controller!,
+      onInsertImage: _pickAndInsertImage,
+      onInsertLink: _onInsertLink,
+    );
+    final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
+    return Column(
+      children: [
+        NoteTitleField(
+          controller: _titleController,
+          hintText: _hintTitle,
+          onChanged: _scheduleSave,
+        ),
+        if (isMacOS) toolbar,
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+            child: _buildEditor(),
+          ),
+        ),
+        if (!isMacOS) toolbar,
+      ],
     );
   }
 
