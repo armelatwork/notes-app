@@ -307,13 +307,19 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       position: position,
       items: [
         if (hasSelection)
-          const PopupMenuItem(value: _MacMenuAction.cut, child: Text('Cut')),
+          const PopupMenuItem(
+              height: 32, value: _MacMenuAction.cut, child: Text('Cut')),
         if (hasSelection)
-          const PopupMenuItem(value: _MacMenuAction.copy, child: Text('Copy')),
-        const PopupMenuItem(value: _MacMenuAction.paste, child: Text('Paste')),
+          const PopupMenuItem(
+              height: 32, value: _MacMenuAction.copy, child: Text('Copy')),
         const PopupMenuItem(
-            value: _MacMenuAction.selectAll, child: Text('Select All')),
+            height: 32, value: _MacMenuAction.paste, child: Text('Paste')),
+        const PopupMenuItem(
+            height: 32,
+            value: _MacMenuAction.selectAll,
+            child: Text('Select All')),
         PopupMenuItem(
+          height: 32,
           value: _MacMenuAction.link,
           child: Text(hasLink ? 'Edit Link' : 'Insert Link'),
         ),
