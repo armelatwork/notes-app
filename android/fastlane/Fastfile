@@ -5,10 +5,23 @@ platform :android do
   desc "Upload AAB to Google Play internal testing track"
   lane :internal do
     upload_to_play_store(
-      track:               "internal",
-      aab:                 "../build/app/outputs/bundle/release/app-release.aab",
-      skip_upload_apk:     true,
-      skip_upload_images:  true,
+      track:                   "internal",
+      aab:                     "../build/app/outputs/bundle/release/app-release.aab",
+      release_status:          "completed",
+      skip_upload_apk:         true,
+      skip_upload_images:      true,
+      skip_upload_screenshots: true,
+    )
+  end
+
+  desc "Upload AAB as draft (use if the app has never been published before)"
+  lane :internal_draft do
+    upload_to_play_store(
+      track:                   "internal",
+      aab:                     "../build/app/outputs/bundle/release/app-release.aab",
+      release_status:          "draft",
+      skip_upload_apk:         true,
+      skip_upload_images:      true,
       skip_upload_screenshots: true,
     )
   end
