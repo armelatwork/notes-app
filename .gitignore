@@ -46,3 +46,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Fastlane — service account key and generated metadata
+android/fastlane/google-play-key.json
+android/fastlane/metadata/
