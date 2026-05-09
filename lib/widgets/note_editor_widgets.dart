@@ -5,8 +5,9 @@ import 'package:flutter_quill/flutter_quill.dart';
 // ── Config builder ─────────────────────────────────────────────────────────────
 
 QuillSimpleToolbarConfig _cfg({
-  bool undo = false, bool redo = false,
+  bool undo = false, bool redo = false, bool search = false,
   bool bold = false, bool italic = false, bool underline = false,
+  bool inlineCode = false, bool subscript = false, bool superscript = false,
   bool color = false, bool background = false, bool clearFormat = false,
   bool alignment = false, bool header = false,
   bool numberedList = false, bool bulletList = false, bool checkList = false,
@@ -14,9 +15,10 @@ QuillSimpleToolbarConfig _cfg({
   List<QuillToolbarCustomButtonOptions> customButtons = const [],
 }) =>
     QuillSimpleToolbarConfig(
-      showUndo: undo, showRedo: redo,
+      showUndo: undo, showRedo: redo, showSearchButton: search,
       showBoldButton: bold, showItalicButton: italic, showUnderLineButton: underline,
       showStrikeThrough: false,
+      showInlineCode: inlineCode, showSubscript: subscript, showSuperscript: superscript,
       showColorButton: color, showBackgroundColorButton: background,
       showClearFormat: clearFormat,
       showAlignmentButtons: alignment,
@@ -55,6 +57,25 @@ Widget _quillSheet(BuildContext context, QuillController ctrl, QuillSimpleToolba
       ),
     );
 
+// Header rendered first, then the rest — overrides QuillSimpleToolbar's internal order.
+Widget _headerFirstSheet(BuildContext context, QuillController ctrl,
+    QuillSimpleToolbarConfig restCfg) =>
+    SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              QuillSimpleToolbar(controller: ctrl, config: _cfg(header: true)),
+              QuillSimpleToolbar(controller: ctrl, config: restCfg),
+            ],
+          ),
+        ),
+      ),
+    );
+
 Widget _insertSheet(BuildContext context, VoidCallback onLink, VoidCallback onImage) =>
     SafeArea(
       child: Column(
@@ -84,20 +105,22 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     _ToolbarGroup(
       icon: Icons.history,
       tooltip: 'History',
-      content: (ctx) => _quillSheet(ctx, ctrl, _cfg(undo: true, redo: true)),
+      content: (ctx) => _quillSheet(ctx, ctrl,
+          _cfg(undo: true, redo: true, search: true)),
     ),
     _ToolbarGroup(
       icon: Icons.format_bold,
       tooltip: 'Text style',
-      content: (ctx) => _quillSheet(ctx, ctrl,
-          _cfg(bold: true, italic: true, underline: true)),
+      content: (ctx) => _quillSheet(ctx, ctrl, _cfg(
+          bold: true, italic: true, underline: true,
+          inlineCode: true, subscript: true, superscript: true)),
     ),
     if (fontsSplit) ...[
       _ToolbarGroup(
         icon: Icons.text_fields,
         tooltip: 'Text',
-        content: (ctx) => _quillSheet(ctx, ctrl,
-            _cfg(header: true, fontFamily: true, fontSize: true)),
+        content: (ctx) => _headerFirstSheet(ctx, ctrl,
+            _cfg(fontFamily: true, fontSize: true)),
       ),
       _ToolbarGroup(
         icon: Icons.palette_outlined,
@@ -109,8 +132,8 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
       _ToolbarGroup(
         icon: Icons.text_format,
         tooltip: 'Fonts',
-        content: (ctx) => _quillSheet(ctx, ctrl, _cfg(
-          header: true, fontFamily: true, fontSize: true,
+        content: (ctx) => _headerFirstSheet(ctx, ctrl, _cfg(
+          fontFamily: true, fontSize: true,
           color: true, background: true, clearFormat: true,
         )),
       ),
