@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -224,12 +225,18 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditor() {
-    return QuillEditor.basic(
+    final editor = QuillEditor.basic(
       controller: _controller!,
       focusNode: _focusNode,
       config: QuillEditorConfig(
         placeholder: 'Start writing…',
         enableInteractiveSelection: true,
+        // Disable flutter_quill's selection toolbar on macOS: its
+        // EditorTextSelectionOverlay inserts handle OverlayEntries above the
+        // toolbar, which absorb clicks before they reach the menu buttons.
+        // Right-click on macOS is handled by the Listener below via showMenu.
+        enableSelectionToolbar:
+            defaultTargetPlatform != TargetPlatform.macOS,
         customStyleBuilder: defaultTargetPlatform == TargetPlatform.macOS
             ? macFontStyleBuilder
             : null,
@@ -255,18 +262,110 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           final uri = Uri.tryParse(url);
           if (uri != null && await canLaunchUrl(uri)) launchUrl(uri);
         },
-        contextMenuBuilder: (ctx, rawEditorState) =>
-            _buildContextMenu(ctx, rawEditorState),
+        contextMenuBuilder: defaultTargetPlatform == TargetPlatform.macOS
+            ? null
+            : (ctx, rawEditorState) => _buildContextMenu(ctx, rawEditorState),
       ),
     );
+
+    if (defaultTargetPlatform != TargetPlatform.macOS) return editor;
+
+    // On macOS, use showMenu (a Navigator Route) for the context menu.
+    // Routes sit above the overlay stack, so clicks always reach the items.
+    return Listener(
+      onPointerDown: (event) {
+        if (event.buttons == kSecondaryMouseButton) {
+          final pos = event.position;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showMacContextMenu(pos);
+          });
+        }
+      },
+      child: editor,
+    );
   }
+
+  // ── macOS context menu (showMenu = Navigator Route, always clickable) ─────────
+
+  Future<void> _showMacContextMenu(Offset globalPos) async {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+
+    final sel = ctrl.selection;
+    final hasSelection = sel.isValid && !sel.isCollapsed;
+    final hasLink = getLinkAtSelection(ctrl) != null;
+
+    final overlayBox =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final position = RelativeRect.fromRect(
+      globalPos & const Size(1, 1),
+      Offset.zero & overlayBox.size,
+    );
+
+    final choice = await showMenu<_MacMenuAction>(
+      context: context,
+      position: position,
+      items: [
+        if (hasSelection)
+          const PopupMenuItem(value: _MacMenuAction.cut, child: Text('Cut')),
+        if (hasSelection)
+          const PopupMenuItem(value: _MacMenuAction.copy, child: Text('Copy')),
+        const PopupMenuItem(value: _MacMenuAction.paste, child: Text('Paste')),
+        const PopupMenuItem(
+            value: _MacMenuAction.selectAll, child: Text('Select All')),
+        PopupMenuItem(
+          value: _MacMenuAction.link,
+          child: Text(hasLink ? 'Edit Link' : 'Insert Link'),
+        ),
+      ],
+    );
+
+    if (!mounted || choice == null) return;
+
+    switch (choice) {
+      case _MacMenuAction.cut:
+        _copyToClipboard(ctrl);
+        ctrl.replaceText(sel.start, sel.end - sel.start, '', null);
+      case _MacMenuAction.copy:
+        _copyToClipboard(ctrl);
+      case _MacMenuAction.paste:
+        // ignore: experimental_member_use
+        await ctrl.clipboardPaste();
+      case _MacMenuAction.selectAll:
+        ctrl.updateSelection(
+          TextSelection(
+              baseOffset: 0, extentOffset: ctrl.document.length - 1),
+          ChangeSource.local,
+        );
+      case _MacMenuAction.link:
+        final savedSel = ctrl.selection;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _controller == null) return;
+          _controller!.updateSelection(savedSel, ChangeSource.local);
+          _onInsertLink();
+        });
+    }
+  }
+
+  void _copyToClipboard(QuillController ctrl) {
+    final sel = ctrl.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
+    final text = ctrl.document.toPlainText();
+    final start = sel.start.clamp(0, text.length);
+    final end = sel.end.clamp(0, text.length);
+    if (start < end) {
+      Clipboard.setData(ClipboardData(text: text.substring(start, end)));
+    }
+  }
+
+  // ── Android / other platforms context menu ────────────────────────────────────
 
   Widget _buildContextMenu(
       BuildContext ctx, QuillRawEditorState rawEditorState) {
     final sel = rawEditorState.textEditingValue.selection;
     final hasSelection = sel.isValid && !sel.isCollapsed;
-    final hasLink = _controller != null &&
-        getLinkAtSelection(_controller!) != null;
+    final hasLink =
+        _controller != null && getLinkAtSelection(_controller!) != null;
 
     return AdaptiveTextSelectionToolbar.buttonItems(
       anchors: rawEditorState.contextMenuAnchors,
@@ -298,13 +397,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           label: hasLink ? 'Edit Link' : 'Insert Link',
           onPressed: () {
             final savedSelection = _controller!.selection;
-            // cutSelection/copySelection/selectAll call hideToolbar()
-            // internally; for Insert Link we need to dismiss manually.
             rawEditorState.hideToolbar();
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _controller == null) return;
-              _controller!.updateSelection(
-                  savedSelection, ChangeSource.local);
+              _controller!
+                  .updateSelection(savedSelection, ChangeSource.local);
               _onInsertLink();
             });
           },
@@ -313,6 +410,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
   }
 }
+
+enum _MacMenuAction { cut, copy, paste, selectAll, link }
 
 class _DragOverlay extends StatelessWidget {
   @override
