@@ -204,6 +204,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       quillController: _controller!,
       onInsertImage: _pickAndInsertImage,
       onInsertLink: _onInsertLink,
+      editorFocusNode: _focusNode,
     );
     final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
     return Column(

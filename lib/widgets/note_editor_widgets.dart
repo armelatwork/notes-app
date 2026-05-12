@@ -28,6 +28,8 @@ QuillSimpleToolbarConfig _cfg({
       showCodeBlock: false, showQuote: false,
       showIndent: indent, showLink: false,
       showFontFamily: fontFamily, showFontSize: fontSize,
+      toolbarSectionSpacing: 0,
+      sectionDividerSpace: 4,
       customButtons: customButtons,
     );
 
@@ -184,7 +186,6 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     ] else
       _ToolbarGroup(
         icon: Icons.text_format, tooltip: 'Fonts',
-        hidesKeyboard: true,
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg(
             fontFamily: true, fontSize: true,
             color: true, background: true, clearFormat: true)),
@@ -232,12 +233,14 @@ class NoteFormattingToolbar extends StatelessWidget {
   final QuillController quillController;
   final VoidCallback onInsertImage;
   final VoidCallback onInsertLink;
+  final FocusNode? editorFocusNode;
 
   const NoteFormattingToolbar({
     super.key,
     required this.quillController,
     required this.onInsertImage,
     required this.onInsertLink,
+    this.editorFocusNode,
   });
 
   @override
@@ -253,6 +256,7 @@ class NoteFormattingToolbar extends StatelessWidget {
       builder: (context, constraints) => _AndroidGroupBar(
         groups: _buildGroups(
             constraints.maxWidth, quillController, onInsertLink, onInsertImage),
+        editorFocusNode: editorFocusNode,
       ),
     );
   }
@@ -404,7 +408,8 @@ class _MacOSGroupButtonState extends State<_MacOSGroupButton> {
 
 class _AndroidGroupBar extends StatefulWidget {
   final List<_ToolbarGroup> groups;
-  const _AndroidGroupBar({required this.groups});
+  final FocusNode? editorFocusNode;
+  const _AndroidGroupBar({required this.groups, this.editorFocusNode});
 
   @override
   State<_AndroidGroupBar> createState() => _AndroidGroupBarState();
@@ -440,12 +445,16 @@ class _AndroidGroupBarState extends State<_AndroidGroupBar> {
 
     final ctrl = Scaffold.of(context).showBottomSheet(
       (ctx) => _PersistentSheetContent(
-        onClose: () => _sheetController?.close(),
         child: group.content(ctx, () => _sheetController?.close()),
       ),
     );
 
     setState(() { _sheetController = ctrl; _openTooltip = group.tooltip; });
+
+    // Re-request editor focus so the keyboard stays visible after the tap
+    // that opened the sheet caused a momentary focus loss.
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => widget.editorFocusNode?.requestFocus());
 
     ctrl.closed.then((_) {
       if (mounted) setState(() { _sheetController = null; _openTooltip = null; });
@@ -477,24 +486,23 @@ class _AndroidGroupBarState extends State<_AndroidGroupBar> {
 
 class _PersistentSheetContent extends StatelessWidget {
   final Widget child;
-  final VoidCallback onClose;
-  const _PersistentSheetContent({required this.child, required this.onClose});
+  const _PersistentSheetContent({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: IconButton(
-            icon: const Icon(Icons.close, size: 18),
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            onPressed: onClose,
+        const SizedBox(height: 6),
+        Container(
+          width: 32,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
+        const SizedBox(height: 4),
         child,
       ],
     );
