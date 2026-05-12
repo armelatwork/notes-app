@@ -311,7 +311,7 @@ class _MacOSToolbar extends StatelessWidget {
                 QuillSimpleToolbar(
                   controller: controller,
                   config: _cfg(
-                    bold: true, italic: true, underline: true,
+                    bold: true, italic: true, underline: true, strikeThrough: true,
                     inlineCode: true, subscript: true, superscript: true,
                   ),
                 ),
