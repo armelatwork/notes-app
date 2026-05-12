@@ -39,6 +39,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _dragging = false;
   bool _isDirty = false;
   bool _secondaryButtonActive = false;
+  int _primaryTapCount = 0;
+  DateTime? _lastPrimaryTapTime;
+  static const Duration _kTripleTapMaxGap = Duration(milliseconds: 400);
   String _hintTitle = 'New Note';
   List<String> _imagesAtLoad = [];
 
@@ -286,6 +289,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       onPointerDown: (event) {
         if (event.buttons == kSecondaryMouseButton) {
           _secondaryButtonActive = true;
+        } else if (event.buttons == kPrimaryMouseButton) {
+          _trackPrimaryTap();
         }
       },
       onPointerUp: (event) {
@@ -382,6 +387,42 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           _onInsertLink();
         });
     }
+  }
+
+  void _trackPrimaryTap() {
+    final now = DateTime.now();
+    final last = _lastPrimaryTapTime;
+    if (last != null && now.difference(last) < _kTripleTapMaxGap) {
+      _primaryTapCount++;
+    } else {
+      _primaryTapCount = 1;
+    }
+    _lastPrimaryTapTime = now;
+    if (_primaryTapCount >= 3) {
+      _primaryTapCount = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _selectParagraphAtCursor();
+      });
+    }
+  }
+
+  void _selectParagraphAtCursor() {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    final text = ctrl.document.toPlainText();
+    final offset = ctrl.selection.baseOffset.clamp(0, text.length);
+    var start = offset;
+    while (start > 0 && text[start - 1] != '\n') {
+      start--;
+    }
+    var end = offset;
+    while (end < text.length && text[end] != '\n') {
+      end++;
+    }
+    ctrl.updateSelection(
+      TextSelection(baseOffset: start, extentOffset: end),
+      ChangeSource.local,
+    );
   }
 
   void _copyToClipboard(QuillController ctrl) {
