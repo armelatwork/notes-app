@@ -7,6 +7,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 QuillSimpleToolbarConfig _cfg({
   bool undo = false, bool redo = false, bool search = false,
   bool bold = false, bool italic = false, bool underline = false,
+  bool strikeThrough = false,
   bool inlineCode = false, bool subscript = false, bool superscript = false,
   bool color = false, bool background = false, bool clearFormat = false,
   bool alignment = false, bool header = false,
@@ -17,7 +18,7 @@ QuillSimpleToolbarConfig _cfg({
     QuillSimpleToolbarConfig(
       showUndo: undo, showRedo: redo, showSearchButton: search,
       showBoldButton: bold, showItalicButton: italic, showUnderLineButton: underline,
-      showStrikeThrough: false,
+      showStrikeThrough: strikeThrough,
       showInlineCode: inlineCode, showSubscript: subscript, showSuperscript: superscript,
       showColorButton: color, showBackgroundColorButton: background,
       showClearFormat: clearFormat,
@@ -161,10 +162,10 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     _ToolbarGroup(
       icon: Icons.format_bold, tooltip: 'Text style',
       content: (ctx, _) => _quillSheet(ctx, ctrl, _cfg(
-          bold: true, italic: true, underline: true,
+          bold: true, italic: true, underline: true, strikeThrough: true,
           inlineCode: true, subscript: true, superscript: true)),
       macContent: (_, _) => _macQuill(ctrl, _cfg(
-          bold: true, italic: true, underline: true,
+          bold: true, italic: true, underline: true, strikeThrough: true,
           inlineCode: true, subscript: true, superscript: true)),
     ),
     if (fontsSplit) ...[
