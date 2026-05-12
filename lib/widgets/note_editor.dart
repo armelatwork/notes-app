@@ -270,6 +270,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           }
           return false;
         },
+        quillMagnifierBuilder: defaultTargetPlatform == TargetPlatform.android
+            ? defaultQuillMagnifierBuilder
+            : null,
         onLaunchUrl: (url) async {
           final uri = Uri.tryParse(url);
           if (uri != null && await canLaunchUrl(uri)) {
