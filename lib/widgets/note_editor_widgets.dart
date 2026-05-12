@@ -36,9 +36,12 @@ QuillSimpleToolbarConfig _cfg({
 class _ToolbarGroup {
   final IconData icon;
   final String tooltip;
-  // Android: wrapped in bottom sheet chrome
-  final Widget Function(BuildContext) content;
-  // macOS: raw widget for the dropdown card, receives a close callback
+  // True for groups whose content needs full screen height (colour pickers).
+  // On Android these use a modal sheet so the keyboard is dismissed first.
+  final bool hidesKeyboard;
+  // Android: content builder receives a close callback for programmatic dismiss.
+  final Widget Function(BuildContext, VoidCallback close) content;
+  // macOS: raw widget for the dropdown card, receives a close callback.
   final Widget Function(BuildContext, VoidCallback close) macContent;
 
   const _ToolbarGroup({
@@ -46,6 +49,7 @@ class _ToolbarGroup {
     required this.tooltip,
     required this.content,
     required this.macContent,
+    this.hidesKeyboard = false,
   });
 }
 
@@ -80,7 +84,7 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
       ),
     );
 
-Widget _insertSheet(BuildContext ctx, VoidCallback onLink, VoidCallback onImage) =>
+Widget _insertSheet(VoidCallback close, VoidCallback onLink, VoidCallback onImage) =>
     SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -88,12 +92,12 @@ Widget _insertSheet(BuildContext ctx, VoidCallback onLink, VoidCallback onImage)
           ListTile(
             leading: const Icon(Icons.link),
             title: const Text('Insert link'),
-            onTap: () { Navigator.pop(ctx); onLink(); },
+            onTap: () { close(); onLink(); },
           ),
           ListTile(
             leading: const Icon(Icons.image_outlined),
             title: const Text('Insert image'),
-            onTap: () { Navigator.pop(ctx); onImage(); },
+            onTap: () { close(); onImage(); },
           ),
         ],
       ),
@@ -147,14 +151,14 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
   return [
     _ToolbarGroup(
       icon: Icons.history, tooltip: 'History',
-      content: (ctx) => _quillSheet(ctx, ctrl,
+      content: (ctx, _) => _quillSheet(ctx, ctrl,
           _cfg(undo: true, redo: true, search: true)),
       macContent: (_, _) => _macQuill(ctrl,
           _cfg(undo: true, redo: true, search: true)),
     ),
     _ToolbarGroup(
       icon: Icons.format_bold, tooltip: 'Text style',
-      content: (ctx) => _quillSheet(ctx, ctrl, _cfg(
+      content: (ctx, _) => _quillSheet(ctx, ctrl, _cfg(
           bold: true, italic: true, underline: true,
           inlineCode: true, subscript: true, superscript: true)),
       macContent: (_, _) => _macQuill(ctrl, _cfg(
@@ -164,14 +168,15 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     if (fontsSplit) ...[
       _ToolbarGroup(
         icon: Icons.text_fields, tooltip: 'Text',
-        content: (ctx) => _headerFirstSheet(ctx, ctrl,
+        content: (ctx, _) => _headerFirstSheet(ctx, ctrl,
             _cfg(fontFamily: true, fontSize: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl,
             _cfg(fontFamily: true, fontSize: true)),
       ),
       _ToolbarGroup(
         icon: Icons.palette_outlined, tooltip: 'Colors',
-        content: (ctx) => _quillSheet(ctx, ctrl,
+        hidesKeyboard: true,
+        content: (ctx, _) => _quillSheet(ctx, ctrl,
             _cfg(color: true, background: true, clearFormat: true)),
         macContent: (_, _) => _macQuill(ctrl,
             _cfg(color: true, background: true, clearFormat: true)),
@@ -179,7 +184,8 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     ] else
       _ToolbarGroup(
         icon: Icons.text_format, tooltip: 'Fonts',
-        content: (ctx) => _headerFirstSheet(ctx, ctrl, _cfg(
+        hidesKeyboard: true,
+        content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg(
             fontFamily: true, fontSize: true,
             color: true, background: true, clearFormat: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl, _cfg(
@@ -189,32 +195,32 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     if (paragraphSplit) ...[
       _ToolbarGroup(
         icon: Icons.format_align_left, tooltip: 'Alignment',
-        content: (ctx) => _quillSheet(ctx, ctrl, _cfg(alignment: true)),
+        content: (ctx, _) => _quillSheet(ctx, ctrl, _cfg(alignment: true)),
         macContent: (_, _) => _macQuill(ctrl, _cfg(alignment: true)),
       ),
       _ToolbarGroup(
         icon: Icons.format_indent_increase, tooltip: 'Indent',
-        content: (ctx) => _quillSheet(ctx, ctrl, _cfg(indent: true)),
+        content: (ctx, _) => _quillSheet(ctx, ctrl, _cfg(indent: true)),
         macContent: (_, _) => _macQuill(ctrl, _cfg(indent: true)),
       ),
     ] else
       _ToolbarGroup(
         icon: Icons.segment, tooltip: 'Paragraph',
-        content: (ctx) => _quillSheet(ctx, ctrl,
+        content: (ctx, _) => _quillSheet(ctx, ctrl,
             _cfg(alignment: true, indent: true)),
         macContent: (_, _) => _macQuill(ctrl,
             _cfg(alignment: true, indent: true)),
       ),
     _ToolbarGroup(
       icon: Icons.format_list_bulleted, tooltip: 'Lists',
-      content: (ctx) => _quillSheet(ctx, ctrl,
+      content: (ctx, _) => _quillSheet(ctx, ctrl,
           _cfg(numberedList: true, bulletList: true, checkList: true)),
       macContent: (_, _) => _macQuill(ctrl,
           _cfg(numberedList: true, bulletList: true, checkList: true)),
     ),
     _ToolbarGroup(
       icon: Icons.add_photo_alternate_outlined, tooltip: 'Insert',
-      content: (ctx) => _insertSheet(ctx, onLink, onImage),
+      content: (_, close) => _insertSheet(close, onLink, onImage),
       macContent: (_, close) => _macInsert(close, onLink, onImage),
     ),
   ];
@@ -396,33 +402,101 @@ class _MacOSGroupButtonState extends State<_MacOSGroupButton> {
 
 // ── Android: group icons bar at bottom ────────────────────────────────────────
 
-class _AndroidGroupBar extends StatelessWidget {
+class _AndroidGroupBar extends StatefulWidget {
   final List<_ToolbarGroup> groups;
   const _AndroidGroupBar({required this.groups});
+
+  @override
+  State<_AndroidGroupBar> createState() => _AndroidGroupBarState();
+}
+
+class _AndroidGroupBarState extends State<_AndroidGroupBar> {
+  PersistentBottomSheetController? _sheetController;
+  String? _openTooltip;
+
+  @override
+  void dispose() {
+    _sheetController?.close();
+    super.dispose();
+  }
+
+  void _onTap(BuildContext context, _ToolbarGroup group) {
+    if (group.hidesKeyboard) {
+      _sheetController?.close();
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => group.content(ctx, () => Navigator.pop(ctx)),
+      );
+      return;
+    }
+
+    // Toggle: same icon closes the open sheet.
+    if (_openTooltip == group.tooltip) {
+      _sheetController?.close();
+      return;
+    }
+
+    _sheetController?.close();
+
+    final ctrl = Scaffold.of(context).showBottomSheet(
+      (ctx) => _PersistentSheetContent(
+        onClose: () => _sheetController?.close(),
+        child: group.content(ctx, () => _sheetController?.close()),
+      ),
+    );
+
+    setState(() { _sheetController = ctrl; _openTooltip = group.tooltip; });
+
+    ctrl.closed.then((_) {
+      if (mounted) setState(() { _sheetController = null; _openTooltip = null; });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         border: Border(
-          top: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant),
-        ),
+            top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
         color: Theme.of(context).colorScheme.surfaceContainerLow,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: groups
-            .map((g) => IconButton(
-                  icon: Icon(g.icon, size: 22),
-                  tooltip: g.tooltip,
-                  onPressed: () => showModalBottomSheet<void>(
-                    context: context,
-                    builder: (ctx) => g.content(ctx),
-                  ),
-                ))
-            .toList(),
+        children: widget.groups.map((g) => IconButton(
+          icon: Icon(g.icon, size: 22,
+              color: _openTooltip == g.tooltip
+                  ? Theme.of(context).colorScheme.primary
+                  : null),
+          tooltip: g.tooltip,
+          onPressed: () => _onTap(context, g),
+        )).toList(),
       ),
+    );
+  }
+}
+
+class _PersistentSheetContent extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onClose;
+  const _PersistentSheetContent({required this.child, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            onPressed: onClose,
+          ),
+        ),
+        child,
+      ],
     );
   }
 }
