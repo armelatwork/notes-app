@@ -50,6 +50,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   void dispose() {
+    _discardIfEmpty();
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _controller?.dispose();
     _focusNode.dispose();
@@ -84,9 +85,26 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
   }
 
+  bool _isNewEmptyNote() {
+    final note = _currentNote;
+    if (note == null || _controller == null || _isDirty) return false;
+    if (!isDefaultNoteTitle(note.title)) return false;
+    return _controller!.document.toPlainText().trim().isEmpty;
+  }
+
+  void _discardIfEmpty() {
+    if (!_isNewEmptyNote()) return;
+    ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
+    _currentNote = null;
+  }
+
   void _loadNote(Note note) {
     if (_currentNote?.id == note.id) return;
-    _saveCurrentNote();
+    if (_isNewEmptyNote()) {
+      ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
+    } else {
+      _saveCurrentNote();
+    }
     _currentNote = note;
     _isDirty = false;
     _imagesAtLoad = extractImageFilenames(note.content);
