@@ -46,11 +46,11 @@ class _MovePushTracker extends NotesNotifier {
   }
 
   @override
-  Note? cancelPendingPush() {
+  void cancelPendingPush() {
     _moveDebounce?.cancel();
     _moveDebounce = null;
     _pendingMoveQueue.clear();
-    return super.cancelPendingPush();
+    super.cancelPendingPush();
   }
 
   @override

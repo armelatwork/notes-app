@@ -34,11 +34,11 @@ class _TrackingNotifier extends NotesNotifier {
     state = AsyncData(List.from(_store));
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
     // ignore: invalid_use_of_visible_for_testing_member
-    pendingNote = note;
+    pendingNotes[note.id] = note;
     // ignore: invalid_use_of_visible_for_testing_member
-    pendingDeletedImages = [
+    pendingDeletedImages[note.id] = [
       // ignore: invalid_use_of_visible_for_testing_member
-      ...pendingDeletedImages,
+      ...(pendingDeletedImages[note.id] ?? []),
       ...deletedImageFilenames,
     ];
     // ignore: invalid_use_of_visible_for_testing_member
@@ -281,6 +281,27 @@ void main() {
 
         fake.flushMicrotasks();
         expect(notifier.pushCallCount, 1);
+      });
+    });
+
+    test('saveNote_twoDifferentNotes_bothGetPushed', () {
+      // Regression: pendingNotes was a single slot, so saving Note B silently
+      // cancelled Note A's scheduled push. Both must reach performPush.
+      fakeAsync((fake) {
+        final notifier = _TrackingNotifier();
+        final container = _makeContainerWithGoogle(notifier);
+        addTearDown(container.dispose);
+        final n = container.read(notesProvider.notifier);
+
+        final noteA = Note.create(title: 'A', content: '{}')..id = 1;
+        final noteB = Note.create(title: 'B', content: '{}')..id = 2;
+
+        n.saveNote(noteA);
+        fake.elapse(const Duration(milliseconds: 500));
+        n.saveNote(noteB);
+        fake.elapse(const Duration(milliseconds: 5000));
+
+        expect(notifier.pushCallCount, 2);
       });
     });
 
