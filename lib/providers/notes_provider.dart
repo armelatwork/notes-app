@@ -6,9 +6,9 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   @visibleForTesting
   Timer? pushTimer;
   @visibleForTesting
-  Note? pendingNote;
+  final Map<int, Note> pendingNotes = {};
   @visibleForTesting
-  List<String> pendingDeletedImages = [];
+  final Map<int, List<String>> pendingDeletedImages = {};
   final List<Note> _pendingMoves = [];
   Timer? _moveTimer;
   Future<void> _pushQueue = Future.value();
@@ -34,7 +34,7 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     final title = computeDefaultNoteTitle(state.valueOrNull ?? []);
     final note = Note.create(
       title: title,
-      content: '{"ops":[{"insert":"\\n"}]}',
+      content: '[{"insert":"\\n"}]',
       preview: '',
       folderId: folderId,
     );
@@ -55,8 +55,11 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     await reload();
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
     ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
-    pendingNote = note;
-    pendingDeletedImages = [...pendingDeletedImages, ...deletedImageFilenames];
+    pendingNotes[note.id] = note;
+    pendingDeletedImages[note.id] = [
+      ...(pendingDeletedImages[note.id] ?? []),
+      ...deletedImageFilenames,
+    ];
     pushTimer?.cancel();
     final debounce = titleChanged ? _kFastPushDebounceMs : _kPushDebounceMs;
     pushTimer = Timer(Duration(milliseconds: debounce), _flushPush);
@@ -105,7 +108,9 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
 
   Future<void> deleteNote(int id) async {
     final note = await DatabaseService.instance.getNote(id);
-    if (pendingNote?.id == id) cancelPendingPush();
+    pendingNotes.remove(id);
+    pendingDeletedImages.remove(id);
+    if (pendingNotes.isEmpty) { pushTimer?.cancel(); pushTimer = null; }
     await DatabaseService.instance.deleteNote(id);
     await reload();
     if (note?.driveFileId != null &&
@@ -115,16 +120,14 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     }
   }
 
-  Note? cancelPendingPush() {
+  void cancelPendingPush() {
     pushTimer?.cancel();
     pushTimer = null;
     _moveTimer?.cancel();
     _moveTimer = null;
     _pendingMoves.clear();
-    final note = pendingNote;
-    pendingNote = null;
-    pendingDeletedImages = [];
-    return note;
+    pendingNotes.clear();
+    pendingDeletedImages.clear();
   }
 
   /// Bypasses the debounce — used by folder cascade and sync button.
@@ -134,12 +137,15 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   void flushPendingPush() => _flushPush();
 
   void _flushPush() {
-    final note = pendingNote;
-    final deleted = List<String>.from(pendingDeletedImages);
-    pendingNote = null;
-    pendingDeletedImages = [];
-    if (note == null) return;
-    _run(() => performPush(note, deleted));
+    final notes = Map<int, Note>.from(pendingNotes);
+    final deleted = Map<int, List<String>>.from(pendingDeletedImages);
+    pendingNotes.clear();
+    pendingDeletedImages.clear();
+    pushTimer = null;
+    for (final entry in notes.entries) {
+      final imgs = deleted[entry.key] ?? [];
+      _run(() => performPush(entry.value, imgs));
+    }
   }
 
   @visibleForTesting
