@@ -40,17 +40,11 @@ class AuthService {
     return await _ensureDriveScope(user);
   }
 
-  // On Android, Play Services may silently reuse a previous authorization that
-  // lacked drive.file scope, returning a null accessToken. Detect this and
-  // request the scope explicitly so Drive API calls succeed.
+  // Always request drive.file explicitly after interactive sign-in. If the
+  // scope is already granted this is a no-op; if a prior cached grant lacked
+  // the scope (401/403 on Drive calls) this forces a fresh authorisation.
   Future<GoogleSignInAccount> _ensureDriveScope(
       GoogleSignInAccount user) async {
-    try {
-      final auth = await user.authentication;
-      if (auth.accessToken != null) return user;
-    } catch (_) {
-      return user; // Can't verify — proceed and let Drive calls surface errors.
-    }
     final granted = await _googleSignIn.requestScopes([_kDriveScope]);
     if (!granted) {
       throw 'Google Drive access is required for notes sync. '

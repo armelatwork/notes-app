@@ -44,7 +44,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
       // The restored token lacks the Drive scope (403 insufficient scopes).
       // Clear the cached session so the user is prompted to sign in
       // interactively, which goes through _ensureDriveScope and re-grants it.
-      if (_isInsufficientScopeError(e)) {
+      if (_isAuthScopeError(e)) {
         AppLogger.instance.warn(
             'AppUserNotifier', 'restored token lacks Drive scope — clearing session', e);
         await AuthService.instance.signOut();
@@ -54,14 +54,27 @@ class AppUserNotifier extends Notifier<AppUser?> {
     }
   }
 
-  static bool _isInsufficientScopeError(Object e) {
+  // Catches 401 (invalid credentials) and 403 (insufficient scope) from the
+  // Drive API — both indicate the token lacks the required drive.file access.
+  static bool _isAuthScopeError(Object e) {
     final s = e.toString();
-    return (s.contains('403') && s.contains('scope')) ||
+    return s.contains('401') ||
+        (s.contains('403') && s.contains('scope')) ||
         s.contains('insufficient');
   }
 
   Future<void> setGoogleUser(dynamic googleUser) async {
-    await _initGoogleSession(googleUser.id as String, googleUser);
+    try {
+      await _initGoogleSession(googleUser.id as String, googleUser);
+    } catch (e) {
+      if (_isAuthScopeError(e)) {
+        AppLogger.instance.warn(
+            'AppUserNotifier', 'Drive scope missing after sign-in; signing out', e);
+        await AuthService.instance.signOut();
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<void> _initGoogleSession(String userId, dynamic googleUser) async {
