@@ -29,6 +29,46 @@ final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 final noteReloadTriggerProvider = StateProvider<int>((ref) => 0);
 final pollTriggerProvider = StateProvider<int>((ref) => 0);
 
+enum DriveStorageSeverity { none, warning, exceeded }
+
+class DriveStorageAlert {
+  final DriveStorageSeverity severity;
+  // null = current user ("Your Drive"). Set to the folder owner's display
+  // name when note-sharing is added so the message adapts automatically.
+  final String? ownerName;
+  final int? usagePercent;
+
+  const DriveStorageAlert({
+    required this.severity,
+    this.ownerName,
+    this.usagePercent,
+  });
+
+  static const none = DriveStorageAlert(severity: DriveStorageSeverity.none);
+
+  String get message {
+    final prefix = ownerName != null ? "$ownerName's" : 'Your';
+    final action =
+        ownerName != null ? 'Ask them to free up space' : 'Free up space';
+    return switch (severity) {
+      DriveStorageSeverity.none => '',
+      DriveStorageSeverity.warning =>
+        '$prefix Google Drive storage is $usagePercent% full. '
+            '$action to avoid sync interruptions.',
+      DriveStorageSeverity.exceeded =>
+        '$prefix Google Drive storage is full. $action to continue syncing.',
+    };
+  }
+}
+
+final driveStorageAlertProvider =
+    StateProvider<DriveStorageAlert>((ref) => DriveStorageAlert.none);
+
+bool isStorageQuotaExceeded(Object e) {
+  final s = e.toString().toLowerCase();
+  return s.contains('storagequotaexceeded') || s.contains('quota_exceeded');
+}
+
 // ── Current authenticated user ────────────────────────────────────────────────
 
 class AppUserNotifier extends Notifier<AppUser?> {
@@ -106,6 +146,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     DriveSyncService.instance.clearCache();
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
+    ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
     if (current?.type == AuthType.google) {
       await AuthService.instance.signOut();
     } else if (current?.type == AuthType.local) {
@@ -123,6 +164,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     final current = state;
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
+    ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
     await DatabaseService.instance.clearAll();
     if (current?.type == AuthType.google) {
       final api = await DriveSyncService.instance.getApi();

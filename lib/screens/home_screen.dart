@@ -32,6 +32,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _sessionRestored = false;
   Timer? _pollTimer;
   bool _pollRunning = false;
+  bool _warningShownThisSession = false;
 
   @override
   void initState() {
@@ -162,6 +163,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final drv = DriveSyncService.instance;
       final api = await drv.getApi();
       if (api == null) return;
+      await _checkStorageQuota(api);
       final appFolderId = await drv.getOrCreateAppFolder(api);
       final userId = user!.id;
 
@@ -212,15 +214,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
       }
     } catch (e) {
-      final isNetworkHiccup = e.toString().contains('Connection reset') ||
-          e.toString().contains('SocketException') ||
-          e.toString().contains('Connection refused') ||
-          e.toString().contains('Network is unreachable');
+      final s = e.toString();
+      final isNetworkHiccup = s.contains('Connection reset') ||
+          s.contains('SocketException') ||
+          s.contains('Connection refused') ||
+          s.contains('Network is unreachable');
       if (isNetworkHiccup) {
-        // Transient connectivity drop — next poll will retry silently.
         AppLogger.instance.warn('HomeScreen', 'poll skipped (network)', e);
         if (mounted) {
           ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+        }
+      } else if (isStorageQuotaExceeded(e)) {
+        if (mounted) {
+          ref.read(driveStorageAlertProvider.notifier).state =
+              const DriveStorageAlert(severity: DriveStorageSeverity.exceeded);
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
         }
       } else {
         AppLogger.instance.error('HomeScreen', 'poll failed', e);
@@ -230,6 +238,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
     } finally {
       _pollRunning = false;
+    }
+  }
+
+  Future<void> _checkStorageQuota(drive.DriveApi api) async {
+    if (_warningShownThisSession) return;
+    try {
+      final about = await api.about.get($fields: 'storageQuota');
+      final limit = int.tryParse(about.storageQuota?.limit ?? '');
+      final usage = int.tryParse(about.storageQuota?.usage ?? '');
+      if (limit == null || limit <= 0 || usage == null) return;
+      final percent = (usage * 100 ~/ limit).clamp(0, 100);
+      if (percent < 90 || !mounted) return;
+      _warningShownThisSession = true;
+      ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert(
+        severity: DriveStorageSeverity.warning,
+        usagePercent: percent,
+      );
+    } catch (e) {
+      AppLogger.instance.warn('HomeScreen', 'quota check failed', e);
     }
   }
 
@@ -352,6 +379,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(notesProvider.notifier).flushPendingPush();
         _pollCycle();
       }
+    });
+    ref.listen(driveStorageAlertProvider, (_, alert) {
+      if (alert.severity == DriveStorageSeverity.none) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text(alert.message),
+          duration: const Duration(hours: 24),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {
+              ref.read(driveStorageAlertProvider.notifier).state =
+                  DriveStorageAlert.none;
+              ScaffoldMessenger.of(context).clearSnackBars();
+            },
+          ),
+        ));
     });
 
     final width = MediaQuery.of(context).size.width;
