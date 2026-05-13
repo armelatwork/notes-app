@@ -101,19 +101,25 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return _controller!.document.toPlainText().trim().isEmpty;
   }
 
+  // Controller listener: debounce for keyboard-driven selection changes.
+  // Pointer-based selection (mouse drag, touch) is handled by _onPrimaryPointerUp,
+  // which cancels this timer and applies immediately on pointer release.
   void _applyFormatPainterIfActive() {
     if (!mounted || _controller == null) return;
     if (ref.read(formatPainterProvider) == null) return;
     final sel = _controller!.selection;
     if (!sel.isValid || sel.isCollapsed) return;
-    // Debounce: cancel and reschedule on every selection change. During a
-    // drag the controller fires this listener every frame; the timer only
-    // fires once the selection stops moving (drag released, tap complete).
-    // Attrs and range are read inside the callback so they reflect the
-    // FINAL selection, not a mid-drag intermediate position.
     _formatPainterTimer?.cancel();
     _formatPainterTimer =
-        Timer(const Duration(milliseconds: 50), _applyFormatPainterNow);
+        Timer(const Duration(milliseconds: 300), _applyFormatPainterNow);
+  }
+
+  // Called on primary pointer-up (mouse release / touch lift) so format painter
+  // applies to the FINAL selection rather than a mid-drag intermediate position.
+  void _onPrimaryPointerUp() {
+    _formatPainterTimer?.cancel();
+    _formatPainterTimer = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyFormatPainterNow());
   }
 
   void _applyFormatPainterNow() {
@@ -130,10 +136,12 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       _clearTextStyle(ctrl, start, len);
     } else {
       for (final attr in attrs.values) {
-        ctrl.formatText(start, len, attr);
+        ctrl.formatText(start, len, attr, shouldNotifyListeners: false); // ignore: experimental_member_use
       }
     }
+    // Clear painter before notifying so the listener sees null and skips.
     ref.read(formatPainterProvider.notifier).clear();
+    ctrl.updateSelection(ctrl.selection, ChangeSource.local);
   }
 
   // Removes all common inline and block text formatting from [start, start+len).
@@ -143,10 +151,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       Attribute.bold, Attribute.italic, Attribute.underline,
       Attribute.strikeThrough, Attribute.inlineCode, Attribute.subscript,
     ]) {
-      ctrl.formatText(start, len, Attribute.clone(attr, null));
+      ctrl.formatText(start, len, Attribute.clone(attr, null), shouldNotifyListeners: false); // ignore: experimental_member_use
     }
     // header is a block attribute; clearing with h1's key removes any level.
-    ctrl.formatText(start, len, Attribute.clone(Attribute.h1, null));
+    ctrl.formatText(start, len, Attribute.clone(Attribute.h1, null), shouldNotifyListeners: false); // ignore: experimental_member_use
   }
 
   void _discardIfEmpty() {
@@ -368,7 +376,14 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       ),
     );
 
-    if (defaultTargetPlatform != TargetPlatform.macOS) return editor;
+    if (defaultTargetPlatform != TargetPlatform.macOS) {
+      // On Android, wrap with a Listener solely to catch pointer-up so the
+      // format painter can apply to the final selection after a drag.
+      return Listener(
+        onPointerUp: (_) => _onPrimaryPointerUp(),
+        child: editor,
+      );
+    }
 
     // On macOS, use showMenu (a Navigator Route) for the context menu.
     // Routes sit above the overlay stack, so clicks always reach the items.
@@ -381,15 +396,18 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         }
       },
       onPointerUp: (event) {
-        if (!_secondaryButtonActive) return;
-        _secondaryButtonActive = false;
-        // Fire on pointer-UP, not pointer-DOWN, so that flutter_quill's
-        // onSecondarySingleTapUp has already moved the cursor to the
-        // right-click position before we check for a link there.
-        final pos = event.position;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _showMacContextMenu(pos);
-        });
+        if (_secondaryButtonActive) {
+          _secondaryButtonActive = false;
+          // Fire on pointer-UP, not pointer-DOWN, so that flutter_quill's
+          // onSecondarySingleTapUp has already moved the cursor to the
+          // right-click position before we check for a link there.
+          final pos = event.position;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showMacContextMenu(pos);
+          });
+          return;
+        }
+        _onPrimaryPointerUp();
       },
       child: editor,
     );
