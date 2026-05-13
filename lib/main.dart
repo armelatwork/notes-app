@@ -32,7 +32,7 @@ class NotesApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Notes',
+      title: 'My Notes',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
         FlutterQuillLocalizations.delegate,

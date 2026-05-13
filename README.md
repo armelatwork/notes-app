@@ -1,4 +1,4 @@
-# Notes
+# My Notes
 
 A cross-platform rich text notes app for macOS and Android with folder organisation, Google Drive sync, and end-to-end encryption.
 
