@@ -142,12 +142,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       _clearTextStyle(ctrl, start, len);
     } else {
       for (final attr in attrs.values) {
-        ctrl.formatText(start, len, attr, shouldNotifyListeners: false); // ignore: experimental_member_use
+        ctrl.formatText(start, len, attr);
       }
     }
-    // Clear painter before notifying so the listener sees null and skips.
     ref.read(formatPainterProvider.notifier).clear();
-    ctrl.updateSelection(ctrl.selection, ChangeSource.local);
   }
 
   // Removes all common inline and block text formatting from [start, start+len).
@@ -157,10 +155,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       Attribute.bold, Attribute.italic, Attribute.underline,
       Attribute.strikeThrough, Attribute.inlineCode, Attribute.subscript,
     ]) {
-      ctrl.formatText(start, len, Attribute.clone(attr, null), shouldNotifyListeners: false); // ignore: experimental_member_use
+      ctrl.formatText(start, len, Attribute.clone(attr, null));
     }
     // header is a block attribute; clearing with h1's key removes any level.
-    ctrl.formatText(start, len, Attribute.clone(Attribute.h1, null), shouldNotifyListeners: false); // ignore: experimental_member_use
+    ctrl.formatText(start, len, Attribute.clone(Attribute.h1, null));
   }
 
   void _discardIfEmpty() {
