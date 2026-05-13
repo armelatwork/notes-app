@@ -78,7 +78,11 @@ class FoldersNotifier extends AsyncNotifier<List<Folder>> {
     task().then((_) {
       ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
     }).catchError((Object e) {
-      AppLogger.instance.error('FoldersNotifier', 'push failed', e);
+      if (isStorageQuotaExceeded(e)) {
+        ref.read(driveQuotaExceededProvider.notifier).state = true;
+      } else {
+        AppLogger.instance.error('FoldersNotifier', 'push failed', e);
+      }
       ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
     });
   }

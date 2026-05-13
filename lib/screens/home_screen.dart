@@ -212,15 +212,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
       }
     } catch (e) {
-      final isNetworkHiccup = e.toString().contains('Connection reset') ||
-          e.toString().contains('SocketException') ||
-          e.toString().contains('Connection refused') ||
-          e.toString().contains('Network is unreachable');
+      final s = e.toString();
+      final isNetworkHiccup = s.contains('Connection reset') ||
+          s.contains('SocketException') ||
+          s.contains('Connection refused') ||
+          s.contains('Network is unreachable');
       if (isNetworkHiccup) {
-        // Transient connectivity drop — next poll will retry silently.
         AppLogger.instance.warn('HomeScreen', 'poll skipped (network)', e);
         if (mounted) {
           ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+        }
+      } else if (isStorageQuotaExceeded(e)) {
+        if (mounted) {
+          ref.read(driveQuotaExceededProvider.notifier).state = true;
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
         }
       } else {
         AppLogger.instance.error('HomeScreen', 'poll failed', e);
@@ -352,6 +357,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(notesProvider.notifier).flushPendingPush();
         _pollCycle();
       }
+    });
+    ref.listen(driveQuotaExceededProvider, (_, exceeded) {
+      if (!exceeded) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: const Text(
+            'Google Drive storage is full. Free up space to continue syncing.',
+          ),
+          duration: const Duration(hours: 24),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            onPressed: () {
+              ref.read(driveQuotaExceededProvider.notifier).state = false;
+              ScaffoldMessenger.of(context).clearSnackBars();
+            },
+          ),
+        ));
     });
 
     final width = MediaQuery.of(context).size.width;

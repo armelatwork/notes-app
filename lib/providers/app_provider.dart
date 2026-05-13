@@ -29,6 +29,14 @@ final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 final noteReloadTriggerProvider = StateProvider<int>((ref) => 0);
 final pollTriggerProvider = StateProvider<int>((ref) => 0);
 
+// True while the user's Google Drive storage quota is exceeded.
+final driveQuotaExceededProvider = StateProvider<bool>((ref) => false);
+
+bool isStorageQuotaExceeded(Object e) {
+  final s = e.toString().toLowerCase();
+  return s.contains('storagequotaexceeded') || s.contains('quota_exceeded');
+}
+
 // ── Current authenticated user ────────────────────────────────────────────────
 
 class AppUserNotifier extends Notifier<AppUser?> {
@@ -106,6 +114,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     DriveSyncService.instance.clearCache();
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
+    ref.read(driveQuotaExceededProvider.notifier).state = false;
     if (current?.type == AuthType.google) {
       await AuthService.instance.signOut();
     } else if (current?.type == AuthType.local) {
@@ -123,6 +132,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     final current = state;
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
+    ref.read(driveQuotaExceededProvider.notifier).state = false;
     await DatabaseService.instance.clearAll();
     if (current?.type == AuthType.google) {
       final api = await DriveSyncService.instance.getApi();
