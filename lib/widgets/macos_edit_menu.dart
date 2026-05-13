@@ -92,7 +92,7 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
   }
 
   PlatformMenu _appMenu() => PlatformMenu(
-        label: 'Notes',
+        label: 'My Notes',
         menus: [
           const PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.about),
           PlatformMenuItemGroup(members: [
