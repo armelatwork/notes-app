@@ -154,10 +154,30 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
                   : null,
             ),
             PlatformMenuItem(
+              label: 'Paste and Match Style',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyV,
+                  meta: true, shift: true, alt: true),
+              onSelected: ctrl != null
+                  ? () => _pasteMatchStyle(ctrl)
+                  : null,
+            ),
+            PlatformMenuItem(
+              label: 'Delete',
+              onSelected: hasSelection ? () => _delete(ctrl!) : null,
+            ),
+            PlatformMenuItem(
               label: 'Select All',
               shortcut: const SingleActivator(LogicalKeyboardKey.keyA,
                   meta: true),
               onSelected: ctrl != null ? () => _selectAll(ctrl) : null,
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Find…',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyF,
+                  meta: true),
+              onSelected: ctrl != null ? () => _openFind(ctrl) : null,
             ),
           ]),
         ],
@@ -194,6 +214,33 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
     if (start < end) {
       Clipboard.setData(ClipboardData(text: text.substring(start, end)));
     }
+  }
+
+  void _pasteMatchStyle(QuillController ctrl) {
+    Clipboard.getData(Clipboard.kTextPlain).then((data) {
+      final text = data?.text;
+      if (text == null || text.isEmpty) return;
+      final sel = ctrl.selection;
+      if (sel.isValid && !sel.isCollapsed) {
+        ctrl.replaceText(sel.start, sel.end - sel.start, text, null);
+      } else if (sel.isValid) {
+        ctrl.replaceText(sel.baseOffset, 0, text, null);
+      }
+    });
+  }
+
+  void _delete(QuillController ctrl) {
+    final sel = ctrl.selection;
+    if (sel.isValid && !sel.isCollapsed) {
+      ctrl.replaceText(sel.start, sel.end - sel.start, '', null);
+    }
+  }
+
+  void _openFind(QuillController ctrl) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => QuillToolbarSearchDialog(controller: ctrl),
+    );
   }
 
   void _selectAll(QuillController ctrl) {
