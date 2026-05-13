@@ -104,15 +104,39 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (attrs == null) return;
     final sel = _controller!.selection;
     if (!sel.isValid || sel.isCollapsed) return;
+    // Snapshot both the captured attrs and the target range before scheduling
+    // the callback. formatText uses explicit index+length so Quill's internal
+    // selection adjustments (which happen after each format call) cannot shrink
+    // or shift the range for subsequent calls.
     final captured = Map<String, Attribute>.from(attrs);
+    final start = sel.start;
+    final len = sel.end - sel.start;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _controller == null) return;
       if (ref.read(formatPainterProvider) == null) return;
-      for (final attr in captured.values) {
-        _controller!.formatSelection(attr);
+      final ctrl = _controller!;
+      if (captured.isEmpty) {
+        _clearTextStyle(ctrl, start, len);
+      } else {
+        for (final attr in captured.values) {
+          ctrl.formatText(start, len, attr);
+        }
       }
       ref.read(formatPainterProvider.notifier).clear();
     });
+  }
+
+  // Removes all common inline and block text formatting from [start, start+len).
+  // Used when the painter was activated on plain (unstyled) text.
+  void _clearTextStyle(QuillController ctrl, int start, int len) {
+    for (final attr in <Attribute>[
+      Attribute.bold, Attribute.italic, Attribute.underline,
+      Attribute.strikeThrough, Attribute.inlineCode, Attribute.subscript,
+    ]) {
+      ctrl.formatText(start, len, Attribute.clone(attr, null));
+    }
+    // header is a block attribute; clearing with h1's key removes any level.
+    ctrl.formatText(start, len, Attribute.clone(Attribute.h1, null));
   }
 
   void _discardIfEmpty() {

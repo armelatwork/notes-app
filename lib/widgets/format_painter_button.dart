@@ -56,7 +56,7 @@ class _FormatPainterButtonState extends ConsumerState<FormatPainterButton> {
       return;
     }
     final attrs = widget.controller.getSelectionStyle().attributes;
-    if (attrs.isNotEmpty) notifier.capture(attrs);
+    notifier.capture(attrs);
   }
 
   @override

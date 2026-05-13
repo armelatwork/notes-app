@@ -133,6 +133,30 @@ void main() {
       expect(state!.containsKey(Attribute.bold.key), isTrue);
     });
 
+    testWidgets(
+        'button_withPlainTextSelection_onPress_activatesPainterWithEmptyMap',
+        (tester) async {
+      // Plain text has no formatting attributes — painter should still activate.
+      final ctrl = _makeController(text: 'plain text');
+      addTearDown(ctrl.dispose);
+      ctrl.updateSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 5),
+          ChangeSource.local);
+
+      await tester.pumpWidget(_wrap(ctrl));
+      await tester.pump();
+
+      await tester.tap(find.byType(IconButton));
+      await tester.pump();
+
+      final container = tester.element(find.byType(FormatPainterButton));
+      final ref = ProviderScope.containerOf(container);
+      final state = ref.read(formatPainterProvider);
+      // State must be non-null (active) even though it captured an empty map.
+      expect(state, isNotNull);
+      expect(state, isEmpty);
+    });
+
     testWidgets('button_whenActive_onPress_clearsPainter', (tester) async {
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);

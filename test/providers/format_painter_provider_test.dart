@@ -68,6 +68,16 @@ void main() {
       expect(state.containsKey(Attribute.bold.key), isFalse);
     });
 
+    test('capture_withEmptyMap_activatesPainterWithEmptyState', () {
+      final container = _makeContainer();
+
+      container.read(formatPainterProvider.notifier).capture({});
+
+      // Non-null means active; empty map means "plain text" style captured.
+      expect(container.read(formatPainterProvider), isNotNull);
+      expect(container.read(formatPainterProvider), isEmpty);
+    });
+
     test('clear_whenAlreadyNull_remainsNull', () {
       final container = _makeContainer();
 
