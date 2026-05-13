@@ -31,18 +31,17 @@ class AuthService {
 
   // Throws on error so callers can surface the message to the user.
   Future<GoogleSignInAccount?> signIn() async {
-    // signOut clears the local credential cache; disconnect revokes server-side.
-    // Both are fire-and-forget — errors are non-fatal.
+    // signOut clears the local credential cache. We intentionally skip
+    // disconnect() here: it revokes the server-side grant, and on Android
+    // Play Services can silently hand back a cached (now-revoked) token on the
+    // subsequent signIn(), causing an immediate 401 from the Drive API.
     await _googleSignIn.signOut().catchError((_) => null);
-    await _googleSignIn.disconnect().catchError((_) => null);
     final user = await _googleSignIn.signIn();
     if (user == null) return null;
     return await _ensureDriveScope(user);
   }
 
-  // Always request drive.file explicitly after interactive sign-in. If the
-  // scope is already granted this is a no-op; if a prior cached grant lacked
-  // the scope (401/403 on Drive calls) this forces a fresh authorisation.
+  // Request drive.file explicitly and verify a valid access token is returned.
   Future<GoogleSignInAccount> _ensureDriveScope(
       GoogleSignInAccount user) async {
     final granted = await _googleSignIn.requestScopes([_kDriveScope]);
@@ -50,8 +49,16 @@ class AuthService {
       throw 'Google Drive access is required for notes sync. '
           'Please grant Drive permission and try again.';
     }
-    // currentUser holds a fresh token after the scope grant.
-    return _googleSignIn.currentUser ?? user;
+    final current = _googleSignIn.currentUser ?? user;
+    // Verify the token actually exists after the scope grant.
+    final auth = await current.authentication;
+    if (auth.accessToken == null) {
+      AppLogger.instance.warn(
+          'AuthService', 'access token is null after scope grant');
+      throw 'Failed to obtain a valid Drive access token. '
+          'Please try signing in again.';
+    }
+    return current;
   }
 
   Future<void> signOut() => _googleSignIn.signOut();
@@ -59,6 +66,17 @@ class AuthService {
   Future<Map<String, String>?> getAuthHeaders() async {
     final user = _googleSignIn.currentUser;
     if (user == null) return null;
-    return user.authHeaders;
+    try {
+      final auth = await user.authentication;
+      final token = auth.accessToken;
+      if (token == null) {
+        AppLogger.instance.warn('AuthService', 'null access token in getAuthHeaders');
+        return null;
+      }
+      return {'Authorization': 'Bearer $token'};
+    } catch (e) {
+      AppLogger.instance.warn('AuthService', 'getAuthHeaders failed', e);
+      return null;
+    }
   }
 }
