@@ -117,27 +117,33 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         Timer(const Duration(milliseconds: 300), _applyFormatPainterNow);
   }
 
-  // Called on primary pointer-up (mouse release / touch lift) so format painter
-  // applies to the FINAL selection rather than a mid-drag intermediate position.
-  // Returns immediately when the painter is inactive to avoid any interference
-  // with Quill's own pointer-up / selection-finalization processing.
+  // Called on primary pointer-up (mouse release / touch lift).
+  // Listener.onPointerUp fires before Quill's gesture recognizer, so the
+  // controller selection still reflects the completed drag. We snapshot the
+  // range here and apply immediately — no frame deferral needed.
   void _onPrimaryPointerUp() {
     if (ref.read(formatPainterProvider) == null) return;
+    final sel = _controller?.selection;
+    if (sel == null || !sel.isValid || sel.isCollapsed) return;
     _formatPainterTimer?.cancel();
     _formatPainterTimer = null;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _applyFormatPainterNow());
+    _applyFormatPainterToRange(sel.start, sel.end - sel.start);
   }
 
+  // Keyboard-fallback path: timer fires after selection settles.
   void _applyFormatPainterNow() {
     _formatPainterTimer = null;
+    if (!mounted || _controller == null) return;
+    final sel = _controller!.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
+    _applyFormatPainterToRange(sel.start, sel.end - sel.start);
+  }
+
+  void _applyFormatPainterToRange(int start, int len) {
     if (!mounted || _controller == null) return;
     final attrs = ref.read(formatPainterProvider);
     if (attrs == null) return;
     final ctrl = _controller!;
-    final sel = ctrl.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    final start = sel.start;
-    final len = sel.end - sel.start;
     if (attrs.isEmpty) {
       _clearTextStyle(ctrl, start, len);
     } else {
