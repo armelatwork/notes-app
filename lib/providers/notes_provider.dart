@@ -158,7 +158,8 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
       ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
     }).catchError((Object e) {
       if (isStorageQuotaExceeded(e)) {
-        ref.read(driveQuotaExceededProvider.notifier).state = true;
+        ref.read(driveStorageAlertProvider.notifier).state =
+            const DriveStorageAlert(severity: DriveStorageSeverity.exceeded);
       } else {
         AppLogger.instance.error('NotesNotifier', 'push failed', e);
       }

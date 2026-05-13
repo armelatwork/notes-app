@@ -32,6 +32,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _sessionRestored = false;
   Timer? _pollTimer;
   bool _pollRunning = false;
+  bool _warningShownThisSession = false;
 
   @override
   void initState() {
@@ -162,6 +163,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final drv = DriveSyncService.instance;
       final api = await drv.getApi();
       if (api == null) return;
+      await _checkStorageQuota(api);
       final appFolderId = await drv.getOrCreateAppFolder(api);
       final userId = user!.id;
 
@@ -224,7 +226,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         }
       } else if (isStorageQuotaExceeded(e)) {
         if (mounted) {
-          ref.read(driveQuotaExceededProvider.notifier).state = true;
+          ref.read(driveStorageAlertProvider.notifier).state =
+              const DriveStorageAlert(severity: DriveStorageSeverity.exceeded);
           ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
         }
       } else {
@@ -235,6 +238,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
     } finally {
       _pollRunning = false;
+    }
+  }
+
+  Future<void> _checkStorageQuota(drive.DriveApi api) async {
+    if (_warningShownThisSession) return;
+    try {
+      final about = await api.about.get($fields: 'storageQuota');
+      final limit = int.tryParse(about.storageQuota?.limit ?? '');
+      final usage = int.tryParse(about.storageQuota?.usage ?? '');
+      if (limit == null || limit <= 0 || usage == null) return;
+      final percent = (usage * 100 ~/ limit).clamp(0, 100);
+      if (percent < 90 || !mounted) return;
+      _warningShownThisSession = true;
+      ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert(
+        severity: DriveStorageSeverity.warning,
+        usagePercent: percent,
+      );
+    } catch (e) {
+      AppLogger.instance.warn('HomeScreen', 'quota check failed', e);
     }
   }
 
@@ -358,19 +380,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _pollCycle();
       }
     });
-    ref.listen(driveQuotaExceededProvider, (_, exceeded) {
-      if (!exceeded) return;
+    ref.listen(driveStorageAlertProvider, (_, alert) {
+      if (alert.severity == DriveStorageSeverity.none) return;
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(SnackBar(
-          content: const Text(
-            'Google Drive storage is full. Free up space to continue syncing.',
-          ),
+          content: Text(alert.message),
           duration: const Duration(hours: 24),
           action: SnackBarAction(
             label: 'Dismiss',
             onPressed: () {
-              ref.read(driveQuotaExceededProvider.notifier).state = false;
+              ref.read(driveStorageAlertProvider.notifier).state =
+                  DriveStorageAlert.none;
               ScaffoldMessenger.of(context).clearSnackBars();
             },
           ),
