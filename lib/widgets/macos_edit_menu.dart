@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/editor_menu_provider.dart';
 import '../providers/format_painter_provider.dart';
@@ -92,20 +93,29 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
 
   PlatformMenu _appMenu() => PlatformMenu(
         label: 'Notes',
-        menus: const [
-          PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.about),
+        menus: [
+          const PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.about),
           PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Visit Website',
+              onSelected: () => launchUrl(
+                Uri.parse('https://thechaos-mynotes.web.app'),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+          ]),
+          const PlatformMenuItemGroup(members: [
             PlatformProvidedMenuItem(
                 type: PlatformProvidedMenuItemType.servicesSubmenu),
           ]),
-          PlatformMenuItemGroup(members: [
+          const PlatformMenuItemGroup(members: [
             PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.hide),
             PlatformProvidedMenuItem(
                 type: PlatformProvidedMenuItemType.hideOtherApplications),
             PlatformProvidedMenuItem(
                 type: PlatformProvidedMenuItemType.showAllApplications),
           ]),
-          PlatformMenuItemGroup(members: [
+          const PlatformMenuItemGroup(members: [
             PlatformProvidedMenuItem(type: PlatformProvidedMenuItemType.quit),
           ]),
         ],

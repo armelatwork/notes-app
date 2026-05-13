@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/app_user.dart';
 import '../providers/app_provider.dart';
+
+const _kWebsiteUrl = 'https://thechaos-mynotes.web.app';
+
+final _packageInfoProvider = FutureProvider<PackageInfo>(
+  (_) => PackageInfo.fromPlatform(),
+);
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -9,6 +17,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appUser = ref.watch(appUserProvider);
+    final packageInfo = ref.watch(_packageInfoProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -37,6 +46,29 @@ class SettingsScreen extends ConsumerWidget {
               Navigator.pop(context);
               ref.read(appUserProvider.notifier).signOut();
             },
+          ),
+          const Divider(),
+          _SectionHeader(label: 'About'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Version'),
+            trailing: packageInfo.whenOrNull(
+              data: (info) => Text(
+                info.version,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.open_in_new),
+            title: const Text('Website'),
+            subtitle: const Text(_kWebsiteUrl),
+            onTap: () => launchUrl(
+              Uri.parse(_kWebsiteUrl),
+              mode: LaunchMode.externalApplication,
+            ),
           ),
         ],
       ),
