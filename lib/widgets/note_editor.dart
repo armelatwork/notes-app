@@ -42,6 +42,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _dragging = false;
   bool _isDirty = false;
   bool _secondaryButtonActive = false;
+  bool _primaryPointerDown = false;
   Timer? _formatPainterTimer;
   int _primaryTapCount = 0;
   DateTime? _lastPrimaryTapTime;
@@ -101,12 +102,14 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return _controller!.document.toPlainText().trim().isEmpty;
   }
 
-  // Controller listener: debounce for keyboard-driven selection changes.
-  // Pointer-based selection (mouse drag, touch) is handled by _onPrimaryPointerUp,
-  // which cancels this timer and applies immediately on pointer release.
+  // Controller listener: debounce for keyboard-driven selection changes only.
+  // Suppressed while a pointer button is held (_primaryPointerDown) because
+  // pointer-based selection is handled by _onPrimaryPointerUp instead, which
+  // fires after the drag ends and always has the final selection.
   void _applyFormatPainterIfActive() {
     if (!mounted || _controller == null) return;
     if (ref.read(formatPainterProvider) == null) return;
+    if (_primaryPointerDown) return;
     final sel = _controller!.selection;
     if (!sel.isValid || sel.isCollapsed) return;
     _formatPainterTimer?.cancel();
@@ -116,7 +119,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   // Called on primary pointer-up (mouse release / touch lift) so format painter
   // applies to the FINAL selection rather than a mid-drag intermediate position.
+  // Returns immediately when the painter is inactive to avoid any interference
+  // with Quill's own pointer-up / selection-finalization processing.
   void _onPrimaryPointerUp() {
+    if (ref.read(formatPainterProvider) == null) return;
     _formatPainterTimer?.cancel();
     _formatPainterTimer = null;
     WidgetsBinding.instance.addPostFrameCallback((_) => _applyFormatPainterNow());
@@ -377,10 +383,12 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
 
     if (defaultTargetPlatform != TargetPlatform.macOS) {
-      // On Android, wrap with a Listener solely to catch pointer-up so the
-      // format painter can apply to the final selection after a drag.
       return Listener(
-        onPointerUp: (_) => _onPrimaryPointerUp(),
+        onPointerDown: (_) => _primaryPointerDown = true,
+        onPointerUp: (_) {
+          _primaryPointerDown = false;
+          _onPrimaryPointerUp();
+        },
         child: editor,
       );
     }
@@ -392,6 +400,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         if (event.buttons == kSecondaryMouseButton) {
           _secondaryButtonActive = true;
         } else if (event.buttons == kPrimaryMouseButton) {
+          _primaryPointerDown = true;
           _trackPrimaryTap();
         }
       },
@@ -407,6 +416,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           });
           return;
         }
+        _primaryPointerDown = false;
         _onPrimaryPointerUp();
       },
       child: editor,
