@@ -38,13 +38,45 @@ The editor toolbar provides full text formatting:
 | Format | Controls |
 |---|---|
 | Font | Family (Sans Serif, Serif, Monospace, Nunito, Pacifico, Roboto Mono, Ibarra Real Nova, Square Peg), size |
-| Style | Bold, italic, underline |
+| Style | Bold, italic, underline, strikethrough |
 | Colour | Text colour, highlight colour |
 | Alignment | Left, centre, right |
 | Structure | Headings (H1–H6), ordered list, bullet list, checklist, indent |
 | History | Undo, redo |
 
 Tab key inserts a fixed-width indent character inside the editor.
+
+**Triple-click** (macOS) selects the entire paragraph under the cursor.
+
+### Format Painter
+
+Copy formatting from one piece of text and apply it to another — similar to the paint-brush tool in word processors.
+
+1. Select source text that has the formatting you want to copy.
+2. Click the **paint-brush icon** (left of the Bold button on macOS; leftmost button in the Text Style sheet on Android). The icon highlights to show the painter is active.
+3. Select the target text. Formatting is applied immediately on mouse/touch release.
+4. Click the icon again while active to cancel without applying.
+
+The Format Painter is also accessible via **Edit → Copy Formatting / Cancel Formatting** on macOS.
+
+Selecting plain (unstyled) text before activating copies a "no formatting" style — applying it strips all inline and block formatting from the target.
+
+### macOS Edit Menu
+
+The macOS menu bar Edit menu supports the following actions with standard shortcuts:
+
+| Action | Shortcut |
+|---|---|
+| Undo | ⌘Z |
+| Redo | ⌘⇧Z |
+| Cut | ⌘X |
+| Copy | ⌘C |
+| Copy Formatting | — |
+| Paste | ⌘V |
+| Paste and Match Style | ⌘⇧⌥V |
+| Delete | — |
+| Select All | ⌘A |
+| Find | ⌘F |
 
 ### Images
 
