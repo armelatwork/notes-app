@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../providers/editor_menu_provider.dart';
+import '../providers/format_painter_provider.dart';
 import '../services/app_logger.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
@@ -97,6 +98,23 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return _controller!.document.toPlainText().trim().isEmpty;
   }
 
+  void _applyFormatPainterIfActive() {
+    if (!mounted || _controller == null) return;
+    final attrs = ref.read(formatPainterProvider);
+    if (attrs == null) return;
+    final sel = _controller!.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
+    final captured = Map<String, Attribute>.from(attrs);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _controller == null) return;
+      if (ref.read(formatPainterProvider) == null) return;
+      for (final attr in captured.values) {
+        _controller!.formatSelection(attr);
+      }
+      ref.read(formatPainterProvider.notifier).clear();
+    });
+  }
+
   void _discardIfEmpty() {
     if (!_isNewEmptyNote()) return;
     ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
@@ -137,6 +155,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       selection: const TextSelection.collapsed(offset: 0),
     );
     _controller!.document.changes.listen((_) => _scheduleSave());
+    _controller!.addListener(_applyFormatPainterIfActive);
     ref.read(editorMenuProvider.notifier).state = _controller;
     setState(() {});
   }
