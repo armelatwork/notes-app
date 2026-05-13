@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
+import '../providers/editor_menu_provider.dart';
 import '../services/app_logger.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
@@ -54,6 +55,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   @override
   void dispose() {
     _discardIfEmpty();
+    ref.read(editorMenuProvider.notifier).state = null;
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _controller?.dispose();
     _focusNode.dispose();
@@ -135,6 +137,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       selection: const TextSelection.collapsed(offset: 0),
     );
     _controller!.document.changes.listen((_) => _scheduleSave());
+    ref.read(editorMenuProvider.notifier).state = _controller;
     setState(() {});
   }
 
@@ -221,7 +224,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditorLayout() {
+    // ValueKey ensures the toolbar subtree (including QuillToolbarHistoryButton)
+    // is destroyed and recreated whenever the controller changes. Without this,
+    // the StatefulWidget elements are reused across note loads, so initState is
+    // never called again and the history buttons stay subscribed to the old
+    // (closed) controller.changes stream — leaving undo/redo permanently disabled.
     final toolbar = NoteFormattingToolbar(
+      key: ValueKey(_controller),
       quillController: _controller!,
       onInsertImage: _pickAndInsertImage,
       onInsertLink: _onInsertLink,

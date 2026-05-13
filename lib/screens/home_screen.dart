@@ -15,6 +15,7 @@ import '../services/sync_log_service.dart';
 import '../utils/image_utils.dart';
 import '../widgets/folder_sidebar.dart';
 import '../widgets/note_editor.dart';
+import '../widgets/macos_edit_menu.dart';
 import '../widgets/notes_list_panel.dart';
 
 const _kPollIntervalSeconds = 5;
@@ -355,12 +356,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     final width = MediaQuery.of(context).size.width;
     if (width >= 800) {
-      return const Scaffold(
-        body: Row(children: [
-          FolderSidebar(),
-          SizedBox(width: 260, child: NotesListPanel()),
-          Expanded(child: NoteEditor()),
-        ]),
+      return const MacOSEditMenu(
+        child: Scaffold(
+          body: Row(children: [
+            FolderSidebar(),
+            SizedBox(width: 260, child: NotesListPanel()),
+            Expanded(child: NoteEditor()),
+          ]),
+        ),
       );
     }
     return const _NarrowLayout();
