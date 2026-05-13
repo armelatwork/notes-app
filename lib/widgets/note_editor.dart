@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
@@ -41,6 +42,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _dragging = false;
   bool _isDirty = false;
   bool _secondaryButtonActive = false;
+  Timer? _formatPainterTimer;
   int _primaryTapCount = 0;
   DateTime? _lastPrimaryTapTime;
   static const Duration _kTripleTapMaxGap = Duration(milliseconds: 400);
@@ -55,6 +57,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   void dispose() {
+    _formatPainterTimer?.cancel();
     _discardIfEmpty();
     ref.read(editorMenuProvider.notifier).state = null;
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
@@ -100,30 +103,37 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   void _applyFormatPainterIfActive() {
     if (!mounted || _controller == null) return;
-    final attrs = ref.read(formatPainterProvider);
-    if (attrs == null) return;
+    if (ref.read(formatPainterProvider) == null) return;
     final sel = _controller!.selection;
     if (!sel.isValid || sel.isCollapsed) return;
-    // Snapshot both the captured attrs and the target range before scheduling
-    // the callback. formatText uses explicit index+length so Quill's internal
-    // selection adjustments (which happen after each format call) cannot shrink
-    // or shift the range for subsequent calls.
-    final captured = Map<String, Attribute>.from(attrs);
+    // Debounce: cancel and reschedule on every selection change. During a
+    // drag the controller fires this listener every frame; the timer only
+    // fires once the selection stops moving (drag released, tap complete).
+    // Attrs and range are read inside the callback so they reflect the
+    // FINAL selection, not a mid-drag intermediate position.
+    _formatPainterTimer?.cancel();
+    _formatPainterTimer =
+        Timer(const Duration(milliseconds: 50), _applyFormatPainterNow);
+  }
+
+  void _applyFormatPainterNow() {
+    _formatPainterTimer = null;
+    if (!mounted || _controller == null) return;
+    final attrs = ref.read(formatPainterProvider);
+    if (attrs == null) return;
+    final ctrl = _controller!;
+    final sel = ctrl.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
     final start = sel.start;
     final len = sel.end - sel.start;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _controller == null) return;
-      if (ref.read(formatPainterProvider) == null) return;
-      final ctrl = _controller!;
-      if (captured.isEmpty) {
-        _clearTextStyle(ctrl, start, len);
-      } else {
-        for (final attr in captured.values) {
-          ctrl.formatText(start, len, attr);
-        }
+    if (attrs.isEmpty) {
+      _clearTextStyle(ctrl, start, len);
+    } else {
+      for (final attr in attrs.values) {
+        ctrl.formatText(start, len, attr);
       }
-      ref.read(formatPainterProvider.notifier).clear();
-    });
+    }
+    ref.read(formatPainterProvider.notifier).clear();
   }
 
   // Removes all common inline and block text formatting from [start, start+len).
@@ -147,6 +157,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   void _loadNote(Note note) {
     if (_currentNote?.id == note.id) return;
+    _formatPainterTimer?.cancel();
+    _formatPainterTimer = null;
+    ref.read(formatPainterProvider.notifier).clear();
     if (_isNewEmptyNote()) {
       ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
     } else {
