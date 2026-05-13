@@ -38,7 +38,26 @@ class AppUserNotifier extends Notifier<AppUser?> {
   Future<void> tryRestore() async {
     final googleUser = await AuthService.instance.trySilentSignIn();
     if (googleUser == null) return;
-    await _initGoogleSession(googleUser.id, googleUser);
+    try {
+      await _initGoogleSession(googleUser.id, googleUser);
+    } catch (e) {
+      // The restored token lacks the Drive scope (403 insufficient scopes).
+      // Clear the cached session so the user is prompted to sign in
+      // interactively, which goes through _ensureDriveScope and re-grants it.
+      if (_isInsufficientScopeError(e)) {
+        AppLogger.instance.warn(
+            'AppUserNotifier', 'restored token lacks Drive scope — clearing session', e);
+        await AuthService.instance.signOut();
+        return;
+      }
+      AppLogger.instance.error('AppUserNotifier', 'session restore failed', e);
+    }
+  }
+
+  static bool _isInsufficientScopeError(Object e) {
+    final s = e.toString();
+    return (s.contains('403') && s.contains('scope')) ||
+        s.contains('insufficient');
   }
 
   Future<void> setGoogleUser(dynamic googleUser) async {
