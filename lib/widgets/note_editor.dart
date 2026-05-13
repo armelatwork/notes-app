@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../providers/editor_menu_provider.dart';
+import '../providers/format_painter_provider.dart';
 import '../services/app_logger.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
@@ -40,6 +42,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _dragging = false;
   bool _isDirty = false;
   bool _secondaryButtonActive = false;
+  bool _primaryPointerDown = false;
+  Timer? _formatPainterTimer;
   int _primaryTapCount = 0;
   DateTime? _lastPrimaryTapTime;
   static const Duration _kTripleTapMaxGap = Duration(milliseconds: 400);
@@ -54,6 +58,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   @override
   void dispose() {
+    _formatPainterTimer?.cancel();
     _discardIfEmpty();
     ref.read(editorMenuProvider.notifier).state = null;
     HardwareKeyboard.instance.removeHandler(_onKeyEvent);
@@ -97,6 +102,71 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return _controller!.document.toPlainText().trim().isEmpty;
   }
 
+  // Controller listener: debounce for keyboard-driven selection changes only.
+  // Suppressed while a pointer button is held (_primaryPointerDown) because
+  // pointer-based selection is handled by _onPrimaryPointerUp instead, which
+  // fires after the drag ends and always has the final selection.
+  void _applyFormatPainterIfActive() {
+    if (!mounted || _controller == null) return;
+    if (ref.read(formatPainterProvider) == null) return;
+    if (_primaryPointerDown) return;
+    final sel = _controller!.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
+    _formatPainterTimer?.cancel();
+    _formatPainterTimer =
+        Timer(const Duration(milliseconds: 300), _applyFormatPainterNow);
+  }
+
+  // Called on primary pointer-up (mouse release / touch lift).
+  // Listener.onPointerUp fires before Quill's gesture recognizer, so the
+  // controller selection still reflects the completed drag. We snapshot the
+  // range here and apply immediately — no frame deferral needed.
+  void _onPrimaryPointerUp() {
+    if (ref.read(formatPainterProvider) == null) return;
+    final sel = _controller?.selection;
+    if (sel == null || !sel.isValid || sel.isCollapsed) return;
+    _formatPainterTimer?.cancel();
+    _formatPainterTimer = null;
+    _applyFormatPainterToRange(sel.start, sel.end - sel.start);
+  }
+
+  // Keyboard-fallback path: timer fires after selection settles.
+  void _applyFormatPainterNow() {
+    _formatPainterTimer = null;
+    if (!mounted || _controller == null) return;
+    final sel = _controller!.selection;
+    if (!sel.isValid || sel.isCollapsed) return;
+    _applyFormatPainterToRange(sel.start, sel.end - sel.start);
+  }
+
+  void _applyFormatPainterToRange(int start, int len) {
+    if (!mounted || _controller == null) return;
+    final attrs = ref.read(formatPainterProvider);
+    if (attrs == null) return;
+    final ctrl = _controller!;
+    if (attrs.isEmpty) {
+      _clearTextStyle(ctrl, start, len);
+    } else {
+      for (final attr in attrs.values) {
+        ctrl.formatText(start, len, attr);
+      }
+    }
+    ref.read(formatPainterProvider.notifier).clear();
+  }
+
+  // Removes all common inline and block text formatting from [start, start+len).
+  // Used when the painter was activated on plain (unstyled) text.
+  void _clearTextStyle(QuillController ctrl, int start, int len) {
+    for (final attr in <Attribute>[
+      Attribute.bold, Attribute.italic, Attribute.underline,
+      Attribute.strikeThrough, Attribute.inlineCode, Attribute.subscript,
+    ]) {
+      ctrl.formatText(start, len, Attribute.clone(attr, null));
+    }
+    // header is a block attribute; clearing with h1's key removes any level.
+    ctrl.formatText(start, len, Attribute.clone(Attribute.h1, null));
+  }
+
   void _discardIfEmpty() {
     if (!_isNewEmptyNote()) return;
     ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
@@ -105,6 +175,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   void _loadNote(Note note) {
     if (_currentNote?.id == note.id) return;
+    _formatPainterTimer?.cancel();
+    _formatPainterTimer = null;
+    ref.read(formatPainterProvider.notifier).clear();
     if (_isNewEmptyNote()) {
       ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
     } else {
@@ -137,6 +210,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       selection: const TextSelection.collapsed(offset: 0),
     );
     _controller!.document.changes.listen((_) => _scheduleSave());
+    _controller!.addListener(_applyFormatPainterIfActive);
     ref.read(editorMenuProvider.notifier).state = _controller;
     setState(() {});
   }
@@ -312,7 +386,16 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       ),
     );
 
-    if (defaultTargetPlatform != TargetPlatform.macOS) return editor;
+    if (defaultTargetPlatform != TargetPlatform.macOS) {
+      return Listener(
+        onPointerDown: (_) => _primaryPointerDown = true,
+        onPointerUp: (_) {
+          _primaryPointerDown = false;
+          _onPrimaryPointerUp();
+        },
+        child: editor,
+      );
+    }
 
     // On macOS, use showMenu (a Navigator Route) for the context menu.
     // Routes sit above the overlay stack, so clicks always reach the items.
@@ -321,19 +404,24 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         if (event.buttons == kSecondaryMouseButton) {
           _secondaryButtonActive = true;
         } else if (event.buttons == kPrimaryMouseButton) {
+          _primaryPointerDown = true;
           _trackPrimaryTap();
         }
       },
       onPointerUp: (event) {
-        if (!_secondaryButtonActive) return;
-        _secondaryButtonActive = false;
-        // Fire on pointer-UP, not pointer-DOWN, so that flutter_quill's
-        // onSecondarySingleTapUp has already moved the cursor to the
-        // right-click position before we check for a link there.
-        final pos = event.position;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _showMacContextMenu(pos);
-        });
+        if (_secondaryButtonActive) {
+          _secondaryButtonActive = false;
+          // Fire on pointer-UP, not pointer-DOWN, so that flutter_quill's
+          // onSecondarySingleTapUp has already moved the cursor to the
+          // right-click position before we check for a link there.
+          final pos = event.position;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showMacContextMenu(pos);
+          });
+          return;
+        }
+        _primaryPointerDown = false;
+        _onPrimaryPointerUp();
       },
       child: editor,
     );

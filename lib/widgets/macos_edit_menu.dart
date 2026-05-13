@@ -5,6 +5,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/editor_menu_provider.dart';
+import '../providers/format_painter_provider.dart';
 
 /// Wraps its child with a native macOS menu bar whose Edit menu routes
 /// actions directly to the active QuillController. On non-macOS platforms
@@ -77,11 +78,12 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
 
     _attachController(ref.watch(editorMenuProvider));
     final ctrl = _ctrl;
+    final isFormatPainterActive = ref.watch(formatPainterProvider) != null;
 
     return PlatformMenuBar(
       menus: [
         _appMenu(),
-        _editMenu(ctrl, _hasSelection),
+        _editMenu(ctrl, _hasSelection, isFormatPainterActive),
         _windowMenu(),
       ],
       child: widget.child,
@@ -109,7 +111,8 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
         ],
       );
 
-  PlatformMenu _editMenu(QuillController? ctrl, bool hasSelection) =>
+  PlatformMenu _editMenu(
+          QuillController? ctrl, bool hasSelection, bool isFormatPainterActive) =>
       PlatformMenu(
         label: 'Edit',
         menus: [
@@ -142,6 +145,14 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
                   meta: true),
               onSelected: hasSelection ? () => _copy(ctrl!) : null,
             ),
+            PlatformMenuItem(
+              label: isFormatPainterActive
+                  ? 'Cancel Formatting'
+                  : 'Copy Formatting',
+              onSelected: (hasSelection || isFormatPainterActive)
+                  ? _toggleFormatPainter
+                  : null,
+            ),
             // Paste has no shortcut so ⌘V stays in Flutter's key pipeline,
             // allowing NoteEditor._onKeyEvent to handle clipboard images.
             PlatformMenuItem(
@@ -154,10 +165,30 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
                   : null,
             ),
             PlatformMenuItem(
+              label: 'Paste and Match Style',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyV,
+                  meta: true, shift: true, alt: true),
+              onSelected: ctrl != null
+                  ? () => _pasteMatchStyle(ctrl)
+                  : null,
+            ),
+            PlatformMenuItem(
+              label: 'Delete',
+              onSelected: hasSelection ? () => _delete(ctrl!) : null,
+            ),
+            PlatformMenuItem(
               label: 'Select All',
               shortcut: const SingleActivator(LogicalKeyboardKey.keyA,
                   meta: true),
               onSelected: ctrl != null ? () => _selectAll(ctrl) : null,
+            ),
+          ]),
+          PlatformMenuItemGroup(members: [
+            PlatformMenuItem(
+              label: 'Find…',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyF,
+                  meta: true),
+              onSelected: ctrl != null ? () => _openFind(ctrl) : null,
             ),
           ]),
         ],
@@ -177,6 +208,18 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
         ],
       );
 
+  void _toggleFormatPainter() {
+    final notifier = ref.read(formatPainterProvider.notifier);
+    if (ref.read(formatPainterProvider) != null) {
+      notifier.clear();
+      return;
+    }
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    final attrs = ctrl.getSelectionStyle().attributes;
+    if (attrs.isNotEmpty) notifier.capture(attrs);
+  }
+
   void _cut(QuillController ctrl) {
     _copy(ctrl);
     final sel = ctrl.selection;
@@ -194,6 +237,33 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
     if (start < end) {
       Clipboard.setData(ClipboardData(text: text.substring(start, end)));
     }
+  }
+
+  void _pasteMatchStyle(QuillController ctrl) {
+    Clipboard.getData(Clipboard.kTextPlain).then((data) {
+      final text = data?.text;
+      if (text == null || text.isEmpty) return;
+      final sel = ctrl.selection;
+      if (sel.isValid && !sel.isCollapsed) {
+        ctrl.replaceText(sel.start, sel.end - sel.start, text, null);
+      } else if (sel.isValid) {
+        ctrl.replaceText(sel.baseOffset, 0, text, null);
+      }
+    });
+  }
+
+  void _delete(QuillController ctrl) {
+    final sel = ctrl.selection;
+    if (sel.isValid && !sel.isCollapsed) {
+      ctrl.replaceText(sel.start, sel.end - sel.start, '', null);
+    }
+  }
+
+  void _openFind(QuillController ctrl) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => QuillToolbarSearchDialog(controller: ctrl),
+    );
   }
 
   void _selectAll(QuillController ctrl) {

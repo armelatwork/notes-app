@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'format_painter_button.dart';
 
 // ── Config builder ─────────────────────────────────────────────────────────────
 
@@ -57,6 +58,30 @@ class _ToolbarGroup {
 }
 
 // ── Android sheet helpers ──────────────────────────────────────────────────────
+
+Widget _textStyleSheet(BuildContext _, QuillController ctrl) =>
+    SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FormatPainterButton(controller: ctrl),
+              QuillSimpleToolbar(
+                controller: ctrl,
+                config: _cfg(
+                  bold: true, italic: true, underline: true,
+                  strikeThrough: true, inlineCode: true,
+                  subscript: true, superscript: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
 Widget _quillSheet(BuildContext _, QuillController ctrl, QuillSimpleToolbarConfig cfg) =>
     SafeArea(
@@ -161,9 +186,7 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     ),
     _ToolbarGroup(
       icon: Icons.format_bold, tooltip: 'Text style',
-      content: (ctx, _) => _quillSheet(ctx, ctrl, _cfg(
-          bold: true, italic: true, underline: true, strikeThrough: true,
-          inlineCode: true, subscript: true, superscript: true)),
+      content: (ctx, _) => _textStyleSheet(ctx, ctrl),
       macContent: (_, _) => _macQuill(ctrl, _cfg(
           bold: true, italic: true, underline: true, strikeThrough: true,
           inlineCode: true, subscript: true, superscript: true)),
@@ -308,6 +331,7 @@ class _MacOSToolbar extends StatelessWidget {
                   width: 1, indent: 8, endIndent: 8,
                   color: Theme.of(context).colorScheme.outlineVariant,
                 ),
+                FormatPainterButton(controller: controller),
                 QuillSimpleToolbar(
                   controller: controller,
                   config: _cfg(
