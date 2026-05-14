@@ -22,6 +22,12 @@ class RichClipboardService {
   static final RichClipboardService instance = RichClipboardService._();
   RichClipboardService._();
 
+  // Used to suppress the macOS native Paste action that fires simultaneously
+  // with Cmd+V when an image has already been handled by _handlePaste().
+  DateTime? _lastImagePasteAt;
+
+  void notifyImagePasted() => _lastImagePasteAt = DateTime.now();
+
   // ── Copy ───────────────────────────────────────────────────────────────────
 
   /// Writes Quill delta JSON + HTML + plain text to the system clipboard.
@@ -59,6 +65,15 @@ class RichClipboardService {
   /// 2. HTML              → preserves bold, italic, headings, lists, links
   /// 3. Plain text        → fallback, no formatting
   Future<void> paste(QuillController ctrl) async {
+    // macOS routes Cmd+V to both _onKeyEvent (keyboard handler) and the native
+    // Paste menu action. If an image was just pasted via the keyboard path,
+    // skip this duplicate call to avoid inserting the HTML text as well.
+    final t = _lastImagePasteAt;
+    if (t != null && DateTime.now().difference(t).inMilliseconds < 500) {
+      _lastImagePasteAt = null;
+      return;
+    }
+
     try {
       final reader = await SystemClipboard.instance?.read();
       if (reader == null) return;

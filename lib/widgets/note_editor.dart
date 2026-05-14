@@ -88,7 +88,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     final ctrl = _controller;
     if (ctrl == null) return;
     final imagePasted = await pasteImageFromClipboard(ctrl);
-    if (!imagePasted) {
+    if (imagePasted) {
+      RichClipboardService.instance.notifyImagePasted();
+    } else {
       await RichClipboardService.instance.paste(ctrl);
     }
   }
