@@ -75,32 +75,57 @@
       <p>My Notes — Android &amp; macOS</p>
     </div>
 
-    <!-- v1.3.0 -->
+    <!-- Unreleased -->
     <div class="release">
       <div class="release-header">
-        <span class="version">Version 1.3.0</span>
-        <span class="badge">Latest</span>
-        <span class="date">May 2026</span>
+        <span class="version">Unreleased</span>
+        <span class="badge" style="background:#e8e8e8;color:#666;">Coming soon</span>
       </div>
 
       <div class="section-label">New Features</div>
       <ul>
-        <li><strong>Format Painter</strong> — copy text formatting from one selection and apply it to another with a single gesture. Available via the paint-brush icon in the toolbar and via Edit → Copy Formatting on macOS.</li>
+        <li><strong>App renamed to My Notes</strong> — the app name has been updated across all platforms.</li>
         <li><strong>Drive storage warnings</strong> — a banner appears at the bottom of the app when your Google Drive storage is 90% full (once per session) or completely full (on every failed sync).</li>
         <li><strong>Version number in Settings</strong> — the app version is now shown in the Settings screen, with a link to the website.</li>
-        <li><strong>App renamed to My Notes</strong> — the app name has been updated across all platforms.</li>
-      </ul>
-
-      <div class="section-label">macOS</div>
-      <ul>
-        <li>Full native Edit menu: Undo, Redo, Cut, Copy, Copy Formatting, Paste, Paste and Match Style, Delete, Select All, Find.</li>
-        <li>Visit Website entry added to the application menu.</li>
       </ul>
 
       <div class="section-label">Bug Fixes</div>
       <ul>
         <li>Fixed a 401 authentication error on Android caused by a revoked OAuth grant being returned from Play Services cache.</li>
         <li>Fixed a 403 insufficient-scope error on macOS when restoring a session without Drive access.</li>
+      </ul>
+    </div>
+
+    <!-- v1.3.0 -->
+    <div class="release">
+      <div class="release-header">
+        <span class="version">Version 1.3.0</span>
+        <span class="badge">Latest release</span>
+        <span class="date">May 2026</span>
+      </div>
+
+      <div class="section-label">New Features</div>
+      <ul>
+        <li><strong>Format Painter</strong> — copy text formatting from one selection and apply it to another with a single gesture. Available via the paint-brush icon in the toolbar and via Edit → Copy Formatting on macOS.</li>
+        <li><strong>Strikethrough</strong> — added to the Text Style group on Android and to the inline toolbar on macOS.</li>
+        <li><strong>Auto-discard empty notes</strong> — switching away from a newly created note without typing anything removes it automatically.</li>
+        <li><strong>Android magnifier</strong> — the system magnifier now appears during text selection handle drag.</li>
+      </ul>
+
+      <div class="section-label">macOS</div>
+      <ul>
+        <li>Full native Edit menu: Undo, Redo, Cut, Copy, Copy Formatting, Paste, Paste and Match Style, Delete, Select All, Find.</li>
+        <li>Triple-click selects the entire paragraph under the cursor.</li>
+      </ul>
+
+      <div class="section-label">Android</div>
+      <ul>
+        <li>Toolbar sheet preserves keyboard focus and adds a drag handle for easier dismissal.</li>
+      </ul>
+
+      <div class="section-label">Bug Fixes</div>
+      <ul>
+        <li>All edited notes are now pushed to Drive when switching notes quickly via the + button.</li>
       </ul>
     </div>
 
