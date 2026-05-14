@@ -14,6 +14,7 @@ import '../providers/app_provider.dart';
 import '../providers/editor_menu_provider.dart';
 import '../providers/format_painter_provider.dart';
 import '../services/app_logger.dart';
+import '../services/rich_clipboard_service.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
@@ -75,11 +76,20 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     final isCmdV = HardwareKeyboard.instance.isMetaPressed &&
         event.logicalKey == LogicalKeyboardKey.keyV;
     if (isCmdV) {
-      pasteImageFromClipboard(_controller!);
-      return false;
+      _handlePaste();
+      return true; // consume — rich paste handles text, avoids flutter_quill double-paste
     }
 
     return false;
+  }
+
+  Future<void> _handlePaste() async {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    final imagePasted = await pasteImageFromClipboard(ctrl);
+    if (!imagePasted) {
+      await RichClipboardService.instance.paste(ctrl);
+    }
   }
 
   void _insertTab() {
@@ -545,14 +555,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   void _copyToClipboard(QuillController ctrl) {
-    final sel = ctrl.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    final text = ctrl.document.toPlainText();
-    final start = sel.start.clamp(0, text.length);
-    final end = sel.end.clamp(0, text.length);
-    if (start < end) {
-      Clipboard.setData(ClipboardData(text: text.substring(start, end)));
-    }
+    RichClipboardService.instance.copy(ctrl);
   }
 
   // ── Android / other platforms context menu ────────────────────────────────────
@@ -581,9 +584,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           ),
         ContextMenuButtonItem(
           label: 'Paste',
-          // ignore: experimental_member_use
-          onPressed: () =>
-              rawEditorState.pasteText(SelectionChangedCause.toolbar),
+          onPressed: () {
+            if (_controller != null) {
+              RichClipboardService.instance.paste(_controller!);
+            }
+          },
         ),
         ContextMenuButtonItem(
           label: 'Select All',

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/editor_menu_provider.dart';
 import '../providers/format_painter_provider.dart';
+import '../services/rich_clipboard_service.dart';
 
 /// Wraps its child with a native macOS menu bar whose Edit menu routes
 /// actions directly to the active QuillController. On non-macOS platforms
@@ -164,14 +165,11 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
                   : null,
             ),
             // Paste has no shortcut so ⌘V stays in Flutter's key pipeline,
-            // allowing NoteEditor._onKeyEvent to handle clipboard images.
+            // where NoteEditor._onKeyEvent handles images then rich text.
             PlatformMenuItem(
               label: 'Paste',
               onSelected: ctrl != null
-                  ? () {
-                      // ignore: experimental_member_use
-                      ctrl.clipboardPaste();
-                    }
+                  ? () => RichClipboardService.instance.paste(ctrl)
                   : null,
             ),
             PlatformMenuItem(
@@ -239,14 +237,7 @@ class _MacOSEditMenuState extends ConsumerState<MacOSEditMenu> {
   }
 
   void _copy(QuillController ctrl) {
-    final sel = ctrl.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    final text = ctrl.document.toPlainText();
-    final start = sel.start.clamp(0, text.length);
-    final end = sel.end.clamp(0, text.length);
-    if (start < end) {
-      Clipboard.setData(ClipboardData(text: text.substring(start, end)));
-    }
+    RichClipboardService.instance.copy(ctrl);
   }
 
   void _pasteMatchStyle(QuillController ctrl) {
