@@ -87,11 +87,16 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   Future<void> _handlePaste() async {
     final ctrl = _controller;
     if (ctrl == null) return;
-    final imagePasted = await pasteImageFromClipboard(ctrl);
-    if (imagePasted) {
-      RichClipboardService.instance.notifyImagePasted();
-    } else {
-      await RichClipboardService.instance.paste(ctrl);
+    // Set the flag synchronously before any await so the macOS native Paste
+    // menu action (which fires almost simultaneously) is suppressed.
+    RichClipboardService.instance.beginKeyboardPaste();
+    try {
+      final imagePasted = await pasteImageFromClipboard(ctrl);
+      if (!imagePasted) {
+        await RichClipboardService.instance.paste(ctrl, fromKeyboard: true);
+      }
+    } finally {
+      RichClipboardService.instance.endKeyboardPaste();
     }
   }
 
