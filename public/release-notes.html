@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release Notes — My Notes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fafafa;
+      color: #1a1a1a;
+      padding: 2rem 1rem;
+      line-height: 1.7;
+    }
+    .container { max-width: 680px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 2.5rem; }
+    .header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .header p { color: #666; font-size: 0.95rem; }
+    .release {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.25rem;
+    }
+    .release-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .version {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #FFD60A;
+      color: #1a1a1a;
+      padding: 0.15rem 0.55rem;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+    }
+    .date { color: #999; font-size: 0.85rem; margin-left: auto; }
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #888;
+      margin: 1rem 0 0.4rem;
+    }
+    ul { padding-left: 1.25rem; }
+    ul li { font-size: 0.95rem; color: #333; margin-bottom: 0.3rem; }
+    .footer {
+      text-align: center;
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #eee;
+      font-size: 0.82rem;
+      color: #999;
+    }
+    .footer a { color: #666; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    .footer .sep { margin: 0 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📝 Release Notes</h1>
+      <p>My Notes — Android &amp; macOS</p>
+    </div>
+
+    <!-- v1.3.0 -->
+    <div class="release">
+      <div class="release-header">
+        <span class="version">Version 1.3.0</span>
+        <span class="badge">Latest</span>
+        <span class="date">May 2026</span>
+      </div>
+
+      <div class="section-label">New Features</div>
+      <ul>
+        <li><strong>Format Painter</strong> — copy text formatting from one selection and apply it to another with a single gesture. Available via the paint-brush icon in the toolbar and via Edit → Copy Formatting on macOS.</li>
+        <li><strong>Drive storage warnings</strong> — a banner appears at the bottom of the app when your Google Drive storage is 90% full (once per session) or completely full (on every failed sync).</li>
+        <li><strong>Version number in Settings</strong> — the app version is now shown in the Settings screen, with a link to the website.</li>
+        <li><strong>App renamed to My Notes</strong> — the app name has been updated across all platforms.</li>
+      </ul>
+
+      <div class="section-label">macOS</div>
+      <ul>
+        <li>Full native Edit menu: Undo, Redo, Cut, Copy, Copy Formatting, Paste, Paste and Match Style, Delete, Select All, Find.</li>
+        <li>Visit Website entry added to the application menu.</li>
+      </ul>
+
+      <div class="section-label">Bug Fixes</div>
+      <ul>
+        <li>Fixed a 401 authentication error on Android caused by a revoked OAuth grant being returned from Play Services cache.</li>
+        <li>Fixed a 403 insufficient-scope error on macOS when restoring a session without Drive access.</li>
+      </ul>
+    </div>
+
+    <!-- v1.2.0 -->
+    <div class="release">
+      <div class="release-header">
+        <span class="version">Version 1.2.0</span>
+        <span class="date">May 2026</span>
+      </div>
+
+      <div class="section-label">New Features</div>
+      <ul>
+        <li><strong>Hyperlinks</strong> — insert, edit, and open links from within the editor. Right-click linked text for quick editing on macOS; long-press on Android.</li>
+        <li><strong>Grouped toolbar</strong> — bottom-sheet overflow for the toolbar on Android; compact inline layout on macOS. Includes bundled decorative fonts (Nunito, Pacifico, Roboto Mono, Ibarra Real Nova, Square Peg).</li>
+        <li><strong>Account deletion</strong> — permanently delete your account and all data (local and Drive) from within the app. Cannot be undone.</li>
+        <li><strong>Privacy Policy page</strong> — accessible from the app footer and the website.</li>
+      </ul>
+
+      <div class="section-label">Android</div>
+      <ul>
+        <li>Release APK with signing configuration for distribution outside the Play Store.</li>
+        <li>Drag-and-drop move-to-folder enabled on wide (tablet) Android layouts.</li>
+        <li>Drawer closes automatically when selecting a folder.</li>
+      </ul>
+
+      <div class="section-label">macOS</div>
+      <ul>
+        <li>Native context menu for the editor (right-click): Insert Link, Edit Link, Delete Note.</li>
+        <li>Cmd+click to open links in the browser.</li>
+      </ul>
+
+      <div class="section-label">Bug Fixes</div>
+      <ul>
+        <li>Title changes now debounce at 5 s (was 15 s) to push quickly to Drive.</li>
+        <li>Note content debounce reduced to 10 s (was 15 s).</li>
+        <li>Transient network errors no longer flip the sync icon to the error state.</li>
+        <li>Full-word link removal when selection is partial.</li>
+      </ul>
+    </div>
+
+    <!-- v1.1.0 -->
+    <div class="release">
+      <div class="release-header">
+        <span class="version">Version 1.1.0</span>
+        <span class="date">April 2026</span>
+      </div>
+
+      <div class="section-label">New Features</div>
+      <ul>
+        <li><strong>Move notes to folders</strong> — drag a note onto a folder in the sidebar (macOS), or long-press and choose Move to Folder (Android).</li>
+        <li><strong>Log-based incremental sync</strong> — sync now uses an append-only log on Drive. Only changed items are downloaded; poll overhead is negligible when nothing has changed.</li>
+        <li><strong>Settings screen</strong> — access via the user menu at the bottom of the sidebar.</li>
+        <li><strong>Structured logging</strong> — all app events are written to a local log file for easier debugging.</li>
+      </ul>
+
+      <div class="section-label">Sync</div>
+      <ul>
+        <li>App folder ID is cached to reduce API calls.</li>
+        <li>First-sync note downloads are parallelised for faster initial load.</li>
+        <li>Concurrent poll cycles are serialised to prevent duplicate downloads.</li>
+        <li>Batch move uploads — multiple moves within 5 s are sent in a single Drive write.</li>
+        <li>30-second timeout on all Drive API requests.</li>
+      </ul>
+
+      <div class="section-label">Bug Fixes</div>
+      <ul>
+        <li>Default view on login is All Notes.</li>
+        <li>Tab key now inserts a fixed-width indent and advances the cursor correctly.</li>
+        <li>Push operations are serialised to prevent sync_log.json race conditions.</li>
+      </ul>
+    </div>
+
+    <!-- v1.0.0 -->
+    <div class="release">
+      <div class="release-header">
+        <span class="version">Version 1.0.0</span>
+        <span class="date">April 2026</span>
+      </div>
+
+      <div class="section-label">Initial Release</div>
+      <ul>
+        <li><strong>Rich text editor</strong> — bold, italic, underline, strikethrough, font family &amp; size, text colour, highlight, headings, lists, checklists, indent, undo/redo.</li>
+        <li><strong>Images</strong> — insert from gallery, drag and drop from Finder (macOS), or paste from clipboard. Right-click to delete.</li>
+        <li><strong>Folders</strong> — create, rename, delete. Deleting a folder moves its notes to the inbox.</li>
+        <li><strong>Google Sign-In</strong> — silent sign-in restores sessions automatically on restart.</li>
+        <li><strong>Local account</strong> — username and password stored on-device; no Google account required.</li>
+        <li><strong>End-to-end encryption</strong> — notes are encrypted with AES-256-GCM before leaving the device. Your key lives only in your own Google Drive.</li>
+        <li><strong>Google Drive sync</strong> — notes and folders sync automatically across devices.</li>
+        <li><strong>Search</strong> — full-text search across all notes by title and content.</li>
+        <li>Available on <strong>macOS</strong> and <strong>Android</strong>.</li>
+      </ul>
+    </div>
+
+    <div class="footer">
+      <a href="/">← Back to download page</a>
+      <span class="sep">·</span>
+      <a href="/privacy.html">Privacy Policy</a>
+      <span class="sep">·</span>
+      Developed by <a href="mailto:thechaosdev@gmail.com">TheChaos</a>
+    </div>
+  </div>
+</body>
+</html>
