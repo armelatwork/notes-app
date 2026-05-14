@@ -7,6 +7,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 import 'package:vsc_quill_delta_to_html/vsc_quill_delta_to_html.dart';
 import 'package:flutter_quill_delta_from_html/flutter_quill_delta_from_html.dart';
 import '../utils/html_normalizer.dart';
+import '../widgets/note_table_embed.dart';
 import 'app_logger.dart';
 
 // Internal clipboard format — lossless round-trip within My Notes.
@@ -71,9 +72,12 @@ class RichClipboardService {
       }
 
       if (reader.canProvide(Formats.htmlText)) {
-        final html = await reader.readValue(Formats.htmlText);
-        if (html != null && html.isNotEmpty) {
-          final delta = HtmlToDelta().convert(normalizeHtml(html));
+        final rawHtml = await reader.readValue(Formats.htmlText);
+        if (rawHtml != null && rawHtml.isNotEmpty) {
+          final tables = <String, List<List<String>>>{};
+          final processedHtml = _extractTables(rawHtml, tables);
+          var delta = HtmlToDelta().convert(normalizeHtml(processedHtml));
+          if (tables.isNotEmpty) delta = _injectTableEmbeds(delta, tables);
           _insertDelta(ctrl, delta);
           return;
         }
@@ -155,5 +159,74 @@ class RichClipboardService {
       text,
       null,
     );
+  }
+
+  // ── Table extraction ───────────────────────────────────────────────────────
+
+  /// Replaces each `<table>` block in [html] with a `<p>___TABLE_N___</p>`
+  /// placeholder and populates [tables] with the parsed row/cell data.
+  /// Returns the modified HTML string.
+  String _extractTables(String html, Map<String, List<List<String>>> tables) {
+    var i = 0;
+    return html.replaceAllMapped(
+      RegExp(r'<table\b[^>]*>.*?</table>', dotAll: true, caseSensitive: false),
+      (m) {
+        final key = '___TABLE_${i++}___';
+        tables[key] = _parseTableRows(m.group(0)!);
+        return '<p>$key</p>';
+      },
+    );
+  }
+
+  List<List<String>> _parseTableRows(String tableHtml) {
+    final rows = <List<String>>[];
+    for (final row in RegExp(r'<tr\b[^>]*>(.*?)</tr>',
+            dotAll: true, caseSensitive: false)
+        .allMatches(tableHtml)) {
+      final cells = <String>[];
+      for (final cell in RegExp(r'<t[dh]\b[^>]*>(.*?)</t[dh]>',
+              dotAll: true, caseSensitive: false)
+          .allMatches(row.group(1)!)) {
+        cells.add(cell.group(1)!
+            .replaceAll(RegExp(r'<[^>]+>'), '')
+            .replaceAll('&amp;', '&')
+            .replaceAll('&lt;', '<')
+            .replaceAll('&gt;', '>')
+            .replaceAll('&nbsp;', ' ')
+            .replaceAll('&quot;', '"')
+            .trim());
+      }
+      if (cells.isNotEmpty) rows.add(cells);
+    }
+    return rows;
+  }
+
+  /// Scans [delta] for placeholder text ops and replaces each one with
+  /// a [kTableEmbedType] block embed carrying the parsed row data.
+  Delta _injectTableEmbeds(
+      Delta delta, Map<String, List<List<String>>> tables) {
+    final result = Delta();
+    for (final op in delta.toList()) {
+      if (!op.isInsert || op.data is! String) {
+        result.push(op);
+        continue;
+      }
+      var text = op.data as String;
+      var matched = false;
+      for (final entry in tables.entries) {
+        final idx = text.indexOf(entry.key);
+        if (idx < 0) continue;
+        if (idx > 0) result.insert(text.substring(0, idx), op.attributes);
+        result.insert({kTableEmbedType: jsonEncode(entry.value)});
+        text = text.substring(idx + entry.key.length);
+        matched = true;
+        break;
+      }
+      if (!matched || text.isNotEmpty) {
+        if (text.isNotEmpty) result.insert(text, op.attributes);
+        if (!matched) result.push(op);
+      }
+    }
+    return result;
   }
 }

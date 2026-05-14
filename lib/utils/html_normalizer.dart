@@ -14,21 +14,7 @@ String normalizeHtml(String html) {
   result = result.replaceAll(
     RegExp(r'<img\b[^>]*/?>', caseSensitive: false), '');
 
-  // 2. Convert table cells to paragraphs so cell text is preserved, then
-  //    strip the surrounding table structure tags.
-  result = result.replaceAllMapped(
-    RegExp(r'<t[dh]\b[^>]*>(.*?)</t[dh]>',
-        dotAll: true, caseSensitive: false),
-    (m) => '<p>${m.group(1)!.trim()}</p>',
-  );
-  result = result.replaceAll(
-    RegExp(
-        r'</?(?:table|tbody|thead|tfoot|tr|colgroup|col)\b[^>]*>',
-        caseSensitive: false),
-    '',
-  );
-
-  // 3. Unwrap <p> nested directly inside <li> (Google Docs list structure).
+  // 2. Unwrap <p> nested directly inside <li> (Google Docs list structure).
   //    <li><p>text</p></li>  →  <li>text</li>
   result = result.replaceAllMapped(
     RegExp(r'<li(\b[^>]*)>\s*<p[^>]*>(.*?)</p>\s*</li>',
@@ -36,7 +22,7 @@ String normalizeHtml(String html) {
     (m) => '<li${m.group(1)}>${m.group(2)!.trim()}</li>',
   );
 
-  // 4. Resolve Apple Notes / Cocoa CSS class styles → semantic HTML.
+  // 3. Resolve Apple Notes / Cocoa CSS class styles → semantic HTML.
   final classStyles = _extractClassStyles(result);
   if (classStyles.isNotEmpty) {
     result = result.replaceAllMapped(

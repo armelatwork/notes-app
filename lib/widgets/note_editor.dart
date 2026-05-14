@@ -15,6 +15,7 @@ import '../providers/editor_menu_provider.dart';
 import '../providers/format_painter_provider.dart';
 import '../services/app_logger.dart';
 import '../services/rich_clipboard_service.dart';
+import 'note_table_embed.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
@@ -359,6 +360,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         embedBuilders: [
           NoteImageEmbedBuilder(controller: _controller!),
           const NoteTabEmbedBuilder(),
+          const NoteTableEmbedBuilder(),
         ],
         // ignore: experimental_member_use
         onKeyPressed: (event, node) {
