@@ -1,28 +1,59 @@
-/// Normalizes CSS-class-based HTML (Apple Notes, Cocoa editors) to semantic
-/// HTML that flutter_quill_delta_from_html can parse.
+/// Normalises HTML from external sources before converting to Quill delta.
 ///
-/// Apple Notes copies with class-based styles:
-///   <style> span.s2 { font-weight: bold } </style>
-///   <span class="s2">Bold text</span>
-///
-/// This resolves those classes to standard <strong>, <em>, <u>, <s> tags.
+/// Handles:
+/// - Apple Notes: CSS-class-based styles → semantic tags
+/// - Google Docs: <p> nested inside <li> for list items
+/// - Tables: cell content extracted as paragraphs (Quill has no table support)
+/// - Images: stripped — clipboard images come via pasteImageFromClipboard
 String normalizeHtml(String html) {
-  final classStyles = _extractClassStyles(html);
-  if (classStyles.isEmpty) return html;
+  var result = html;
 
-  var result = html.replaceAllMapped(
-    RegExp(r'\bclass="([^"]*)"'),
-    (m) {
-      final props = <String>[];
-      for (final cls in m.group(1)!.trim().split(RegExp(r'\s+'))) {
-        final s = classStyles[cls];
-        if (s != null) props.add(s);
-      }
-      return props.isEmpty ? '' : 'style="${props.join('; ')}"';
-    },
+  // 1. Remove all <img> tags. Images copied as PNG/JPEG data are handled by
+  //    pasteImageFromClipboard via the native platform channel. Keeping <img>
+  //    src="https://..." in the HTML would create broken URL-based embeds.
+  result = result.replaceAll(
+    RegExp(r'<img\b[^>]*/?>', caseSensitive: false), '');
+
+  // 2. Convert table cells to paragraphs so cell text is preserved, then
+  //    strip the surrounding table structure tags.
+  result = result.replaceAllMapped(
+    RegExp(r'<t[dh]\b[^>]*>(.*?)</t[dh]>',
+        dotAll: true, caseSensitive: false),
+    (m) => '<p>${m.group(1)!.trim()}</p>',
+  );
+  result = result.replaceAll(
+    RegExp(
+        r'</?(?:table|tbody|thead|tfoot|tr|colgroup|col)\b[^>]*>',
+        caseSensitive: false),
+    '',
   );
 
-  return _inlineToSemantic(result);
+  // 3. Unwrap <p> nested directly inside <li> (Google Docs list structure).
+  //    <li><p>text</p></li>  →  <li>text</li>
+  result = result.replaceAllMapped(
+    RegExp(r'<li(\b[^>]*)>\s*<p[^>]*>(.*?)</p>\s*</li>',
+        dotAll: true, caseSensitive: false),
+    (m) => '<li${m.group(1)}>${m.group(2)!.trim()}</li>',
+  );
+
+  // 4. Resolve Apple Notes / Cocoa CSS class styles → semantic HTML.
+  final classStyles = _extractClassStyles(result);
+  if (classStyles.isNotEmpty) {
+    result = result.replaceAllMapped(
+      RegExp(r'\bclass="([^"]*)"'),
+      (m) {
+        final props = <String>[];
+        for (final cls in m.group(1)!.trim().split(RegExp(r'\s+'))) {
+          final s = classStyles[cls];
+          if (s != null) props.add(s);
+        }
+        return props.isEmpty ? '' : 'style="${props.join('; ')}"';
+      },
+    );
+    result = _inlineToSemantic(result);
+  }
+
+  return result;
 }
 
 Map<String, String> _extractClassStyles(String html) {
