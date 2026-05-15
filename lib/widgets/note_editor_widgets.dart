@@ -57,6 +57,71 @@ class _ToolbarGroup {
   });
 }
 
+// ── Heading / font-size sub-menu buttons ──────────────────────────────────────
+//
+// Quill's built-in heading and font-size buttons use MenuController.open()
+// inside a StatefulWidget that also calls controller.addListener(setState).
+// In a persistent bottom sheet, tapping the button can trigger an editor focus
+// change, which fires the QuillController listener, which calls setState and
+// rebuilds the widget before MenuController.open() renders — silently dropping
+// the menu. A modal sheet traps focus and avoids the race, but hides the
+// keyboard.
+//
+// These replacements keep the persistent sheet (keyboard stays visible) and fix
+// the race by opening a nested showModalBottomSheet for the sub-menu options.
+// A nested modal DOES trap focus, eliminating the race, while the outer
+// persistent sheet and keyboard remain visible.
+
+Widget _headingPickerSheet(QuillController ctrl, BuildContext modal) =>
+    SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(title: const Text('Normal'), onTap: () { ctrl.formatSelection(Attribute.clone(Attribute.header, null)); Navigator.pop(modal); }),
+          ListTile(title: const Text('Heading 1'), onTap: () { ctrl.formatSelection(Attribute.h1); Navigator.pop(modal); }),
+          ListTile(title: const Text('Heading 2'), onTap: () { ctrl.formatSelection(Attribute.h2); Navigator.pop(modal); }),
+          ListTile(title: const Text('Heading 3'), onTap: () { ctrl.formatSelection(Attribute.h3); Navigator.pop(modal); }),
+        ],
+      ),
+    );
+
+Widget _fontSizePickerSheet(QuillController ctrl, BuildContext modal) =>
+    SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(title: const Text('Small'), onTap: () { ctrl.formatSelection(const SizeAttribute('small')); Navigator.pop(modal); }),
+          ListTile(title: const Text('Normal'), onTap: () { ctrl.formatSelection(const SizeAttribute(null)); Navigator.pop(modal); }),
+          ListTile(title: const Text('Large'), onTap: () { ctrl.formatSelection(const SizeAttribute('large')); Navigator.pop(modal); }),
+          ListTile(title: const Text('Huge'), onTap: () { ctrl.formatSelection(const SizeAttribute('huge')); Navigator.pop(modal); }),
+        ],
+      ),
+    );
+
+Widget _headingButton(QuillController ctrl) => Builder(
+      builder: (ctx) => TextButton.icon(
+        label: const Text('Heading'),
+        icon: const Icon(Icons.arrow_drop_down, size: 18),
+        iconAlignment: IconAlignment.end,
+        onPressed: () => showModalBottomSheet<void>(
+          context: ctx,
+          builder: (modal) => _headingPickerSheet(ctrl, modal),
+        ),
+      ),
+    );
+
+Widget _fontSizeButton(QuillController ctrl) => Builder(
+      builder: (ctx) => TextButton.icon(
+        label: const Text('Size'),
+        icon: const Icon(Icons.arrow_drop_down, size: 18),
+        iconAlignment: IconAlignment.end,
+        onPressed: () => showModalBottomSheet<void>(
+          context: ctx,
+          builder: (modal) => _fontSizePickerSheet(ctrl, modal),
+        ),
+      ),
+    );
+
 // ── Android sheet helpers ──────────────────────────────────────────────────────
 
 Widget _textStyleSheet(BuildContext _, QuillController ctrl) =>
@@ -104,7 +169,8 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              QuillSimpleToolbar(controller: ctrl, config: _cfg(header: true)),
+              _headingButton(ctrl),
+              _fontSizeButton(ctrl),
               QuillSimpleToolbar(controller: ctrl, config: restCfg),
             ],
           ),
@@ -194,9 +260,8 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     if (fontsSplit) ...[
       _ToolbarGroup(
         icon: Icons.text_fields, tooltip: 'Text',
-        hidesKeyboard: true,
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl,
-            _cfg(fontFamily: true, fontSize: true)),
+            _cfg(fontFamily: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl,
             _cfg(fontFamily: true, fontSize: true)),
       ),
@@ -211,9 +276,8 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     ] else
       _ToolbarGroup(
         icon: Icons.text_format, tooltip: 'Fonts',
-        hidesKeyboard: true,
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg(
-            fontFamily: true, fontSize: true,
+            fontFamily: true,
             color: true, background: true, clearFormat: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl, _cfg(
             fontFamily: true, fontSize: true,
