@@ -43,6 +43,11 @@ class _ToolbarGroup {
   // True for groups whose content needs full screen height (colour pickers).
   // On Android these use a modal sheet so the keyboard is dismissed first.
   final bool hidesKeyboard;
+  // True for groups that contain Quill DropdownButton widgets (heading style,
+  // font size, font family). Persistent bottom sheets don't give those widgets
+  // a valid overlay context on real Android hardware, so they must use a modal
+  // sheet — even though the keyboard doesn't need to hide.
+  final bool usesModal;
   // Android: content builder receives a close callback for programmatic dismiss.
   final Widget Function(BuildContext, VoidCallback close) content;
   // macOS: raw widget for the dropdown card, receives a close callback.
@@ -54,6 +59,7 @@ class _ToolbarGroup {
     required this.content,
     required this.macContent,
     this.hidesKeyboard = false,
+    this.usesModal = false,
   });
 }
 
@@ -194,6 +200,7 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     if (fontsSplit) ...[
       _ToolbarGroup(
         icon: Icons.text_fields, tooltip: 'Text',
+        usesModal: true,
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl,
             _cfg(fontFamily: true, fontSize: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl,
@@ -210,6 +217,7 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     ] else
       _ToolbarGroup(
         icon: Icons.text_format, tooltip: 'Fonts',
+        usesModal: true,
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg(
             fontFamily: true, fontSize: true,
             color: true, background: true, clearFormat: true)),
@@ -451,8 +459,10 @@ class _AndroidGroupBarState extends State<_AndroidGroupBar> {
   }
 
   void _onTap(BuildContext context, _ToolbarGroup group) {
-    if (group.hidesKeyboard) {
+    if (group.hidesKeyboard || group.usesModal) {
       _sheetController?.close();
+      _sheetController = null;
+      if (mounted) setState(() => _openTooltip = null);
       showModalBottomSheet<void>(
         context: context,
         builder: (ctx) => group.content(ctx, () => Navigator.pop(ctx)),
