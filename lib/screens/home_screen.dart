@@ -214,12 +214,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
       }
     } catch (e) {
-      final s = e.toString();
-      final isNetworkHiccup = s.contains('Connection reset') ||
-          s.contains('SocketException') ||
-          s.contains('Connection refused') ||
-          s.contains('Network is unreachable');
-      if (isNetworkHiccup) {
+      if (isNetworkHiccup(e)) {
         AppLogger.instance.warn('HomeScreen', 'poll skipped (network)', e);
         if (mounted) {
           ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
@@ -380,6 +375,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _pollCycle();
       }
     });
+    ref.listen<SyncStatus>(syncStatusProvider, (prev, next) {
+      if (next != SyncStatus.error) return;
+      final message = ref.read(syncErrorMessageProvider);
+      if (message.isEmpty) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () =>
+                ref.read(pollTriggerProvider.notifier).state++,
+          ),
+        ));
+    });
+
     ref.listen(driveStorageAlertProvider, (_, alert) {
       if (alert.severity == DriveStorageSeverity.none) return;
       ScaffoldMessenger.of(context)

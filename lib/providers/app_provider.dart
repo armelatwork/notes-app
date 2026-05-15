@@ -69,6 +69,33 @@ bool isStorageQuotaExceeded(Object e) {
   return s.contains('storagequotaexceeded') || s.contains('quota_exceeded');
 }
 
+/// Returns true for transient network errors that should not show the red
+/// sync error icon (device offline, DNS failure, connection reset, etc.).
+bool isNetworkHiccup(Object e) {
+  final s = e.toString();
+  return s.contains('SocketException') ||
+      s.contains('Connection reset') ||
+      s.contains('Connection refused') ||
+      s.contains('Network is unreachable') ||
+      s.contains('Failed host lookup');
+}
+
+/// Human-readable message for a sync push failure shown in the error SnackBar.
+String syncErrorMessage(Object e) {
+  if (isStorageQuotaExceeded(e)) {
+    return 'Sync failed: Google Drive storage is full';
+  }
+  final s = e.toString().toLowerCase();
+  if (s.contains('401') || s.contains('403') ||
+      s.contains('unauthorized') || s.contains('insufficient')) {
+    return 'Sync failed: authentication error — try signing out and back in';
+  }
+  return 'Sync failed — tap the sync icon to retry';
+}
+
+/// Stores the last sync error message so the UI can display it in a SnackBar.
+final syncErrorMessageProvider = StateProvider<String>((ref) => '');
+
 // ── Current authenticated user ────────────────────────────────────────────────
 
 class AppUserNotifier extends Notifier<AppUser?> {
