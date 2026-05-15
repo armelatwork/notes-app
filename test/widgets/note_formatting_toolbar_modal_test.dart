@@ -127,7 +127,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Size'));
+      await tester.tap(find.text('Font size'));
       await tester.pumpAndSettle();
 
       expect(find.text('Small'), findsOneWidget);
@@ -148,7 +148,7 @@ void main() {
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Size'));
+      await tester.tap(find.text('Font size'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Large'));

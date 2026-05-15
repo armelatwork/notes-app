@@ -61,66 +61,73 @@ class _ToolbarGroup {
 //
 // Quill's built-in heading and font-size buttons use MenuController.open()
 // inside a StatefulWidget that also calls controller.addListener(setState).
-// In a persistent bottom sheet, tapping the button can trigger an editor focus
-// change, which fires the QuillController listener, which calls setState and
-// rebuilds the widget before MenuController.open() renders — silently dropping
-// the menu. A modal sheet traps focus and avoids the race, but hides the
-// keyboard.
-//
-// These replacements keep the persistent sheet (keyboard stays visible) and fix
-// the race by opening a nested showModalBottomSheet for the sub-menu options.
-// A nested modal DOES trap focus, eliminating the race, while the outer
-// persistent sheet and keyboard remain visible.
+// The setState rebuild races with the pending open and drops it on real Android
+// hardware. Font family is unaffected because its implementation has no such
+// listener. These replacements mirror font family exactly — MenuAnchor +
+// MenuController, NO controller listener — so the sub-menus open without
+// hiding the keyboard, matching font family behaviour.
 
-Widget _headingPickerSheet(QuillController ctrl, BuildContext modal) =>
-    SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(title: const Text('Normal'), onTap: () { ctrl.formatSelection(Attribute.clone(Attribute.header, null)); Navigator.pop(modal); }),
-          ListTile(title: const Text('Heading 1'), onTap: () { ctrl.formatSelection(Attribute.h1); Navigator.pop(modal); }),
-          ListTile(title: const Text('Heading 2'), onTap: () { ctrl.formatSelection(Attribute.h2); Navigator.pop(modal); }),
-          ListTile(title: const Text('Heading 3'), onTap: () { ctrl.formatSelection(Attribute.h3); Navigator.pop(modal); }),
-        ],
-      ),
-    );
+class _HeadingMenuButton extends StatefulWidget {
+  const _HeadingMenuButton({required this.ctrl});
+  final QuillController ctrl;
+  @override
+  State<_HeadingMenuButton> createState() => _HeadingMenuButtonState();
+}
 
-Widget _fontSizePickerSheet(QuillController ctrl, BuildContext modal) =>
-    SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(title: const Text('Small'), onTap: () { ctrl.formatSelection(const SizeAttribute('small')); Navigator.pop(modal); }),
-          ListTile(title: const Text('Normal'), onTap: () { ctrl.formatSelection(const SizeAttribute(null)); Navigator.pop(modal); }),
-          ListTile(title: const Text('Large'), onTap: () { ctrl.formatSelection(const SizeAttribute('large')); Navigator.pop(modal); }),
-          ListTile(title: const Text('Huge'), onTap: () { ctrl.formatSelection(const SizeAttribute('huge')); Navigator.pop(modal); }),
-        ],
-      ),
-    );
+class _HeadingMenuButtonState extends State<_HeadingMenuButton> {
+  final _menu = MenuController();
 
-Widget _headingButton(QuillController ctrl) => Builder(
-      builder: (ctx) => TextButton.icon(
-        label: const Text('Heading'),
-        icon: const Icon(Icons.arrow_drop_down, size: 18),
-        iconAlignment: IconAlignment.end,
-        onPressed: () => showModalBottomSheet<void>(
-          context: ctx,
-          builder: (modal) => _headingPickerSheet(ctrl, modal),
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      controller: _menu,
+      menuChildren: [
+        MenuItemButton(child: const Text('Normal'), onPressed: () => widget.ctrl.formatSelection(Attribute.clone(Attribute.header, null))),
+        MenuItemButton(child: const Text('Heading 1'), onPressed: () => widget.ctrl.formatSelection(Attribute.h1)),
+        MenuItemButton(child: const Text('Heading 2'), onPressed: () => widget.ctrl.formatSelection(Attribute.h2)),
+        MenuItemButton(child: const Text('Heading 3'), onPressed: () => widget.ctrl.formatSelection(Attribute.h3)),
+      ],
+      child: IconButton(
+        onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+        icon: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [Text('Heading'), Icon(Icons.arrow_drop_down, size: 18)],
         ),
       ),
     );
+  }
+}
 
-Widget _fontSizeButton(QuillController ctrl) => Builder(
-      builder: (ctx) => TextButton.icon(
-        label: const Text('Size'),
-        icon: const Icon(Icons.arrow_drop_down, size: 18),
-        iconAlignment: IconAlignment.end,
-        onPressed: () => showModalBottomSheet<void>(
-          context: ctx,
-          builder: (modal) => _fontSizePickerSheet(ctrl, modal),
+class _FontSizeMenuButton extends StatefulWidget {
+  const _FontSizeMenuButton({required this.ctrl});
+  final QuillController ctrl;
+  @override
+  State<_FontSizeMenuButton> createState() => _FontSizeMenuButtonState();
+}
+
+class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
+  final _menu = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      controller: _menu,
+      menuChildren: [
+        MenuItemButton(child: const Text('Small'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('small'))),
+        MenuItemButton(child: const Text('Normal'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute(null))),
+        MenuItemButton(child: const Text('Large'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('large'))),
+        MenuItemButton(child: const Text('Huge'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('huge'))),
+      ],
+      child: IconButton(
+        onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+        icon: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [Text('Font size'), Icon(Icons.arrow_drop_down, size: 18)],
         ),
       ),
     );
+  }
+}
 
 // ── Android sheet helpers ──────────────────────────────────────────────────────
 
@@ -169,8 +176,8 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _headingButton(ctrl),
-              _fontSizeButton(ctrl),
+              _HeadingMenuButton(ctrl: ctrl),
+              _FontSizeMenuButton(ctrl: ctrl),
               QuillSimpleToolbar(controller: ctrl, config: restCfg),
             ],
           ),
