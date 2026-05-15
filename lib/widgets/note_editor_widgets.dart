@@ -57,53 +57,70 @@ class _ToolbarGroup {
   });
 }
 
-// ── Custom heading / font-size selectors ───────────────────────────────────────
+// ── Heading / font-size sub-menu buttons ──────────────────────────────────────
 //
-// Quill's built-in heading and font-size buttons use MenuController.open()
-// paired with a QuillController listener that calls setState(). On real Android
+// Quill's built-in heading and font-size toolbar buttons use MenuController
+// plus a QuillController listener that calls setState(). On real Android
 // hardware the controller notification arrives before the menu frame renders,
-// the setState rebuild races with the pending open, and the menu never appears.
-// These custom selectors apply attributes directly — no MenuController, no
-// controller listener, no rebuild race.
+// so the setState rebuild races with the pending MenuController.open() and
+// the menu silently never appears.
+//
+// These replacements use showModalBottomSheet instead. Unlike MenuController,
+// the modal route is pushed to the Navigator synchronously inside onPressed
+// and cannot be cancelled by a concurrent setState rebuild.
 
-Widget _headingSelector(QuillController ctrl) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextButton(
-            onPressed: () =>
-                ctrl.formatSelection(Attribute.clone(Attribute.header, null)),
-            child: const Text('Normal')),
-        TextButton(
-            onPressed: () => ctrl.formatSelection(Attribute.h1),
-            child: const Text('H1')),
-        TextButton(
-            onPressed: () => ctrl.formatSelection(Attribute.h2),
-            child: const Text('H2')),
-        TextButton(
-            onPressed: () => ctrl.formatSelection(Attribute.h3),
-            child: const Text('H3')),
-      ],
+// Two picker sheets ────────────────────────────────────────────────────────────
+
+Widget _headingPickerSheet(QuillController ctrl, BuildContext modal) =>
+    SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(title: const Text('Normal'), onTap: () { ctrl.formatSelection(Attribute.clone(Attribute.header, null)); Navigator.pop(modal); }),
+          ListTile(title: const Text('Heading 1'), onTap: () { ctrl.formatSelection(Attribute.h1); Navigator.pop(modal); }),
+          ListTile(title: const Text('Heading 2'), onTap: () { ctrl.formatSelection(Attribute.h2); Navigator.pop(modal); }),
+          ListTile(title: const Text('Heading 3'), onTap: () { ctrl.formatSelection(Attribute.h3); Navigator.pop(modal); }),
+        ],
+      ),
     );
 
-Widget _fontSizeSelector(QuillController ctrl) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextButton(
-            onPressed: () =>
-                ctrl.formatSelection(const SizeAttribute('small')),
-            child: const Text('S')),
-        TextButton(
-            onPressed: () => ctrl.formatSelection(const SizeAttribute(null)),
-            child: const Text('M')),
-        TextButton(
-            onPressed: () =>
-                ctrl.formatSelection(const SizeAttribute('large')),
-            child: const Text('L')),
-        TextButton(
-            onPressed: () =>
-                ctrl.formatSelection(const SizeAttribute('huge')),
-            child: const Text('XL')),
-      ],
+Widget _fontSizePickerSheet(QuillController ctrl, BuildContext modal) =>
+    SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(title: const Text('Small'), onTap: () { ctrl.formatSelection(const SizeAttribute('small')); Navigator.pop(modal); }),
+          ListTile(title: const Text('Normal'), onTap: () { ctrl.formatSelection(const SizeAttribute(null)); Navigator.pop(modal); }),
+          ListTile(title: const Text('Large'), onTap: () { ctrl.formatSelection(const SizeAttribute('large')); Navigator.pop(modal); }),
+          ListTile(title: const Text('Huge'), onTap: () { ctrl.formatSelection(const SizeAttribute('huge')); Navigator.pop(modal); }),
+        ],
+      ),
+    );
+
+// Two compact trigger buttons (shown inside the bottom sheet row) ───────────────
+
+Widget _headingButton(QuillController ctrl) => Builder(
+      builder: (ctx) => TextButton.icon(
+        label: const Text('Heading'),
+        icon: const Icon(Icons.arrow_drop_down, size: 18),
+        iconAlignment: IconAlignment.end,
+        onPressed: () => showModalBottomSheet<void>(
+          context: ctx,
+          builder: (modal) => _headingPickerSheet(ctrl, modal),
+        ),
+      ),
+    );
+
+Widget _fontSizeButton(QuillController ctrl) => Builder(
+      builder: (ctx) => TextButton.icon(
+        label: const Text('Size'),
+        icon: const Icon(Icons.arrow_drop_down, size: 18),
+        iconAlignment: IconAlignment.end,
+        onPressed: () => showModalBottomSheet<void>(
+          context: ctx,
+          builder: (modal) => _fontSizePickerSheet(ctrl, modal),
+        ),
+      ),
     );
 
 // ── Android sheet helpers ──────────────────────────────────────────────────────
@@ -153,8 +170,8 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _headingSelector(ctrl),
-              _fontSizeSelector(ctrl),
+              _headingButton(ctrl),
+              _fontSizeButton(ctrl),
               QuillSimpleToolbar(controller: ctrl, config: restCfg),
             ],
           ),

@@ -4,15 +4,19 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/widgets/note_editor_widgets.dart';
 
-// Verify that the custom heading and font-size selectors inside the Android
-// formatting toolbar correctly apply Quill attributes when tapped.
+// Regression tests for the heading and font-size sub-menu fix.
 //
-// Background: Quill's built-in heading/font-size buttons use MenuController
-// with a QuillController listener that calls setState(). On real Android
-// hardware, the controller notification arrives before the menu frame renders,
-// the setState rebuild races with the pending MenuController.open(), and the
-// menu silently never appears. The custom TextButton selectors bypass this
-// entirely by applying attributes directly.
+// Root cause: Quill's QuillToolbarSelectHeaderStyleDropdownButton and
+// QuillToolbarFontSizeButton both extend QuillToolbarBaseButtonState, which
+// registers controller.addListener(setState). On real Android hardware, a
+// focus/selection change fires that listener before the MenuController.open()
+// frame renders, so setState rebuilds the widget and the pending menu open is
+// silently dropped. Font family (different base class, no listener) works fine.
+//
+// Fix: the Heading and Size buttons in the Android bottom sheet now open a
+// showModalBottomSheet picker instead of a MenuAnchor dropdown. A modal route
+// is pushed to the Navigator synchronously inside onPressed and cannot be
+// cancelled by a concurrent setState rebuild.
 
 Widget _buildApp(QuillController ctrl, {double width = 400}) => MaterialApp(
       localizationsDelegates: const [FlutterQuillLocalizations.delegate],
@@ -37,21 +41,48 @@ QuillController _makeController() {
 }
 
 void main() {
-  group('NoteFormattingToolbar Android custom heading selector', () {
+  group('NoteFormattingToolbar Android heading sub-menu', () {
     testWidgets(
-        'h1Button_tapped_appliesH1Attribute', (tester) async {
+        'headingButton_tapped_opensSubMenuWithOptions', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);
 
-      // Arrange: open the Fonts sheet (narrow screen → text_format icon)
+      // Arrange: narrow screen → Fonts group contains "Heading" button
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      // Act
-      await tester.tap(find.text('H1'));
+      // Act: tap the Heading button inside the sheet
+      await tester.tap(find.text('Heading'));
+      await tester.pumpAndSettle();
+
+      // Assert: sub-menu picker is open with all heading options visible
+      expect(find.text('Normal'), findsOneWidget);
+      expect(find.text('Heading 1'), findsOneWidget);
+      expect(find.text('Heading 2'), findsOneWidget);
+      expect(find.text('Heading 3'), findsOneWidget);
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+        'headingSubMenu_h1Selected_appliesH1Attribute', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Heading'));
+      await tester.pumpAndSettle();
+
+      // Act: select Heading 1
+      await tester.tap(find.text('Heading 1'));
       await tester.pump();
 
       // Assert
@@ -62,36 +93,18 @@ void main() {
     });
 
     testWidgets(
-        'h2Button_tapped_appliesH2Attribute', (tester) async {
+        'headingSubMenu_normalSelected_clearsHeadingAttribute', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);
+      ctrl.formatSelection(Attribute.h2);
 
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('H2'));
-      await tester.pump();
-
-      final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
-      expect(attr?.value, equals(2));
-
-      debugDefaultTargetPlatformOverride = null;
-    });
-
-    testWidgets(
-        'normalButton_tapped_clearsHeadingAttribute', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
-      final ctrl = _makeController();
-      addTearDown(ctrl.dispose);
-
-      ctrl.formatSelection(Attribute.h1);
-
-      await tester.pumpWidget(_buildApp(ctrl));
-      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.tap(find.text('Heading'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Normal'));
@@ -104,9 +117,9 @@ void main() {
     });
   });
 
-  group('NoteFormattingToolbar Android custom font-size selector', () {
+  group('NoteFormattingToolbar Android font-size sub-menu', () {
     testWidgets(
-        'sButton_tapped_appliesSmallSizeAttribute', (tester) async {
+        'sizeButton_tapped_opensSubMenuWithOptions', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
@@ -116,17 +129,19 @@ void main() {
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('S'));
-      await tester.pump();
+      await tester.tap(find.text('Size'));
+      await tester.pumpAndSettle();
 
-      final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
-      expect(attr?.value, equals('small'));
+      // Assert: sub-menu picker shows size options
+      expect(find.text('Small'), findsOneWidget);
+      expect(find.text('Large'), findsOneWidget);
+      expect(find.text('Huge'), findsOneWidget);
 
       debugDefaultTargetPlatformOverride = null;
     });
 
     testWidgets(
-        'xlButton_tapped_appliesHugeSizeAttribute', (tester) async {
+        'sizeSubMenu_largeSelected_appliesLargeAttribute', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
@@ -136,33 +151,14 @@ void main() {
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('XL'));
-      await tester.pump();
-
-      final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
-      expect(attr?.value, equals('huge'));
-
-      debugDefaultTargetPlatformOverride = null;
-    });
-
-    testWidgets(
-        'mButton_tapped_clearsSizeAttribute', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
-      final ctrl = _makeController();
-      addTearDown(ctrl.dispose);
-
-      ctrl.formatSelection(const SizeAttribute('large'));
-
-      await tester.pumpWidget(_buildApp(ctrl));
-      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.tap(find.text('Size'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('M'));
+      await tester.tap(find.text('Large'));
       await tester.pump();
 
       final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
-      expect(attr, isNull);
+      expect(attr?.value, equals('large'));
 
       debugDefaultTargetPlatformOverride = null;
     });
