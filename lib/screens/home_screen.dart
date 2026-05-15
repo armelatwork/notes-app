@@ -188,18 +188,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
     _listenToStorageAlert();
     final width = MediaQuery.of(context).size.width;
-    if (width >= 800) {
-      return const MacOSEditMenu(
-        child: Scaffold(
-          body: Row(children: [
-            FolderSidebar(),
-            SizedBox(width: 260, child: NotesListPanel()),
-            Expanded(child: NoteEditor()),
-          ]),
-        ),
-      );
-    }
-    return const _NarrowLayout();
+    // MacOSEditMenu must always be the root widget so PlatformMenuBar's
+    // element is never torn down and recreated. Swapping it in and out when
+    // the window crosses the 800 px threshold causes the _lockedContext
+    // assertion in platform_menu_bar.dart during rapid resizing.
+    return MacOSEditMenu(
+      child: width >= 800
+          ? const Scaffold(
+              body: Row(children: [
+                FolderSidebar(),
+                SizedBox(width: 260, child: NotesListPanel()),
+                Expanded(child: NoteEditor()),
+              ]),
+            )
+          : const _NarrowLayout(),
+    );
   }
 
   void _listenToStorageAlert() {

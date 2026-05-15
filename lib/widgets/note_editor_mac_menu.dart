@@ -91,22 +91,31 @@ extension _MacMenu on _NoteEditorState {
     _lastPrimaryTapTime = now;
     if (_primaryTapCount >= 3) {
       _primaryTapCount = 0;
+      final ctrl = _controller;
+      if (ctrl == null) return;
+      // Capture baseOffset NOW (click-3 pointer-down), while ctrl.selection
+      // still holds the double-click word position inside the target block.
+      // macOS native triple-click processing runs later and repositions the
+      // cursor PAST the block's trailing \n (into the next paragraph), so
+      // reading baseOffset in the callback would select the wrong paragraph —
+      // especially on headings where the cursor ends up after the {header:\n}.
+      final capturedOffset = ctrl.selection.baseOffset;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _selectParagraphAtCursor();
+        if (mounted) _selectParagraphAt(capturedOffset);
       });
     }
   }
 
-  void _selectParagraphAtCursor() {
+  void _selectParagraphAt(int offset) {
     final ctrl = _controller;
     if (ctrl == null) return;
     final text = ctrl.document.toPlainText();
-    final offset = ctrl.selection.baseOffset.clamp(0, text.length);
-    var start = offset;
+    final clamped = offset.clamp(0, text.length);
+    var start = clamped;
     while (start > 0 && text[start - 1] != '\n') {
       start--;
     }
-    var end = offset;
+    var end = clamped;
     while (end < text.length && text[end] != '\n') {
       end++;
     }
