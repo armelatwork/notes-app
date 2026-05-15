@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +15,6 @@ import '../providers/editor_menu_provider.dart';
 import '../providers/format_painter_provider.dart';
 import '../services/app_logger.dart';
 import '../services/rich_clipboard_service.dart';
-import 'note_table_embed.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
@@ -23,6 +22,11 @@ import 'note_editor_widgets.dart';
 import 'note_image_handler.dart';
 import 'note_link_handler.dart';
 import 'note_tab_embed.dart';
+import 'note_table_embed.dart';
+
+part 'note_editor_mac_menu.dart';
+part 'note_editor_context_menus.dart';
+part 'note_editor_format_painter.dart';
 
 const _kSaveDebounceMs = 800;
 const _kPreviewMaxLength = 120;
@@ -67,6 +71,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _titleController.dispose();
     super.dispose();
   }
+
+  // ── Clipboard ──────────────────────────────────────────────────────────────
 
   void _handleCopy() {
     final ctrl = _controller;
@@ -113,76 +119,13 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
   }
 
+  // ── Note lifecycle ─────────────────────────────────────────────────────────
+
   bool _isNewEmptyNote() {
     final note = _currentNote;
     if (note == null || _controller == null || _isDirty) return false;
     if (!isDefaultNoteTitle(note.title)) return false;
     return _controller!.document.toPlainText().trim().isEmpty;
-  }
-
-  // Controller listener: debounce for keyboard-driven selection changes only.
-  // Suppressed while a pointer button is held (_primaryPointerDown) because
-  // pointer-based selection is handled by _onPrimaryPointerUp instead, which
-  // fires after the drag ends and always has the final selection.
-  void _applyFormatPainterIfActive() {
-    if (!mounted || _controller == null) return;
-    if (ref.read(formatPainterProvider) == null) return;
-    if (_primaryPointerDown) return;
-    final sel = _controller!.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    _formatPainterTimer?.cancel();
-    _formatPainterTimer =
-        Timer(const Duration(milliseconds: 300), _applyFormatPainterNow);
-  }
-
-  // Called on primary pointer-up (mouse release / touch lift).
-  // Listener.onPointerUp fires before Quill's gesture recognizer, so the
-  // controller selection still reflects the completed drag. We snapshot the
-  // range here and apply immediately — no frame deferral needed.
-  void _onPrimaryPointerUp() {
-    if (ref.read(formatPainterProvider) == null) return;
-    final sel = _controller?.selection;
-    if (sel == null || !sel.isValid || sel.isCollapsed) return;
-    _formatPainterTimer?.cancel();
-    _formatPainterTimer = null;
-    _applyFormatPainterToRange(sel.start, sel.end - sel.start);
-  }
-
-  // Keyboard-fallback path: timer fires after selection settles.
-  void _applyFormatPainterNow() {
-    _formatPainterTimer = null;
-    if (!mounted || _controller == null) return;
-    final sel = _controller!.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    _applyFormatPainterToRange(sel.start, sel.end - sel.start);
-  }
-
-  void _applyFormatPainterToRange(int start, int len) {
-    if (!mounted || _controller == null) return;
-    final attrs = ref.read(formatPainterProvider);
-    if (attrs == null) return;
-    final ctrl = _controller!;
-    if (attrs.isEmpty) {
-      _clearTextStyle(ctrl, start, len);
-    } else {
-      for (final attr in attrs.values) {
-        ctrl.formatText(start, len, attr);
-      }
-    }
-    ref.read(formatPainterProvider.notifier).clear();
-  }
-
-  // Removes all common inline and block text formatting from [start, start+len).
-  // Used when the painter was activated on plain (unstyled) text.
-  void _clearTextStyle(QuillController ctrl, int start, int len) {
-    for (final attr in <Attribute>[
-      Attribute.bold, Attribute.italic, Attribute.underline,
-      Attribute.strikeThrough, Attribute.inlineCode, Attribute.subscript,
-    ]) {
-      ctrl.formatText(start, len, Attribute.clone(attr, null));
-    }
-    // header is a block attribute; clearing with h1's key removes any level.
-    ctrl.formatText(start, len, Attribute.clone(Attribute.h1, null));
   }
 
   void _discardIfEmpty() {
@@ -204,7 +147,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _currentNote = note;
     _isDirty = false;
     _imagesAtLoad = extractImageFilenames(note.content);
-
     if (isDefaultNoteTitle(note.title)) {
       _hintTitle = note.title;
       _titleController.text = '';
@@ -212,7 +154,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       _hintTitle = 'New Note';
       _titleController.text = note.title;
     }
-
     Document doc;
     try {
       final json = jsonDecode(note.content) as List;
@@ -221,7 +162,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       AppLogger.instance.warn('NoteEditor', 'failed to parse note content', e);
       doc = Document();
     }
+    _initNoteController(doc);
+    setState(() {});
+  }
 
+  void _initNoteController(Document doc) {
     _controller?.dispose();
     _controller = QuillController(
       document: doc,
@@ -230,7 +175,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _controller!.document.changes.listen((_) => _scheduleSave());
     _controller!.addListener(_applyFormatPainterIfActive);
     ref.read(editorMenuProvider.notifier).state = _controller;
-    setState(() {});
   }
 
   void _scheduleSave() {
@@ -247,24 +191,20 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _isDirty = false;
     final note = _currentNote;
     if (note == null || _controller == null) return;
-
     final delta = _controller!.document.toDelta();
     final contentJson = jsonEncode(delta.toJson());
     final plainText = _controller!.document.toPlainText();
     final preview = plainText.trim().replaceAll('\n', ' ');
-
     final typedTitle = _titleController.text.trim();
     note.title = typedTitle.isEmpty ? _hintTitle : typedTitle;
     note.content = contentJson;
     note.preview = preview.length > _kPreviewMaxLength
         ? preview.substring(0, _kPreviewMaxLength)
         : preview;
-
     final currentImages = extractImageFilenames(contentJson);
     final deletedImages =
         _imagesAtLoad.where((f) => !currentImages.contains(f)).toList();
     _imagesAtLoad = currentImages;
-
     await ref.read(notesProvider.notifier).saveNote(note,
         deletedImageFilenames: deletedImages);
   }
@@ -282,27 +222,25 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     showInsertLinkDialog(context, _controller!);
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final note = ref.watch(selectedNoteProvider);
     if (note == null) return const NoteEmptyPlaceholder();
-
     if (note.id != _currentNote?.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadNote(note));
     }
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
     }
-
     return DropTarget(
       onDragEntered: (_) => setState(() => _dragging = true),
       onDragExited: (_) => setState(() => _dragging = false),
       onDragDone: (detail) async {
         setState(() => _dragging = false);
         for (final file in detail.files) {
-          if (isImagePath(file.path)) {
-            await embedImageFile(_controller!, file.path);
-          }
+          if (isImagePath(file.path)) await embedImageFile(_controller!, file.path);
         }
         if (mounted) setState(() {});
       },
@@ -316,11 +254,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditorLayout() {
-    // ValueKey ensures the toolbar subtree (including QuillToolbarHistoryButton)
-    // is destroyed and recreated whenever the controller changes. Without this,
-    // the StatefulWidget elements are reused across note loads, so initState is
-    // never called again and the history buttons stay subscribed to the old
-    // (closed) controller.changes stream — leaving undo/redo permanently disabled.
+    // ValueKey forces toolbar rebuild on controller change so the history
+    // buttons re-subscribe to the new controller.changes stream.
     final toolbar = NoteFormattingToolbar(
       key: ValueKey(_controller),
       quillController: _controller!,
@@ -348,87 +283,88 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
   }
 
+  // ── Editor widget ──────────────────────────────────────────────────────────
+
   Widget _buildEditor() {
     final editor = QuillEditor.basic(
       controller: _controller!,
       focusNode: _focusNode,
-      config: QuillEditorConfig(
-        placeholder: 'Start writing…',
-        enableInteractiveSelection: true,
-        // Disable flutter_quill's selection toolbar on macOS: its
-        // EditorTextSelectionOverlay inserts handle OverlayEntries above the
-        // toolbar, which absorb clicks before they reach the menu buttons.
-        // Right-click on macOS is handled by the Listener below via showMenu.
-        enableSelectionToolbar:
-            defaultTargetPlatform != TargetPlatform.macOS,
-        customStyleBuilder: defaultTargetPlatform == TargetPlatform.macOS
-            ? macFontStyleBuilder
-            : null,
-        embedBuilders: [
-          NoteImageEmbedBuilder(controller: _controller!),
-          const NoteTabEmbedBuilder(),
-          const NoteTableEmbedBuilder(),
-        ],
-        // ignore: experimental_member_use
-        onKeyPressed: (event, node) {
-          if (event is! KeyDownEvent) return null;
-          if (event.logicalKey == LogicalKeyboardKey.tab) {
-            _insertTab();
-            return KeyEventResult.handled;
-          }
-          // Intercept Cmd+C/X/V (macOS) and Ctrl+C/X/V (all other platforms)
-          // so Quill's built-in plain-text clipboard handlers never run —
-          // our rich service handles all three.
-          final isMac = defaultTargetPlatform == TargetPlatform.macOS;
-          final modifierDown = isMac
-              ? HardwareKeyboard.instance.isMetaPressed
-              : HardwareKeyboard.instance.isControlPressed;
-          if (modifierDown) {
-            final key = event.logicalKey;
-            if (key == LogicalKeyboardKey.keyV) {
-              _handlePaste();
-              return KeyEventResult.handled;
-            }
-            if (key == LogicalKeyboardKey.keyC) {
-              _handleCopy();
-              return KeyEventResult.handled;
-            }
-            if (key == LogicalKeyboardKey.keyX) {
-              _handleCut();
-              return KeyEventResult.handled;
-            }
-          }
-          return null;
-        },
-        onTapUp: (details, getPosition) {
-          final pos = getPosition(details.localPosition);
-          if (defaultTargetPlatform == TargetPlatform.macOS) {
-            // Cmd+click opens link; plain click just positions the cursor.
-            if (HardwareKeyboard.instance.isMetaPressed) {
-              openLinkAtPosition(_controller!, pos.offset);
-            }
-          } else {
-            openLinkAtPosition(_controller!, pos.offset);
-          }
-          return false;
-        },
-        quillMagnifierBuilder: defaultTargetPlatform == TargetPlatform.android
-            ? defaultQuillMagnifierBuilder
-            : null,
-        onLaunchUrl: (url) async {
-          final uri = Uri.tryParse(url);
-          if (uri != null && await canLaunchUrl(uri)) {
-            launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        },
-        contextMenuBuilder: defaultTargetPlatform == TargetPlatform.macOS
-            ? null
-            : (ctx, rawEditorState) => _buildContextMenu(ctx, rawEditorState),
-      ),
+      config: _buildEditorConfig(),
     );
+    return defaultTargetPlatform != TargetPlatform.macOS
+        ? _buildAndroidListener(editor)
+        : _buildMacListener(editor);
+  }
 
-    if (defaultTargetPlatform != TargetPlatform.macOS) {
-      return Listener(
+  QuillEditorConfig _buildEditorConfig() {
+    return QuillEditorConfig(
+      placeholder: 'Start writing…',
+      enableInteractiveSelection: true,
+      // Quill's selection toolbar overlaps the toolbar on macOS; use showMenu.
+      enableSelectionToolbar: defaultTargetPlatform != TargetPlatform.macOS,
+      customStyleBuilder: defaultTargetPlatform == TargetPlatform.macOS
+          ? macFontStyleBuilder
+          : null,
+      embedBuilders: [
+        NoteImageEmbedBuilder(controller: _controller!),
+        const NoteTabEmbedBuilder(),
+        const NoteTableEmbedBuilder(),
+      ],
+      // ignore: experimental_member_use
+      onKeyPressed: _onEditorKeyPressed,
+      onTapUp: _onEditorTapUp,
+      quillMagnifierBuilder: defaultTargetPlatform == TargetPlatform.android
+          ? defaultQuillMagnifierBuilder
+          : null,
+      onLaunchUrl: _onEditorLaunchUrl,
+      contextMenuBuilder: defaultTargetPlatform == TargetPlatform.macOS
+          ? null
+          : (ctx, rawEditorState) => _buildContextMenu(ctx, rawEditorState),
+    );
+  }
+
+  KeyEventResult? _onEditorKeyPressed(KeyEvent event, Node? node) {
+    if (event is! KeyDownEvent) return null;
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      _insertTab();
+      return KeyEventResult.handled;
+    }
+    // Intercept Cmd+C/X/V (macOS) and Ctrl+C/X/V (other platforms) so
+    // Quill's built-in plain-text handlers never run.
+    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+    final modifierDown = isMac
+        ? HardwareKeyboard.instance.isMetaPressed
+        : HardwareKeyboard.instance.isControlPressed;
+    if (!modifierDown) return null;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.keyV) { _handlePaste(); return KeyEventResult.handled; }
+    if (key == LogicalKeyboardKey.keyC) { _handleCopy(); return KeyEventResult.handled; }
+    if (key == LogicalKeyboardKey.keyX) { _handleCut();  return KeyEventResult.handled; }
+    return null;
+  }
+
+  bool _onEditorTapUp(
+      TapUpDetails details, TextPosition Function(Offset) getPosition) {
+    final pos = getPosition(details.localPosition);
+    if (defaultTargetPlatform == TargetPlatform.macOS) {
+      // Cmd+click opens link; plain click just positions the cursor.
+      if (HardwareKeyboard.instance.isMetaPressed) {
+        openLinkAtPosition(_controller!, pos.offset);
+      }
+    } else {
+      openLinkAtPosition(_controller!, pos.offset);
+    }
+    return false;
+  }
+
+  Future<void> _onEditorLaunchUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildAndroidListener(Widget editor) => Listener(
         onPointerDown: (_) => _primaryPointerDown = true,
         onPointerUp: (_) {
           _primaryPointerDown = false;
@@ -436,236 +372,28 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         },
         child: editor,
       );
-    }
 
-    // On macOS, use showMenu (a Navigator Route) for the context menu.
-    // Routes sit above the overlay stack, so clicks always reach the items.
-    return Listener(
-      onPointerDown: (event) {
-        if (event.buttons == kSecondaryMouseButton) {
-          _secondaryButtonActive = true;
-        } else if (event.buttons == kPrimaryMouseButton) {
-          _primaryPointerDown = true;
-          _trackPrimaryTap();
-        }
-      },
-      onPointerUp: (event) {
-        if (_secondaryButtonActive) {
-          _secondaryButtonActive = false;
-          // Fire on pointer-UP, not pointer-DOWN, so that flutter_quill's
-          // onSecondarySingleTapUp has already moved the cursor to the
-          // right-click position before we check for a link there.
-          final pos = event.position;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _showMacContextMenu(pos);
-          });
-          return;
-        }
-        _primaryPointerDown = false;
-        _onPrimaryPointerUp();
-      },
-      child: editor,
-    );
-  }
-
-  // ── macOS context menu (showMenu = Navigator Route, always clickable) ─────────
-
-  Future<void> _showMacContextMenu(Offset globalPos) async {
-    final ctrl = _controller;
-    if (ctrl == null) return;
-
-    final sel = ctrl.selection;
-    final hasSelection = sel.isValid && !sel.isCollapsed;
-    // Cursor is now at the right-click position (moved by flutter_quill's
-    // onSecondarySingleTapUp before this post-frame callback fired).
-    final linkUrl = getLinkAtSelection(ctrl);
-    final hasLink = linkUrl != null;
-
-    final overlayBox =
-        Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final position = RelativeRect.fromRect(
-      globalPos & const Size(1, 1),
-      Offset.zero & overlayBox.size,
-    );
-
-    final choice = await showMenu<_MacMenuAction>(
-      context: context,
-      position: position,
-      items: [
-        if (hasLink) ...[
-          const PopupMenuItem(
-              height: 32,
-              value: _MacMenuAction.openLink,
-              child: Text('Open Link')),
-          const PopupMenuDivider(height: 8),
-        ],
-        if (hasSelection)
-          const PopupMenuItem(
-              height: 32, value: _MacMenuAction.cut, child: Text('Cut')),
-        if (hasSelection)
-          const PopupMenuItem(
-              height: 32, value: _MacMenuAction.copy, child: Text('Copy')),
-        const PopupMenuItem(
-            height: 32, value: _MacMenuAction.paste, child: Text('Paste')),
-        const PopupMenuItem(
-            height: 32,
-            value: _MacMenuAction.selectAll,
-            child: Text('Select All')),
-        PopupMenuItem(
-          height: 32,
-          value: _MacMenuAction.link,
-          child: Text(hasLink ? 'Edit Link' : 'Insert Link'),
-        ),
-      ],
-    );
-
-    if (!mounted || choice == null) return;
-
-    switch (choice) {
-      case _MacMenuAction.openLink:
-        final uri = Uri.tryParse(linkUrl ?? '');
-        if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
-      case _MacMenuAction.cut:
-        _handleCopy();
-        ctrl.replaceText(sel.start, sel.end - sel.start, '', null);
-      case _MacMenuAction.copy:
-        _handleCopy();
-      case _MacMenuAction.paste:
-        await RichClipboardService.instance.paste(ctrl);
-      case _MacMenuAction.selectAll:
-        ctrl.updateSelection(
-          TextSelection(
-              baseOffset: 0, extentOffset: ctrl.document.length - 1),
-          ChangeSource.local,
-        );
-      case _MacMenuAction.link:
-        final savedSel = ctrl.selection;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || _controller == null) return;
-          _controller!.updateSelection(savedSel, ChangeSource.local);
-          _onInsertLink();
-        });
-    }
-  }
-
-  void _trackPrimaryTap() {
-    final now = DateTime.now();
-    final last = _lastPrimaryTapTime;
-    if (last != null && now.difference(last) < _kTripleTapMaxGap) {
-      _primaryTapCount++;
-    } else {
-      _primaryTapCount = 1;
-    }
-    _lastPrimaryTapTime = now;
-    if (_primaryTapCount >= 3) {
-      _primaryTapCount = 0;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _selectParagraphAtCursor();
-      });
-    }
-  }
-
-  void _selectParagraphAtCursor() {
-    final ctrl = _controller;
-    if (ctrl == null) return;
-    final text = ctrl.document.toPlainText();
-    final offset = ctrl.selection.baseOffset.clamp(0, text.length);
-    var start = offset;
-    while (start > 0 && text[start - 1] != '\n') {
-      start--;
-    }
-    var end = offset;
-    while (end < text.length && text[end] != '\n') {
-      end++;
-    }
-    ctrl.updateSelection(
-      TextSelection(baseOffset: start, extentOffset: end),
-      ChangeSource.local,
-    );
-  }
-
-  // ── Android / other platforms context menu ────────────────────────────────────
-
-  Widget _buildContextMenu(
-      BuildContext ctx, QuillRawEditorState rawEditorState) {
-    final sel = rawEditorState.textEditingValue.selection;
-    final hasSelection = sel.isValid && !sel.isCollapsed;
-    final hasLink =
-        _controller != null && getLinkAtSelection(_controller!) != null;
-
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: rawEditorState.contextMenuAnchors,
-      buttonItems: [
-        if (hasSelection)
-          ContextMenuButtonItem(
-            label: 'Cut',
-            onPressed: () =>
-                rawEditorState.cutSelection(SelectionChangedCause.toolbar),
-          ),
-        if (hasSelection)
-          ContextMenuButtonItem(
-            label: 'Copy',
-            onPressed: () =>
-                rawEditorState.copySelection(SelectionChangedCause.toolbar),
-          ),
-        ContextMenuButtonItem(
-          label: 'Paste',
-          onPressed: () {
-            if (_controller != null) {
-              RichClipboardService.instance.paste(_controller!);
-            }
-          },
-        ),
-        ContextMenuButtonItem(
-          label: 'Select All',
-          onPressed: () =>
-              rawEditorState.selectAll(SelectionChangedCause.toolbar),
-        ),
-        ContextMenuButtonItem(
-          label: hasLink ? 'Edit Link' : 'Insert Link',
-          onPressed: () {
-            final savedSelection = _controller!.selection;
-            rawEditorState.hideToolbar();
+  Widget _buildMacListener(Widget editor) => Listener(
+        onPointerDown: (event) {
+          if (event.buttons == kSecondaryMouseButton) {
+            _secondaryButtonActive = true;
+          } else if (event.buttons == kPrimaryMouseButton) {
+            _primaryPointerDown = true;
+            _trackPrimaryTap();
+          }
+        },
+        onPointerUp: (event) {
+          if (_secondaryButtonActive) {
+            _secondaryButtonActive = false;
+            final pos = event.position;
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || _controller == null) return;
-              _controller!
-                  .updateSelection(savedSelection, ChangeSource.local);
-              _onInsertLink();
+              if (mounted) _showMacContextMenu(pos);
             });
-          },
-        ),
-      ],
-    );
-  }
-}
-
-enum _MacMenuAction { openLink, cut, copy, paste, selectAll, link }
-
-class _DragOverlay extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Theme.of(context)
-          .colorScheme
-          .primary
-          .withValues(alpha: _kDragOverlayOpacity),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.image_outlined,
-                size: 48, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 8),
-            Text(
-              'Drop image to insert',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+            return;
+          }
+          _primaryPointerDown = false;
+          _onPrimaryPointerUp();
+        },
+        child: editor,
+      );
 }
