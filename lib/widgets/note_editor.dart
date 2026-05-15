@@ -269,6 +269,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
   }
 
+  // Height threshold below which the title is hidden to prevent overflow.
+  // Reached in landscape mode when the software keyboard is visible.
+  static const double _kCompactHeightThreshold = 160;
+
   Widget _buildEditorLayout() {
     // ValueKey forces toolbar rebuild on controller change so the history
     // buttons re-subscribe to the new controller.changes stream.
@@ -280,22 +284,28 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       editorFocusNode: _focusNode,
     );
     final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
-    return Column(
-      children: [
-        NoteTitleField(
-          controller: _titleController,
-          hintText: _hintTitle,
-          onChanged: _scheduleSave,
-        ),
-        if (isMacOS) toolbar,
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-            child: _buildEditor(),
-          ),
-        ),
-        if (!isMacOS) toolbar,
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxHeight < _kCompactHeightThreshold;
+        return Column(
+          children: [
+            if (!isCompact)
+              NoteTitleField(
+                controller: _titleController,
+                hintText: _hintTitle,
+                onChanged: _scheduleSave,
+              ),
+            if (isMacOS) toolbar,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: _buildEditor(),
+              ),
+            ),
+            if (!isMacOS) toolbar,
+          ],
+        );
+      },
     );
   }
 
