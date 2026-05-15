@@ -91,22 +91,24 @@ extension _MacMenu on _NoteEditorState {
     _lastPrimaryTapTime = now;
     if (_primaryTapCount >= 3) {
       _primaryTapCount = 0;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _selectParagraphAtCursor();
-      });
+      // Signal _onEditorTapUp to apply the paragraph selection synchronously
+      // once the tap settles. Using a flag avoids the addPostFrameCallback race
+      // with Quill's own post-frame callbacks (which can reset the selection,
+      // especially on heading blocks).
+      _pendingTripleTap = true;
     }
   }
 
-  void _selectParagraphAtCursor() {
+  void _selectParagraphAt(int offset) {
     final ctrl = _controller;
     if (ctrl == null) return;
     final text = ctrl.document.toPlainText();
-    final offset = ctrl.selection.baseOffset.clamp(0, text.length);
-    var start = offset;
+    final clamped = offset.clamp(0, text.length);
+    var start = clamped;
     while (start > 0 && text[start - 1] != '\n') {
       start--;
     }
-    var end = offset;
+    var end = clamped;
     while (end < text.length && text[end] != '\n') {
       end++;
     }

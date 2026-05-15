@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Exercises the paragraph-selection logic extracted from _NoteEditorState.
 // The public surface under test is QuillController.updateSelection, driven
-// by the same boundary-walking algorithm used in _selectParagraphAtCursor.
+// by the same boundary-walking algorithm used in _selectParagraphAt.
 
 TextSelection _selectParagraphAtOffset(QuillController ctrl, int offset) {
   final text = ctrl.document.toPlainText();
