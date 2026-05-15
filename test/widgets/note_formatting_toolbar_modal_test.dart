@@ -4,18 +4,17 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/widgets/note_editor_widgets.dart';
 
-// Verify that toolbar groups containing Quill DropdownButton widgets (heading
-// style, font size, font family) open via showModalBottomSheet, not the
-// persistent showBottomSheet.
+// Verify that the custom heading and font-size selectors inside the Android
+// formatting toolbar correctly apply Quill attributes when tapped.
 //
-// showModalBottomSheet pushes a new Navigator route, adding an extra
-// ModalBarrier to the tree. showBottomSheet (persistent) does not.
-// The initial page route always contributes one ModalBarrier, so:
-//   modal sheet  → count increases by ≥ 1
-//   persistent   → count stays the same
+// Background: Quill's built-in heading/font-size buttons use MenuController
+// with a QuillController listener that calls setState(). On real Android
+// hardware, the controller notification arrives before the menu frame renders,
+// the setState rebuild races with the pending MenuController.open(), and the
+// menu silently never appears. The custom TextButton selectors bypass this
+// entirely by applying attributes directly.
 
-Widget _buildApp({required double width, required QuillController ctrl}) =>
-    MaterialApp(
+Widget _buildApp(QuillController ctrl, {double width = 400}) => MaterialApp(
       localizationsDelegates: const [FlutterQuillLocalizations.delegate],
       home: Scaffold(
         body: SizedBox(
@@ -29,83 +28,141 @@ Widget _buildApp({required double width, required QuillController ctrl}) =>
       ),
     );
 
-QuillController _makeController() => QuillController(
-      document: Document(),
-      selection: const TextSelection.collapsed(offset: 0),
-    );
+QuillController _makeController() {
+  final doc = Document()..insert(0, 'hello world');
+  return QuillController(
+    document: doc,
+    selection: const TextSelection(baseOffset: 0, extentOffset: 11),
+  );
+}
 
 void main() {
-  group('NoteFormattingToolbar Android modal sheets', () {
+  group('NoteFormattingToolbar Android custom heading selector', () {
     testWidgets(
-        'fontsGroup_tapped_onNarrowScreen_addsModalBarrier', (tester) async {
-      // debugDefaultTargetPlatformOverride must be reset in the test body —
-      // the framework's _verifyInvariants fires before addTearDown callbacks.
+        'h1Button_tapped_appliesH1Attribute', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);
 
-      // Arrange: width < 600 → "Fonts" group combines heading + font size
-      await tester.pumpWidget(_buildApp(width: 400, ctrl: ctrl));
-      final countBefore = find.byType(ModalBarrier).evaluate().length;
-
-      // Act
+      // Arrange: open the Fonts sheet (narrow screen → text_format icon)
+      await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      // Assert: modal sheet pushes a new route → ModalBarrier count increases.
-      final countAfter = find.byType(ModalBarrier).evaluate().length;
-      expect(countAfter, greaterThan(countBefore));
-
-      debugDefaultTargetPlatformOverride = null;
-    });
-
-    testWidgets(
-        'textGroup_tapped_onWideScreen_addsModalBarrier', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
-      tester.view.physicalSize = const Size(1200, 1600);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-
-      final ctrl = _makeController();
-      addTearDown(ctrl.dispose);
-
-      // Arrange: width ≥ 600 → "Text" group shown separately
-      await tester.pumpWidget(_buildApp(width: 700, ctrl: ctrl));
-      final countBefore = find.byType(ModalBarrier).evaluate().length;
-
       // Act
-      await tester.tap(find.byIcon(Icons.text_fields));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('H1'));
+      await tester.pump();
 
       // Assert
-      final countAfter = find.byType(ModalBarrier).evaluate().length;
-      expect(countAfter, greaterThan(countBefore));
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
+      expect(attr?.value, equals(1));
 
       debugDefaultTargetPlatformOverride = null;
     });
 
     testWidgets(
-        'historyGroup_tapped_onNarrowScreen_doesNotAddModalBarrier',
-        (tester) async {
+        'h2Button_tapped_appliesH2Attribute', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);
 
-      // Arrange: History group uses plain toggle buttons → persistent sheet
-      await tester.pumpWidget(_buildApp(width: 400, ctrl: ctrl));
-      final countBefore = find.byType(ModalBarrier).evaluate().length;
-
-      // Act
-      await tester.tap(find.byIcon(Icons.history));
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      // Assert: persistent sheet does not push a route → count unchanged.
-      final countAfter = find.byType(ModalBarrier).evaluate().length;
-      expect(countAfter, equals(countBefore));
+      await tester.tap(find.text('H2'));
+      await tester.pump();
+
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
+      expect(attr?.value, equals(2));
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+        'normalButton_tapped_clearsHeadingAttribute', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+
+      ctrl.formatSelection(Attribute.h1);
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Normal'));
+      await tester.pump();
+
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
+      expect(attr, isNull);
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+  });
+
+  group('NoteFormattingToolbar Android custom font-size selector', () {
+    testWidgets(
+        'sButton_tapped_appliesSmallSizeAttribute', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('S'));
+      await tester.pump();
+
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
+      expect(attr?.value, equals('small'));
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+        'xlButton_tapped_appliesHugeSizeAttribute', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('XL'));
+      await tester.pump();
+
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
+      expect(attr?.value, equals('huge'));
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+        'mButton_tapped_clearsSizeAttribute', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+
+      ctrl.formatSelection(const SizeAttribute('large'));
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('M'));
+      await tester.pump();
+
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
+      expect(attr, isNull);
 
       debugDefaultTargetPlatformOverride = null;
     });

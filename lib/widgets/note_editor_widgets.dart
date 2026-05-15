@@ -43,11 +43,6 @@ class _ToolbarGroup {
   // True for groups whose content needs full screen height (colour pickers).
   // On Android these use a modal sheet so the keyboard is dismissed first.
   final bool hidesKeyboard;
-  // True for groups that contain Quill DropdownButton widgets (heading style,
-  // font size, font family). Persistent bottom sheets don't give those widgets
-  // a valid overlay context on real Android hardware, so they must use a modal
-  // sheet — even though the keyboard doesn't need to hide.
-  final bool usesModal;
   // Android: content builder receives a close callback for programmatic dismiss.
   final Widget Function(BuildContext, VoidCallback close) content;
   // macOS: raw widget for the dropdown card, receives a close callback.
@@ -59,9 +54,57 @@ class _ToolbarGroup {
     required this.content,
     required this.macContent,
     this.hidesKeyboard = false,
-    this.usesModal = false,
   });
 }
+
+// ── Custom heading / font-size selectors ───────────────────────────────────────
+//
+// Quill's built-in heading and font-size buttons use MenuController.open()
+// paired with a QuillController listener that calls setState(). On real Android
+// hardware the controller notification arrives before the menu frame renders,
+// the setState rebuild races with the pending open, and the menu never appears.
+// These custom selectors apply attributes directly — no MenuController, no
+// controller listener, no rebuild race.
+
+Widget _headingSelector(QuillController ctrl) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextButton(
+            onPressed: () =>
+                ctrl.formatSelection(Attribute.clone(Attribute.header, null)),
+            child: const Text('Normal')),
+        TextButton(
+            onPressed: () => ctrl.formatSelection(Attribute.h1),
+            child: const Text('H1')),
+        TextButton(
+            onPressed: () => ctrl.formatSelection(Attribute.h2),
+            child: const Text('H2')),
+        TextButton(
+            onPressed: () => ctrl.formatSelection(Attribute.h3),
+            child: const Text('H3')),
+      ],
+    );
+
+Widget _fontSizeSelector(QuillController ctrl) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextButton(
+            onPressed: () =>
+                ctrl.formatSelection(const SizeAttribute('small')),
+            child: const Text('S')),
+        TextButton(
+            onPressed: () => ctrl.formatSelection(const SizeAttribute(null)),
+            child: const Text('M')),
+        TextButton(
+            onPressed: () =>
+                ctrl.formatSelection(const SizeAttribute('large')),
+            child: const Text('L')),
+        TextButton(
+            onPressed: () =>
+                ctrl.formatSelection(const SizeAttribute('huge')),
+            child: const Text('XL')),
+      ],
+    );
 
 // ── Android sheet helpers ──────────────────────────────────────────────────────
 
@@ -110,7 +153,8 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              QuillSimpleToolbar(controller: ctrl, config: _cfg(header: true)),
+              _headingSelector(ctrl),
+              _fontSizeSelector(ctrl),
               QuillSimpleToolbar(controller: ctrl, config: restCfg),
             ],
           ),
@@ -200,9 +244,8 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     if (fontsSplit) ...[
       _ToolbarGroup(
         icon: Icons.text_fields, tooltip: 'Text',
-        usesModal: true,
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl,
-            _cfg(fontFamily: true, fontSize: true)),
+            _cfg(fontFamily: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl,
             _cfg(fontFamily: true, fontSize: true)),
       ),
@@ -217,9 +260,8 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     ] else
       _ToolbarGroup(
         icon: Icons.text_format, tooltip: 'Fonts',
-        usesModal: true,
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg(
-            fontFamily: true, fontSize: true,
+            fontFamily: true,
             color: true, background: true, clearFormat: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl, _cfg(
             fontFamily: true, fontSize: true,
@@ -459,10 +501,8 @@ class _AndroidGroupBarState extends State<_AndroidGroupBar> {
   }
 
   void _onTap(BuildContext context, _ToolbarGroup group) {
-    if (group.hidesKeyboard || group.usesModal) {
+    if (group.hidesKeyboard) {
       _sheetController?.close();
-      _sheetController = null;
-      if (mounted) setState(() => _openTooltip = null);
       showModalBottomSheet<void>(
         context: context,
         builder: (ctx) => group.content(ctx, () => Navigator.pop(ctx)),
