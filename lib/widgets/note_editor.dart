@@ -49,7 +49,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _isDirty = false;
   bool _secondaryButtonActive = false;
   bool _primaryPointerDown = false;
-  bool _pendingTripleTap = false;
   Timer? _formatPainterTimer;
   int _primaryTapCount = 0;
   DateTime? _lastPrimaryTapTime;
@@ -346,13 +345,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   bool _onEditorTapUp(
       TapUpDetails details, TextPosition Function(Offset) getPosition) {
-    // Triple-tap: apply paragraph selection using the exact tap position and
-    // return true so Quill does not collapse it with its own tap handling.
-    if (_pendingTripleTap) {
-      _pendingTripleTap = false;
-      _selectParagraphAt(getPosition(details.localPosition).offset);
-      return true;
-    }
     final pos = getPosition(details.localPosition);
     if (defaultTargetPlatform == TargetPlatform.macOS) {
       // Cmd+click opens link; plain click just positions the cursor.

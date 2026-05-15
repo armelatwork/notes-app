@@ -91,11 +91,18 @@ extension _MacMenu on _NoteEditorState {
     _lastPrimaryTapTime = now;
     if (_primaryTapCount >= 3) {
       _primaryTapCount = 0;
-      // Signal _onEditorTapUp to apply the paragraph selection synchronously
-      // once the tap settles. Using a flag avoids the addPostFrameCallback race
-      // with Quill's own post-frame callbacks (which can reset the selection,
-      // especially on heading blocks).
-      _pendingTripleTap = true;
+      final ctrl = _controller;
+      if (ctrl == null) return;
+      // Capture baseOffset NOW (click-3 pointer-down), while ctrl.selection
+      // still holds the double-click word position inside the target block.
+      // macOS native triple-click processing runs later and repositions the
+      // cursor PAST the block's trailing \n (into the next paragraph), so
+      // reading baseOffset in the callback would select the wrong paragraph —
+      // especially on headings where the cursor ends up after the {header:\n}.
+      final capturedOffset = ctrl.selection.baseOffset;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _selectParagraphAt(capturedOffset);
+      });
     }
   }
 
