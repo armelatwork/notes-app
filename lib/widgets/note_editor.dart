@@ -62,10 +62,31 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   @override
+  void deactivate() {
+    // ref is still valid here, but Riverpod forbids mutating providers during
+    // deactivate() (the tree is mid-rebuild). Capture the notifier objects now
+    // and schedule the mutations for the next frame. Notifiers live in the
+    // Riverpod container and remain valid after this widget is gone.
+    final editorMenu = ref.read(editorMenuProvider.notifier);
+    NotesNotifier? notesNotifier;
+    int? discardId;
+    if (_isNewEmptyNote()) {
+      discardId = _currentNote!.id;
+      notesNotifier = ref.read(notesProvider.notifier);
+      _currentNote = null;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      editorMenu.state = null;
+      if (notesNotifier != null && discardId != null) {
+        notesNotifier.deleteNote(discardId);
+      }
+    });
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     _formatPainterTimer?.cancel();
-    _discardIfEmpty();
-    ref.read(editorMenuProvider.notifier).state = null;
     _controller?.dispose();
     _focusNode.dispose();
     _titleController.dispose();
@@ -128,11 +149,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     return _controller!.document.toPlainText().trim().isEmpty;
   }
 
-  void _discardIfEmpty() {
-    if (!_isNewEmptyNote()) return;
-    ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
-    _currentNote = null;
-  }
 
   void _loadNote(Note note) {
     if (_currentNote?.id == note.id) return;
