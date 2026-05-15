@@ -8,20 +8,24 @@ import 'package:notes_app/widgets/note_editor_widgets.dart';
 //
 // Root cause: Quill's heading and font-size buttons use MenuController.open()
 // inside a StatefulWidget that also registers controller.addListener(setState).
-// In a persistent bottom sheet (keyboard stays visible), tapping the button
-// triggers a focus change → QuillController notification → setState rebuilds
-// the button before MenuController.open() renders → menu silently dropped.
+// On real Android hardware the controller notification arrives before the menu
+// frame renders; the setState rebuild drops the pending open silently.
 //
-// Fix: the Fonts/Text sheet remains persistent (keyboard visible). The broken
-// Quill buttons are replaced by _headingButton / _fontSizeButton, compact
-// TextButtons that open a nested showModalBottomSheet for their options. The
-// nested modal traps focus, eliminating the race, while the outer sheet and
-// keyboard remain visible.
+// Fix: _HeadingMenuButton and _FontSizeMenuButton mirror font family exactly —
+// MenuAnchor + MenuController, NO controller listener — and are hosted inside
+// QuillSimpleToolbar via customButtons so they share the same widget-tree
+// context as the working font family button.
+//
+// Note: tests render NoteFormattingToolbar inside a SizedBox(height: 600) to
+// ensure the persistent sheet content receives bounded height constraints.
+// Without this the test-environment showBottomSheet passes unbounded height
+// and QuillSimpleToolbar's internal Wrap overflows.
 
 Widget _buildApp(QuillController ctrl, {double width = 400}) => MaterialApp(
       localizationsDelegates: const [FlutterQuillLocalizations.delegate],
       home: Scaffold(
         body: SizedBox(
+          height: 600,
           width: width,
           child: NoteFormattingToolbar(
             quillController: ctrl,
@@ -49,16 +53,13 @@ void main() {
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);
 
-      // Arrange: open the Fonts sheet (narrow screen)
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      // Act: tap the compact Heading button inside the sheet
       await tester.tap(find.text('Heading'));
       await tester.pumpAndSettle();
 
-      // Assert: nested modal sub-menu shows all heading options
       expect(find.text('Normal'), findsOneWidget);
       expect(find.text('Heading 1'), findsOneWidget);
       expect(find.text('Heading 2'), findsOneWidget);
@@ -80,11 +81,9 @@ void main() {
       await tester.tap(find.text('Heading'));
       await tester.pumpAndSettle();
 
-      // Act
       await tester.tap(find.text('Heading 1'));
       await tester.pump();
 
-      // Assert
       final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
       expect(attr?.value, equals(1));
 
@@ -117,7 +116,7 @@ void main() {
 
   group('NoteFormattingToolbar Android font-size sub-menu', () {
     testWidgets(
-        'sizeButton_tapped_opensSubMenuWithAllOptions', (tester) async {
+        'fontSizeButton_tapped_opensSubMenuWithAllOptions', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
@@ -139,7 +138,7 @@ void main() {
     });
 
     testWidgets(
-        'sizeSubMenu_largeSelected_appliesLargeAttribute', (tester) async {
+        'fontSizeSubMenu_largeSelected_appliesLargeAttribute', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();

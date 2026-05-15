@@ -87,11 +87,19 @@ class _HeadingMenuButtonState extends State<_HeadingMenuButton> {
         MenuItemButton(child: const Text('Heading 2'), onPressed: () => widget.ctrl.formatSelection(Attribute.h2)),
         MenuItemButton(child: const Text('Heading 3'), onPressed: () => widget.ctrl.formatSelection(Attribute.h3)),
       ],
-      child: IconButton(
-        onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
-        icon: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [Text('Heading'), Icon(Icons.arrow_drop_down, size: 18)],
+      child: Builder(
+        builder: (ctx) => QuillToolbarIconButton(
+          onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+          isSelected: false,
+          iconTheme: null,
+          icon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Heading', style: TextStyle(
+                color: IconTheme.of(ctx).color, fontSize: 13)),
+              Icon(Icons.arrow_drop_down, size: 18),
+            ],
+          ),
         ),
       ),
     );
@@ -118,11 +126,19 @@ class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
         MenuItemButton(child: const Text('Large'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('large'))),
         MenuItemButton(child: const Text('Huge'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('huge'))),
       ],
-      child: IconButton(
-        onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
-        icon: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [Text('Font size'), Icon(Icons.arrow_drop_down, size: 18)],
+      child: Builder(
+        builder: (ctx) => QuillToolbarIconButton(
+          onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+          isSelected: false,
+          iconTheme: null,
+          icon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Font size', style: TextStyle(
+                color: IconTheme.of(ctx).color, fontSize: 13)),
+              Icon(Icons.arrow_drop_down, size: 18),
+            ],
+          ),
         ),
       ),
     );
