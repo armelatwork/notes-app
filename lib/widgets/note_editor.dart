@@ -62,10 +62,17 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   @override
-  void dispose() {
-    _formatPainterTimer?.cancel();
+  void deactivate() {
+    // ref is still valid in deactivate() but is invalidated by Riverpod before
+    // dispose() is called, so all ref-based cleanup must happen here.
     _discardIfEmpty();
     ref.read(editorMenuProvider.notifier).state = null;
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _formatPainterTimer?.cancel();
     _controller?.dispose();
     _focusNode.dispose();
     _titleController.dispose();
