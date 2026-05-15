@@ -4,19 +4,19 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/widgets/note_editor_widgets.dart';
 
-// Regression tests for the heading and font-size sub-menu fix.
+// Regression test for the heading and font-size sub-menu fix.
 //
-// Root cause: Quill's QuillToolbarSelectHeaderStyleDropdownButton and
-// QuillToolbarFontSizeButton both extend QuillToolbarBaseButtonState, which
-// registers controller.addListener(setState). On real Android hardware, a
-// focus/selection change fires that listener before the MenuController.open()
-// frame renders, so setState rebuilds the widget and the pending menu open is
-// silently dropped. Font family (different base class, no listener) works fine.
+// Root cause: commit 556687e removed hidesKeyboard: true from the Fonts and
+// Text toolbar groups. That flag made those groups open via showModalBottomSheet,
+// which traps focus inside the modal — so tapping the heading/font-size button
+// does not trigger an editor focus change, the QuillController never fires its
+// notification, and MenuController.open() succeeds. Switching to a persistent
+// sheet (showBottomSheet) broke focus trapping: the controller notification
+// fires before the menu frame renders, the setState rebuild drops the pending
+// open, and the menu silently never appears.
 //
-// Fix: the Heading and Size buttons in the Android bottom sheet now open a
-// showModalBottomSheet picker instead of a MenuAnchor dropdown. A modal route
-// is pushed to the Navigator synchronously inside onPressed and cannot be
-// cancelled by a concurrent setState rebuild.
+// Fix: restore hidesKeyboard: true on both the narrow Fonts group and the wide
+// Text group so they continue to use showModalBottomSheet.
 
 Widget _buildApp(QuillController ctrl, {double width = 400}) => MaterialApp(
       localizationsDelegates: const [FlutterQuillLocalizations.delegate],
@@ -32,133 +32,62 @@ Widget _buildApp(QuillController ctrl, {double width = 400}) => MaterialApp(
       ),
     );
 
-QuillController _makeController() {
-  final doc = Document()..insert(0, 'hello world');
-  return QuillController(
-    document: doc,
-    selection: const TextSelection(baseOffset: 0, extentOffset: 11),
-  );
-}
+QuillController _makeController() => QuillController(
+      document: Document(),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
 
 void main() {
-  group('NoteFormattingToolbar Android heading sub-menu', () {
+  group('NoteFormattingToolbar Android Fonts/Text groups use modal sheet', () {
     testWidgets(
-        'headingButton_tapped_opensSubMenuWithOptions', (tester) async {
+        'fontsGroup_tapped_onNarrowScreen_opensModalSheet', (tester) async {
+      // Arrange: narrow screen (< 600 px) → Fonts group
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);
 
-      // Arrange: narrow screen → Fonts group contains "Heading" button
-      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.pumpWidget(_buildApp(ctrl, width: 400));
+      final countBefore = find.byType(ModalBarrier).evaluate().length;
+
+      // Act
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      // Act: tap the Heading button inside the sheet
-      await tester.tap(find.text('Heading'));
-      await tester.pumpAndSettle();
-
-      // Assert: sub-menu picker is open with all heading options visible
-      expect(find.text('Normal'), findsOneWidget);
-      expect(find.text('Heading 1'), findsOneWidget);
-      expect(find.text('Heading 2'), findsOneWidget);
-      expect(find.text('Heading 3'), findsOneWidget);
+      // Assert: hidesKeyboard: true → showModalBottomSheet → extra ModalBarrier.
+      expect(
+        find.byType(ModalBarrier).evaluate().length,
+        greaterThan(countBefore),
+      );
 
       debugDefaultTargetPlatformOverride = null;
     });
 
     testWidgets(
-        'headingSubMenu_h1Selected_appliesH1Attribute', (tester) async {
+        'textGroup_tapped_onWideScreen_opensModalSheet', (tester) async {
+      // Arrange: wide screen (≥ 600 px) → Text group
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      tester.view.physicalSize = const Size(1200, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       final ctrl = _makeController();
       addTearDown(ctrl.dispose);
 
-      await tester.pumpWidget(_buildApp(ctrl));
-      await tester.tap(find.byIcon(Icons.text_format));
-      await tester.pumpAndSettle();
+      await tester.pumpWidget(_buildApp(ctrl, width: 700));
+      final countBefore = find.byType(ModalBarrier).evaluate().length;
 
-      await tester.tap(find.text('Heading'));
+      // Act
+      await tester.tap(find.byIcon(Icons.text_fields));
       await tester.pumpAndSettle();
-
-      // Act: select Heading 1
-      await tester.tap(find.text('Heading 1'));
-      await tester.pump();
 
       // Assert
-      final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
-      expect(attr?.value, equals(1));
-
-      debugDefaultTargetPlatformOverride = null;
-    });
-
-    testWidgets(
-        'headingSubMenu_normalSelected_clearsHeadingAttribute', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
-      final ctrl = _makeController();
-      addTearDown(ctrl.dispose);
-      ctrl.formatSelection(Attribute.h2);
-
-      await tester.pumpWidget(_buildApp(ctrl));
-      await tester.tap(find.byIcon(Icons.text_format));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Heading'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Normal'));
-      await tester.pump();
-
-      final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
-      expect(attr, isNull);
-
-      debugDefaultTargetPlatformOverride = null;
-    });
-  });
-
-  group('NoteFormattingToolbar Android font-size sub-menu', () {
-    testWidgets(
-        'sizeButton_tapped_opensSubMenuWithOptions', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
-      final ctrl = _makeController();
-      addTearDown(ctrl.dispose);
-
-      await tester.pumpWidget(_buildApp(ctrl));
-      await tester.tap(find.byIcon(Icons.text_format));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Size'));
-      await tester.pumpAndSettle();
-
-      // Assert: sub-menu picker shows size options
-      expect(find.text('Small'), findsOneWidget);
-      expect(find.text('Large'), findsOneWidget);
-      expect(find.text('Huge'), findsOneWidget);
-
-      debugDefaultTargetPlatformOverride = null;
-    });
-
-    testWidgets(
-        'sizeSubMenu_largeSelected_appliesLargeAttribute', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-
-      final ctrl = _makeController();
-      addTearDown(ctrl.dispose);
-
-      await tester.pumpWidget(_buildApp(ctrl));
-      await tester.tap(find.byIcon(Icons.text_format));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Size'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Large'));
-      await tester.pump();
-
-      final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
-      expect(attr?.value, equals('large'));
+      expect(
+        find.byType(ModalBarrier).evaluate().length,
+        greaterThan(countBefore),
+      );
 
       debugDefaultTargetPlatformOverride = null;
     });
