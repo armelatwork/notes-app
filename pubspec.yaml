@@ -62,6 +62,9 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   package_info_plus: ^9.0.1
+  super_clipboard: ^0.9.1
+  vsc_quill_delta_to_html: ^1.0.5
+  flutter_quill_delta_from_html: ^1.5.3
 
 dev_dependencies:
   flutter_test:

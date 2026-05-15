@@ -23,18 +23,20 @@ Future<void> embedImageFile(
   _embed(controller, filename);
 }
 
-Future<void> pasteImageFromClipboard(QuillController controller) async {
+Future<bool> pasteImageFromClipboard(QuillController controller) async {
   try {
     final result = await _kClipboardChannel.invokeMethod<Map>('getImageData');
-    if (result == null) return;
+    if (result == null) return false;
     final bytes = result['data'] as Uint8List;
     final ext = result['ext'] as String? ?? 'png';
     final filename = 'img_${DateTime.now().millisecondsSinceEpoch}.$ext';
     final dest = await imageLocalPath(filename);
     await File(dest).writeAsBytes(bytes);
     _embed(controller, filename);
+    return true;
   } catch (e) {
     AppLogger.instance.error('NoteImageHandler', 'clipboard paste failed', e);
+    return false;
   }
 }
 

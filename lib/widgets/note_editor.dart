@@ -14,6 +14,8 @@ import '../providers/app_provider.dart';
 import '../providers/editor_menu_provider.dart';
 import '../providers/format_painter_provider.dart';
 import '../services/app_logger.dart';
+import '../services/rich_clipboard_service.dart';
+import 'note_table_embed.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
@@ -53,7 +55,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   @override
   void initState() {
     super.initState();
-    HardwareKeyboard.instance.addHandler(_onKeyEvent);
   }
 
   @override
@@ -61,25 +62,42 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _formatPainterTimer?.cancel();
     _discardIfEmpty();
     ref.read(editorMenuProvider.notifier).state = null;
-    HardwareKeyboard.instance.removeHandler(_onKeyEvent);
     _controller?.dispose();
     _focusNode.dispose();
     _titleController.dispose();
     super.dispose();
   }
 
-  bool _onKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-    if (!_focusNode.hasFocus || _controller == null) return false;
+  void _handleCopy() {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    RichClipboardService.instance.copy(ctrl);
+  }
 
-    final isCmdV = HardwareKeyboard.instance.isMetaPressed &&
-        event.logicalKey == LogicalKeyboardKey.keyV;
-    if (isCmdV) {
-      pasteImageFromClipboard(_controller!);
-      return false;
+  void _handleCut() {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    RichClipboardService.instance.copy(ctrl);
+    final sel = ctrl.selection;
+    if (sel.isValid && !sel.isCollapsed) {
+      ctrl.replaceText(sel.start, sel.end - sel.start, '', null);
     }
+  }
 
-    return false;
+  Future<void> _handlePaste() async {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    // Set the flag synchronously before any await so the macOS native Paste
+    // menu action (which fires almost simultaneously) is suppressed.
+    RichClipboardService.instance.beginKeyboardPaste();
+    try {
+      final imagePasted = await pasteImageFromClipboard(ctrl);
+      if (!imagePasted) {
+        await RichClipboardService.instance.paste(ctrl, fromKeyboard: true);
+      }
+    } finally {
+      RichClipboardService.instance.endKeyboardPaste();
+    }
   }
 
   void _insertTab() {
@@ -349,13 +367,36 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         embedBuilders: [
           NoteImageEmbedBuilder(controller: _controller!),
           const NoteTabEmbedBuilder(),
+          const NoteTableEmbedBuilder(),
         ],
         // ignore: experimental_member_use
         onKeyPressed: (event, node) {
-          if (event is KeyDownEvent &&
-              event.logicalKey == LogicalKeyboardKey.tab) {
+          if (event is! KeyDownEvent) return null;
+          if (event.logicalKey == LogicalKeyboardKey.tab) {
             _insertTab();
             return KeyEventResult.handled;
+          }
+          // Intercept Cmd+C/X/V (macOS) and Ctrl+C/X/V (all other platforms)
+          // so Quill's built-in plain-text clipboard handlers never run —
+          // our rich service handles all three.
+          final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+          final modifierDown = isMac
+              ? HardwareKeyboard.instance.isMetaPressed
+              : HardwareKeyboard.instance.isControlPressed;
+          if (modifierDown) {
+            final key = event.logicalKey;
+            if (key == LogicalKeyboardKey.keyV) {
+              _handlePaste();
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.keyC) {
+              _handleCopy();
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.keyX) {
+              _handleCut();
+              return KeyEventResult.handled;
+            }
           }
           return null;
         },
@@ -485,13 +526,12 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
         final uri = Uri.tryParse(linkUrl ?? '');
         if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
       case _MacMenuAction.cut:
-        _copyToClipboard(ctrl);
+        _handleCopy();
         ctrl.replaceText(sel.start, sel.end - sel.start, '', null);
       case _MacMenuAction.copy:
-        _copyToClipboard(ctrl);
+        _handleCopy();
       case _MacMenuAction.paste:
-        // ignore: experimental_member_use
-        await ctrl.clipboardPaste();
+        await RichClipboardService.instance.paste(ctrl);
       case _MacMenuAction.selectAll:
         ctrl.updateSelection(
           TextSelection(
@@ -544,17 +584,6 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
   }
 
-  void _copyToClipboard(QuillController ctrl) {
-    final sel = ctrl.selection;
-    if (!sel.isValid || sel.isCollapsed) return;
-    final text = ctrl.document.toPlainText();
-    final start = sel.start.clamp(0, text.length);
-    final end = sel.end.clamp(0, text.length);
-    if (start < end) {
-      Clipboard.setData(ClipboardData(text: text.substring(start, end)));
-    }
-  }
-
   // ── Android / other platforms context menu ────────────────────────────────────
 
   Widget _buildContextMenu(
@@ -581,9 +610,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           ),
         ContextMenuButtonItem(
           label: 'Paste',
-          // ignore: experimental_member_use
-          onPressed: () =>
-              rawEditorState.pasteText(SelectionChangedCause.toolbar),
+          onPressed: () {
+            if (_controller != null) {
+              RichClipboardService.instance.paste(_controller!);
+            }
+          },
         ),
         ContextMenuButtonItem(
           label: 'Select All',
