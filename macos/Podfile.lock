@@ -1211,6 +1211,8 @@ PODS:
     - FlutterMacOS
   - desktop_drop (0.0.1):
     - FlutterMacOS
+  - device_info_plus (0.0.1):
+    - FlutterMacOS
   - file_picker (0.0.1):
     - FlutterMacOS
   - file_selector_macos (0.0.1):
@@ -1378,6 +1380,8 @@ PODS:
   - GTMSessionFetcher/Core (3.5.0)
   - GTMSessionFetcher/Full (3.5.0):
     - GTMSessionFetcher/Core
+  - irondash_engine_context (0.0.1):
+    - FlutterMacOS
   - isar_flutter_libs (1.0.0):
     - FlutterMacOS
   - leveldb-library (1.22.6)
@@ -1386,11 +1390,15 @@ PODS:
     - nanopb/encode (= 3.30910.0)
   - nanopb/decode (3.30910.0)
   - nanopb/encode (3.30910.0)
+  - package_info_plus (0.0.1):
+    - FlutterMacOS
   - PromisesObjC (2.4.0)
   - quill_native_bridge_macos (0.0.1):
     - FlutterMacOS
   - shared_preferences_foundation (0.0.1):
     - Flutter
+    - FlutterMacOS
+  - super_native_extensions (0.0.1):
     - FlutterMacOS
   - url_launcher_macos (0.0.1):
     - FlutterMacOS
@@ -1398,15 +1406,19 @@ PODS:
 DEPENDENCIES:
   - cloud_firestore (from `Flutter/ephemeral/.symlinks/plugins/cloud_firestore/macos`)
   - desktop_drop (from `Flutter/ephemeral/.symlinks/plugins/desktop_drop/macos`)
+  - device_info_plus (from `Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos`)
   - file_picker (from `Flutter/ephemeral/.symlinks/plugins/file_picker/macos`)
   - file_selector_macos (from `Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos`)
   - firebase_core (from `Flutter/ephemeral/.symlinks/plugins/firebase_core/macos`)
   - flutter_secure_storage_macos (from `Flutter/ephemeral/.symlinks/plugins/flutter_secure_storage_macos/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - google_sign_in_ios (from `Flutter/ephemeral/.symlinks/plugins/google_sign_in_ios/darwin`)
+  - irondash_engine_context (from `Flutter/ephemeral/.symlinks/plugins/irondash_engine_context/macos`)
   - isar_flutter_libs (from `Flutter/ephemeral/.symlinks/plugins/isar_flutter_libs/macos`)
+  - package_info_plus (from `Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos`)
   - quill_native_bridge_macos (from `Flutter/ephemeral/.symlinks/plugins/quill_native_bridge_macos/macos`)
   - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
+  - super_native_extensions (from `Flutter/ephemeral/.symlinks/plugins/super_native_extensions/macos`)
   - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
 
 SPEC REPOS:
@@ -1438,6 +1450,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/cloud_firestore/macos
   desktop_drop:
     :path: Flutter/ephemeral/.symlinks/plugins/desktop_drop/macos
+  device_info_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos
   file_picker:
     :path: Flutter/ephemeral/.symlinks/plugins/file_picker/macos
   file_selector_macos:
@@ -1450,12 +1464,18 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
   google_sign_in_ios:
     :path: Flutter/ephemeral/.symlinks/plugins/google_sign_in_ios/darwin
+  irondash_engine_context:
+    :path: Flutter/ephemeral/.symlinks/plugins/irondash_engine_context/macos
   isar_flutter_libs:
     :path: Flutter/ephemeral/.symlinks/plugins/isar_flutter_libs/macos
+  package_info_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/package_info_plus/macos
   quill_native_bridge_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/quill_native_bridge_macos/macos
   shared_preferences_foundation:
     :path: Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin
+  super_native_extensions:
+    :path: Flutter/ephemeral/.symlinks/plugins/super_native_extensions/macos
   url_launcher_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos
 
@@ -1466,6 +1486,7 @@ SPEC CHECKSUMS:
   BoringSSL-GRPC: dded2a44897e45f28f08ae87a55ee4bcd19bc508
   cloud_firestore: 92bf414ac4a12c1008efa35a70ffe988f90cf740
   desktop_drop: e0b672a7d84c0a6cbc378595e82cdb15f2970a43
+  device_info_plus: 4fb280989f669696856f8b129e4a5e3cd6c48f76
   file_picker: 7584aae6fa07a041af2b36a2655122d42f578c1a
   file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
   Firebase: d99ac19b909cd2c548339c2241ecd0d1599ab02e
@@ -1486,12 +1507,15 @@ SPEC CHECKSUMS:
   gRPC-Core: 860978b7db482de8b4f5e10677216309b5ff6330
   GTMAppAuth: f69bd07d68cd3b766125f7e072c45d7340dea0de
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
+  irondash_engine_context: 893c7d96d20ce361d7e996f39d360c4c2f9869ba
   isar_flutter_libs: a65381780401f81ad6bf3f2e7cd0de5698fb98c4
   leveldb-library: cc8b8f8e013647a295ad3f8cd2ddf49a6f19be19
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
+  package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   quill_native_bridge_macos: 2b005cb56902bb740e0cd9620aa399dfac6b4882
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+  super_native_extensions: c2795d6d9aedf4a79fae25cb6160b71b50549189
   url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
 
 PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
