@@ -89,7 +89,20 @@ class _HeadingMenuButtonState extends State<_HeadingMenuButton> {
       ],
       child: Builder(
         builder: (ctx) => QuillToolbarIconButton(
-          onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+          onPressed: () {
+            if (_menu.isOpen) {
+              _menu.close();
+            } else {
+              // MenuAnchor calculates available space using the full overlay
+              // height (full screen) without knowing the software keyboard
+              // occupies the bottom portion. A short menu (4 items ≈ 200 dp)
+              // fits in the gap between the sheet and the screen bottom, so
+              // MenuAnchor opens it downward — into the keyboard, invisible.
+              // Shifting by the keyboard height forces it above the keyboard.
+              final kb = MediaQuery.viewInsetsOf(ctx).bottom;
+              _menu.open(position: kb > 0 ? Offset(0, -kb) : null);
+            }
+          },
           isSelected: false,
           iconTheme: null,
           icon: Row(
@@ -128,7 +141,20 @@ class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
       ],
       child: Builder(
         builder: (ctx) => QuillToolbarIconButton(
-          onPressed: () => _menu.isOpen ? _menu.close() : _menu.open(),
+          onPressed: () {
+            if (_menu.isOpen) {
+              _menu.close();
+            } else {
+              // MenuAnchor calculates available space using the full overlay
+              // height (full screen) without knowing the software keyboard
+              // occupies the bottom portion. A short menu (4 items ≈ 200 dp)
+              // fits in the gap between the sheet and the screen bottom, so
+              // MenuAnchor opens it downward — into the keyboard, invisible.
+              // Shifting by the keyboard height forces it above the keyboard.
+              final kb = MediaQuery.viewInsetsOf(ctx).bottom;
+              _menu.open(position: kb > 0 ? Offset(0, -kb) : null);
+            }
+          },
           isSelected: false,
           iconTheme: null,
           icon: Row(
@@ -192,8 +218,21 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _HeadingMenuButton(ctrl: ctrl),
-              _FontSizeMenuButton(ctrl: ctrl),
+              QuillSimpleToolbar(
+                controller: ctrl,
+                config: _cfg(customButtons: [
+                  QuillToolbarCustomButtonOptions(
+                    icon: const Icon(Icons.text_format),
+                    childBuilder: (dynamic opt, dynamic extra) =>
+                        _HeadingMenuButton(ctrl: ctrl),
+                  ),
+                  QuillToolbarCustomButtonOptions(
+                    icon: const Icon(Icons.format_size),
+                    childBuilder: (dynamic opt, dynamic extra) =>
+                        _FontSizeMenuButton(ctrl: ctrl),
+                  ),
+                ]),
+              ),
               QuillSimpleToolbar(controller: ctrl, config: restCfg),
             ],
           ),
