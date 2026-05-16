@@ -57,6 +57,126 @@ class _ToolbarGroup {
   });
 }
 
+// ── Heading / font-size sub-menu buttons ──────────────────────────────────────
+//
+// Quill's built-in heading and font-size buttons use MenuController.open()
+// inside a StatefulWidget that also calls controller.addListener(setState).
+// The setState rebuild races with the pending open and drops it on real Android
+// hardware. Font family is unaffected because its implementation has no such
+// listener. These replacements mirror font family exactly — MenuAnchor +
+// MenuController, NO controller listener — so the sub-menus open without
+// hiding the keyboard, matching font family behaviour.
+
+class _HeadingMenuButton extends StatefulWidget {
+  const _HeadingMenuButton({required this.ctrl});
+  final QuillController ctrl;
+  @override
+  State<_HeadingMenuButton> createState() => _HeadingMenuButtonState();
+}
+
+class _HeadingMenuButtonState extends State<_HeadingMenuButton> {
+  final _menu = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      controller: _menu,
+      menuChildren: [
+        MenuItemButton(child: const Text('Normal'), onPressed: () => widget.ctrl.formatSelection(Attribute.clone(Attribute.header, null))),
+        MenuItemButton(child: const Text('Heading 1'), onPressed: () => widget.ctrl.formatSelection(Attribute.h1)),
+        MenuItemButton(child: const Text('Heading 2'), onPressed: () => widget.ctrl.formatSelection(Attribute.h2)),
+        MenuItemButton(child: const Text('Heading 3'), onPressed: () => widget.ctrl.formatSelection(Attribute.h3)),
+      ],
+      child: Builder(
+        builder: (ctx) => QuillToolbarIconButton(
+          onPressed: () {
+            if (_menu.isOpen) {
+              _menu.close();
+            } else {
+              // MenuAnchor positions the menu using the full overlay height
+              // (full screen) without knowing the keyboard occupies the bottom.
+              // A 4-item menu (~200 dp) fits in the apparent gap below the
+              // button and opens downward into the keyboard — invisible.
+              // Font family's long list (~400 dp) does not fit below so it
+              // naturally flips above with menu.bottom = anchor.top.
+              // Replicating that flip: position.y = −menu_height places the
+              // menu's bottom exactly at the anchor's top (flush to button),
+              // regardless of keyboard height. Only apply when keyboard is up.
+              final kb = MediaQuery.viewInsetsOf(ctx).bottom;
+              _menu.open(position: kb > 0 ? const Offset(0, -200) : null);
+            }
+          },
+          isSelected: false,
+          iconTheme: null,
+          icon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Heading', style: TextStyle(
+                color: IconTheme.of(ctx).color, fontSize: 13)),
+              Icon(Icons.arrow_drop_down, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FontSizeMenuButton extends StatefulWidget {
+  const _FontSizeMenuButton({required this.ctrl});
+  final QuillController ctrl;
+  @override
+  State<_FontSizeMenuButton> createState() => _FontSizeMenuButtonState();
+}
+
+class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
+  final _menu = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      controller: _menu,
+      menuChildren: [
+        MenuItemButton(child: const Text('Small'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('small'))),
+        MenuItemButton(child: const Text('Normal'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute(null))),
+        MenuItemButton(child: const Text('Large'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('large'))),
+        MenuItemButton(child: const Text('Huge'), onPressed: () => widget.ctrl.formatSelection(const SizeAttribute('huge'))),
+      ],
+      child: Builder(
+        builder: (ctx) => QuillToolbarIconButton(
+          onPressed: () {
+            if (_menu.isOpen) {
+              _menu.close();
+            } else {
+              // MenuAnchor positions the menu using the full overlay height
+              // (full screen) without knowing the keyboard occupies the bottom.
+              // A 4-item menu (~200 dp) fits in the apparent gap below the
+              // button and opens downward into the keyboard — invisible.
+              // Font family's long list (~400 dp) does not fit below so it
+              // naturally flips above with menu.bottom = anchor.top.
+              // Replicating that flip: position.y = −menu_height places the
+              // menu's bottom exactly at the anchor's top (flush to button),
+              // regardless of keyboard height. Only apply when keyboard is up.
+              final kb = MediaQuery.viewInsetsOf(ctx).bottom;
+              _menu.open(position: kb > 0 ? const Offset(0, -200) : null);
+            }
+          },
+          isSelected: false,
+          iconTheme: null,
+          icon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Font size', style: TextStyle(
+                color: IconTheme.of(ctx).color, fontSize: 13)),
+              Icon(Icons.arrow_drop_down, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Android sheet helpers ──────────────────────────────────────────────────────
 
 Widget _textStyleSheet(BuildContext _, QuillController ctrl) =>
@@ -104,7 +224,21 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              QuillSimpleToolbar(controller: ctrl, config: _cfg(header: true)),
+              QuillSimpleToolbar(
+                controller: ctrl,
+                config: _cfg(customButtons: [
+                  QuillToolbarCustomButtonOptions(
+                    icon: const Icon(Icons.text_format),
+                    childBuilder: (dynamic opt, dynamic extra) =>
+                        _HeadingMenuButton(ctrl: ctrl),
+                  ),
+                  QuillToolbarCustomButtonOptions(
+                    icon: const Icon(Icons.format_size),
+                    childBuilder: (dynamic opt, dynamic extra) =>
+                        _FontSizeMenuButton(ctrl: ctrl),
+                  ),
+                ]),
+              ),
               QuillSimpleToolbar(controller: ctrl, config: restCfg),
             ],
           ),
@@ -195,7 +329,7 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
       _ToolbarGroup(
         icon: Icons.text_fields, tooltip: 'Text',
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl,
-            _cfg(fontFamily: true, fontSize: true)),
+            _cfg(fontFamily: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl,
             _cfg(fontFamily: true, fontSize: true)),
       ),
@@ -211,7 +345,7 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
       _ToolbarGroup(
         icon: Icons.text_format, tooltip: 'Fonts',
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg(
-            fontFamily: true, fontSize: true,
+            fontFamily: true,
             color: true, background: true, clearFormat: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl, _cfg(
             fontFamily: true, fontSize: true,
