@@ -93,14 +93,17 @@ class _HeadingMenuButtonState extends State<_HeadingMenuButton> {
             if (_menu.isOpen) {
               _menu.close();
             } else {
-              // MenuAnchor calculates available space using the full overlay
-              // height (full screen) without knowing the software keyboard
-              // occupies the bottom portion. A short menu (4 items ≈ 200 dp)
-              // fits in the gap between the sheet and the screen bottom, so
-              // MenuAnchor opens it downward — into the keyboard, invisible.
-              // Shifting by the keyboard height forces it above the keyboard.
+              // MenuAnchor positions the menu using the full overlay height
+              // (full screen) without knowing the keyboard occupies the bottom.
+              // A 4-item menu (~200 dp) fits in the apparent gap below the
+              // button and opens downward into the keyboard — invisible.
+              // Font family's long list (~400 dp) does not fit below so it
+              // naturally flips above with menu.bottom = anchor.top.
+              // Replicating that flip: position.y = −menu_height places the
+              // menu's bottom exactly at the anchor's top (flush to button),
+              // regardless of keyboard height. Only apply when keyboard is up.
               final kb = MediaQuery.viewInsetsOf(ctx).bottom;
-              _menu.open(position: kb > 0 ? Offset(0, -kb) : null);
+              _menu.open(position: kb > 0 ? const Offset(0, -200) : null);
             }
           },
           isSelected: false,
@@ -145,14 +148,17 @@ class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
             if (_menu.isOpen) {
               _menu.close();
             } else {
-              // MenuAnchor calculates available space using the full overlay
-              // height (full screen) without knowing the software keyboard
-              // occupies the bottom portion. A short menu (4 items ≈ 200 dp)
-              // fits in the gap between the sheet and the screen bottom, so
-              // MenuAnchor opens it downward — into the keyboard, invisible.
-              // Shifting by the keyboard height forces it above the keyboard.
+              // MenuAnchor positions the menu using the full overlay height
+              // (full screen) without knowing the keyboard occupies the bottom.
+              // A 4-item menu (~200 dp) fits in the apparent gap below the
+              // button and opens downward into the keyboard — invisible.
+              // Font family's long list (~400 dp) does not fit below so it
+              // naturally flips above with menu.bottom = anchor.top.
+              // Replicating that flip: position.y = −menu_height places the
+              // menu's bottom exactly at the anchor's top (flush to button),
+              // regardless of keyboard height. Only apply when keyboard is up.
               final kb = MediaQuery.viewInsetsOf(ctx).bottom;
-              _menu.open(position: kb > 0 ? Offset(0, -kb) : null);
+              _menu.open(position: kb > 0 ? const Offset(0, -200) : null);
             }
           },
           isSelected: false,
