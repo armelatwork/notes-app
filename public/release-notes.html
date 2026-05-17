@@ -81,18 +81,40 @@
         <span class="version">Unreleased</span>
         <span class="badge" style="background:#e8e8e8;color:#666;">Coming soon</span>
       </div>
+    </div>
+
+    <!-- v1.4.0 -->
+    <div class="release">
+      <div class="release-header">
+        <span class="version">v1.4.0</span>
+        <span class="badge">Latest</span>
+        <span class="date">May 2026</span>
+      </div>
 
       <div class="section-label">New Features</div>
       <ul>
-        <li><strong>App renamed to My Notes</strong> — the app name has been updated across all platforms.</li>
-        <li><strong>Drive storage warnings</strong> — a banner appears at the bottom of the app when your Google Drive storage is 90% full (once per session) or completely full (on every failed sync).</li>
-        <li><strong>Version number in Settings</strong> — the app version is now shown in the Settings screen, with a link to the website.</li>
+        <li><strong>Rich clipboard</strong> — pasting from Google Docs, web browsers, and other apps now preserves bold, italic, headings, bullet lists, numbered lists, and tables. Tables are embedded as read-only blocks.</li>
+        <li><strong>Format painter</strong> — tap the brush icon in the toolbar to copy formatting from selected text and apply it to another selection (macOS + Android).</li>
+        <li><strong>Strikethrough</strong> — available in the Text Style group on all platforms.</li>
+        <li><strong>Android back navigation</strong> — the back gesture now follows the panel hierarchy: editor → notes list → folder sidebar → exit to home.</li>
+        <li><strong>Android text magnifier</strong> — appears during selection handle drag for precise cursor placement.</li>
+        <li><strong>macOS triple-click</strong> — selects the full paragraph, not just the line.</li>
+        <li><strong>macOS Edit menu</strong> — Paste and Match Style, Delete, Find, Copy Formatting, and Cancel Formatting added to the native Edit menu.</li>
+        <li><strong>Drive storage warnings</strong> — a warning banner appears when your Google Drive storage reaches 90% full (once per session), and a persistent alert shows on every sync attempt when storage is completely full.</li>
+        <li><strong>Settings About section</strong> — the app version number and a link to the website are now shown at the bottom of the Settings screen.</li>
+        <li><strong>App renamed to My Notes</strong> — the name is updated across all platforms.</li>
       </ul>
 
       <div class="section-label">Bug Fixes</div>
       <ul>
-        <li>Fixed a 401 authentication error on Android caused by a revoked OAuth grant being returned from Play Services cache.</li>
-        <li>Fixed a 403 insufficient-scope error on macOS when restoring a session without Drive access.</li>
+        <li>Android: heading and font-size sub-menus now open correctly when the keyboard is visible.</li>
+        <li>Android: fixed a 401 authentication error caused by Play Services returning a stale OAuth grant.</li>
+        <li>macOS: fixed a 403 insufficient-scope error when restoring a session without Drive access.</li>
+        <li>macOS: triple-click paragraph selection now works correctly on headings.</li>
+        <li>macOS: set a minimum window size to prevent layout overflow.</li>
+        <li>Fixed multi-note push loss when switching notes rapidly.</li>
+        <li>Drive sync icon now correctly reflects the current sync state.</li>
+        <li>Empty new notes are automatically discarded when switching away.</li>
       </ul>
     </div>
 
