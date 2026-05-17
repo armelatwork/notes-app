@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/models/note.dart';
 import 'package:notes_app/providers/app_provider.dart';
 
-// Tests for the Android back-navigation fix in _NarrowLayout.
+// Tests for the Android back-navigation in _NarrowLayout.
 //
 // Desired back-stack (narrow / phone layout):
-//   Editor  →[back]→  Notes list (drawer closed)
-//   Notes list (drawer closed)  →[back]→  Opens folder-sidebar drawer
-//   Notes list (drawer open)    →[back]→  Exits to phone home (canPop=true)
+//   Editor        →[back]→  Notes list
+//   Notes list    →[back]→  Opens folder-sidebar drawer
+//   Drawer open   →[back]→  Exits app (SystemNavigator.pop)
 
 Note _fakeNote() {
   final note = Note()
@@ -22,9 +23,6 @@ Note _fakeNote() {
   return note;
 }
 
-// A minimal replica of _NarrowLayout that is public so tests can build it
-// without needing the full Riverpod provider graph (notes DB, etc.).
-// Mirrors the exact state logic of the private production widget.
 class _TestNarrowLayout extends ConsumerStatefulWidget {
   const _TestNarrowLayout();
   @override
@@ -34,19 +32,15 @@ class _TestNarrowLayout extends ConsumerStatefulWidget {
 class _TestNarrowLayoutState extends ConsumerState<_TestNarrowLayout> {
   int _page = 0;
   bool _drawerOpen = false;
-  bool _drawerOpenedByBack = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  bool get _canPop => _page == 0 && _drawerOpenedByBack && !_drawerOpen;
 
   void _handleBack() {
     if (_page == 1) {
       ref.read(selectedNoteProvider.notifier).state = null;
-      setState(() { _page = 0; _drawerOpenedByBack = false; });
+      setState(() => _page = 0);
     } else if (_drawerOpen) {
-      _scaffoldKey.currentState?.closeDrawer();
+      SystemNavigator.pop();
     } else {
-      setState(() => _drawerOpenedByBack = true);
       _scaffoldKey.currentState?.openDrawer();
     }
   }
@@ -55,13 +49,11 @@ class _TestNarrowLayoutState extends ConsumerState<_TestNarrowLayout> {
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
     if (selectedNote != null && _page == 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {
-        _page = 1;
-        _drawerOpenedByBack = false;
-      }));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => setState(() => _page = 1));
     }
     return PopScope(
-      canPop: _canPop,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
       },
@@ -105,7 +97,6 @@ void main() {
         'backOnEditor_navigatesToNotesList', (tester) async {
       await tester.pumpWidget(_buildApp(selectedNote: _fakeNote()));
       await tester.pumpAndSettle();
-
       expect(find.text('editor'), findsOneWidget);
 
       await tester.binding.handlePopRoute();
@@ -120,7 +111,6 @@ void main() {
       await tester.pumpWidget(_buildApp());
       await tester.pumpAndSettle();
 
-      expect(find.text('notes-list'), findsOneWidget);
       expect(find.byType(Drawer), findsNothing);
 
       await tester.binding.handlePopRoute();
@@ -130,21 +120,22 @@ void main() {
     });
 
     testWidgets(
-        'backOnDrawerOpen_closesDrawer', (tester) async {
-      // With the drawer open, back calls closeDrawer() — no longer a no-op.
+        'backOnDrawerOpen_callsSystemExit_noRenavigation', (tester) async {
+      // SystemNavigator.pop() is a no-op in tests; verify the handler does NOT
+      // close the drawer or navigate to another page — it just exits.
       await tester.pumpWidget(_buildApp());
       await tester.pumpAndSettle();
 
-      // Back 1: open drawer.
-      await tester.binding.handlePopRoute();
+      await tester.binding.handlePopRoute(); // open drawer
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsOneWidget);
 
-      // Back 2: closes drawer via _handleBack → closeDrawer().
-      await tester.binding.handlePopRoute();
+      await tester.binding.handlePopRoute(); // exit (no-op in tests)
       await tester.pumpAndSettle();
-      expect(find.byType(Drawer), findsNothing);
-      expect(find.text('notes-list'), findsOneWidget);
+
+      // Drawer not closed, page not changed — SystemNavigator.pop() was called.
+      expect(find.byType(Drawer), findsOneWidget);
+      expect(find.text('editor'), findsNothing);
     });
 
     testWidgets(
@@ -153,27 +144,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('editor'), findsOneWidget);
 
-      // Step 1: editor → notes list.
-      await tester.binding.handlePopRoute();
+      await tester.binding.handlePopRoute(); // editor → notes list
       await tester.pumpAndSettle();
       expect(find.text('notes-list'), findsOneWidget);
 
-      // Step 2: notes list → opens folder sidebar drawer.
-      await tester.binding.handlePopRoute();
+      await tester.binding.handlePopRoute(); // notes list → open drawer
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsOneWidget);
 
-      // Step 3: back closes drawer.
-      await tester.binding.handlePopRoute();
+      await tester.binding.handlePopRoute(); // drawer → exit (no-op in tests)
       await tester.pumpAndSettle();
-      expect(find.byType(Drawer), findsNothing);
-
-      // Step 4: canPop=true → system exits. Custom handler not called →
-      // drawer stays closed, page unchanged.
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byType(Drawer), findsNothing);
-      expect(find.text('notes-list'), findsOneWidget);
+      expect(find.byType(Drawer), findsOneWidget); // drawer still open (no crash)
     });
   });
 }

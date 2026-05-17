@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import '../models/app_user.dart';
@@ -238,25 +239,15 @@ class _NarrowLayout extends ConsumerStatefulWidget {
 class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   int _page = 0;
   bool _drawerOpen = false;
-  // True once the user has navigated back to reveal the folder sidebar drawer.
-  // Persists after the drawer closes so the NEXT back press exits the app
-  // rather than re-opening the drawer.
-  bool _drawerOpenedByBack = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  // Exit is allowed after the folder-sidebar has been revealed and closed.
-  // While the drawer is open the Scaffold's own LocalHistoryEntry handles
-  // back (closing the drawer), so PopScope is not consulted at that point.
-  bool get _canPop => _page == 0 && _drawerOpenedByBack && !_drawerOpen;
 
   void _handleBack() {
     if (_page == 1) {
       ref.read(selectedNoteProvider.notifier).state = null;
-      setState(() { _page = 0; _drawerOpenedByBack = false; });
+      setState(() => _page = 0);
     } else if (_drawerOpen) {
-      _scaffoldKey.currentState?.closeDrawer();
+      SystemNavigator.pop();
     } else {
-      setState(() => _drawerOpenedByBack = true);
       _scaffoldKey.currentState?.openDrawer();
     }
   }
@@ -265,13 +256,11 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
     if (selectedNote != null && _page == 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {
-        _page = 1;
-        _drawerOpenedByBack = false;
-      }));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => setState(() => _page = 1));
     }
     return PopScope(
-      canPop: _canPop,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _handleBack();
       },
