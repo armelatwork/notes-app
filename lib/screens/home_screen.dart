@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import '../models/app_user.dart';
@@ -237,6 +238,19 @@ class _NarrowLayout extends ConsumerStatefulWidget {
 
 class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   int _page = 0;
+  bool _drawerOpen = false;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  void _handleBack() {
+    if (_page == 1) {
+      ref.read(selectedNoteProvider.notifier).state = null;
+      setState(() => _page = 0);
+    } else if (_drawerOpen) {
+      SystemNavigator.pop();
+    } else {
+      _scaffoldKey.currentState?.openDrawer();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -245,27 +259,30 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => setState(() => _page = 1));
     }
-    return Scaffold(
-      appBar: AppBar(
-        title: _page == 0 ? const Text('Notes') : const Text('Edit'),
-        leading: _page == 1
-            ? BackButton(onPressed: () {
-                ref.read(selectedNoteProvider.notifier).state = null;
-                setState(() => _page = 0);
-              })
-            : null,
-        actions: [
-          if (_page == 0)
-            Builder(
-              builder: (ctx) => IconButton(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        onDrawerChanged: (isOpen) => setState(() => _drawerOpen = isOpen),
+        appBar: AppBar(
+          title: _page == 0 ? const Text('Notes') : const Text('Edit'),
+          leading: _page == 1
+              ? BackButton(onPressed: _handleBack)
+              : null,
+          actions: [
+            if (_page == 0)
+              IconButton(
                 icon: const Icon(Icons.menu),
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
-            ),
-        ],
+          ],
+        ),
+        drawer: const Drawer(child: FolderSidebar()),
+        body: _page == 0 ? const NotesListPanel() : const NoteEditor(),
       ),
-      drawer: const Drawer(child: FolderSidebar()),
-      body: _page == 0 ? const NotesListPanel() : const NoteEditor(),
     );
   }
 }
