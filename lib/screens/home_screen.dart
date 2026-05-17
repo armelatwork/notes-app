@@ -237,6 +237,21 @@ class _NarrowLayout extends ConsumerStatefulWidget {
 
 class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   int _page = 0;
+  bool _drawerOpen = false;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // Back is allowed only when the drawer is open on the notes-list page,
+  // which lets the system handler exit the app.
+  bool get _canPop => _page == 0 && _drawerOpen;
+
+  void _handleBack() {
+    if (_page == 1) {
+      ref.read(selectedNoteProvider.notifier).state = null;
+      setState(() => _page = 0);
+    } else {
+      _scaffoldKey.currentState?.openDrawer();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -245,27 +260,30 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => setState(() => _page = 1));
     }
-    return Scaffold(
-      appBar: AppBar(
-        title: _page == 0 ? const Text('Notes') : const Text('Edit'),
-        leading: _page == 1
-            ? BackButton(onPressed: () {
-                ref.read(selectedNoteProvider.notifier).state = null;
-                setState(() => _page = 0);
-              })
-            : null,
-        actions: [
-          if (_page == 0)
-            Builder(
-              builder: (ctx) => IconButton(
+    return PopScope(
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        onDrawerChanged: (isOpen) => setState(() => _drawerOpen = isOpen),
+        appBar: AppBar(
+          title: _page == 0 ? const Text('Notes') : const Text('Edit'),
+          leading: _page == 1
+              ? BackButton(onPressed: _handleBack)
+              : null,
+          actions: [
+            if (_page == 0)
+              IconButton(
                 icon: const Icon(Icons.menu),
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
-            ),
-        ],
+          ],
+        ),
+        drawer: const Drawer(child: FolderSidebar()),
+        body: _page == 0 ? const NotesListPanel() : const NoteEditor(),
       ),
-      drawer: const Drawer(child: FolderSidebar()),
-      body: _page == 0 ? const NotesListPanel() : const NoteEditor(),
     );
   }
 }
