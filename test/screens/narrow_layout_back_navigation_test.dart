@@ -43,6 +43,8 @@ class _TestNarrowLayoutState extends ConsumerState<_TestNarrowLayout> {
     if (_page == 1) {
       ref.read(selectedNoteProvider.notifier).state = null;
       setState(() { _page = 0; _drawerOpenedByBack = false; });
+    } else if (_drawerOpen) {
+      _scaffoldKey.currentState?.closeDrawer();
     } else {
       setState(() => _drawerOpenedByBack = true);
       _scaffoldKey.currentState?.openDrawer();
@@ -128,27 +130,17 @@ void main() {
     });
 
     testWidgets(
-        'afterDrawerOpenedByBack_drawerClosed_nextBackDoesNotReopenDrawer',
-        (tester) async {
-      // On real Android, back when the drawer is open removes the Scaffold's
-      // LocalHistoryEntry (closing the drawer). In tests we simulate that by
-      // closing the drawer programmatically, then verify the NEXT back does NOT
-      // re-open the drawer (canPop=true → system exits instead).
+        'backOnDrawerOpen_closesDrawer', (tester) async {
+      // With the drawer open, back calls closeDrawer() — no longer a no-op.
       await tester.pumpWidget(_buildApp());
       await tester.pumpAndSettle();
 
-      // Back: open drawer via back navigation.
+      // Back 1: open drawer.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsOneWidget);
 
-      // Simulate the system closing the drawer (tap scrim outside drawer).
-      await tester.tapAt(const Offset(600, 300));
-      await tester.pumpAndSettle();
-      expect(find.byType(Drawer), findsNothing);
-
-      // Back again: canPop=true now — custom handler must NOT fire.
-      // The drawer must NOT re-open; still on notes-list.
+      // Back 2: closes drawer via _handleBack → closeDrawer().
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsNothing);
@@ -171,13 +163,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsOneWidget);
 
-      // Step 3: drawer closes (tap scrim, mirrors system back on real device).
-      await tester.tapAt(const Offset(600, 300));
+      // Step 3: back closes drawer.
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsNothing);
 
       // Step 4: canPop=true → system exits. Custom handler not called →
-      // drawer not re-opened, page unchanged.
+      // drawer stays closed, page unchanged.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsNothing);

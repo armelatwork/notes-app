@@ -253,6 +253,8 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
     if (_page == 1) {
       ref.read(selectedNoteProvider.notifier).state = null;
       setState(() { _page = 0; _drawerOpenedByBack = false; });
+    } else if (_drawerOpen) {
+      _scaffoldKey.currentState?.closeDrawer();
     } else {
       setState(() => _drawerOpenedByBack = true);
       _scaffoldKey.currentState?.openDrawer();
