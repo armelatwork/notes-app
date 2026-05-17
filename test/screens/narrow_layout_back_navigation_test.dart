@@ -34,15 +34,17 @@ class _TestNarrowLayout extends ConsumerStatefulWidget {
 class _TestNarrowLayoutState extends ConsumerState<_TestNarrowLayout> {
   int _page = 0;
   bool _drawerOpen = false;
+  bool _drawerOpenedByBack = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  bool get _canPop => _page == 0 && _drawerOpen;
+  bool get _canPop => _page == 0 && _drawerOpenedByBack && !_drawerOpen;
 
   void _handleBack() {
     if (_page == 1) {
       ref.read(selectedNoteProvider.notifier).state = null;
-      setState(() => _page = 0);
+      setState(() { _page = 0; _drawerOpenedByBack = false; });
     } else {
+      setState(() => _drawerOpenedByBack = true);
       _scaffoldKey.currentState?.openDrawer();
     }
   }
@@ -51,8 +53,10 @@ class _TestNarrowLayoutState extends ConsumerState<_TestNarrowLayout> {
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
     if (selectedNote != null && _page == 0) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => setState(() => _page = 1));
+      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {
+        _page = 1;
+        _drawerOpenedByBack = false;
+      }));
     }
     return PopScope(
       canPop: _canPop,
@@ -124,23 +128,59 @@ void main() {
     });
 
     testWidgets(
-        'backOnNotesList_drawerOpen_closesDrawer', (tester) async {
-      // When the drawer is open, Flutter's Scaffold adds a LocalHistoryEntry.
-      // System back removes that entry (closes drawer) rather than calling
-      // our custom handler — this is the step just before exiting the app.
+        'afterDrawerOpenedByBack_drawerClosed_nextBackDoesNotReopenDrawer',
+        (tester) async {
+      // On real Android, back when the drawer is open removes the Scaffold's
+      // LocalHistoryEntry (closing the drawer). In tests we simulate that by
+      // closing the drawer programmatically, then verify the NEXT back does NOT
+      // re-open the drawer (canPop=true → system exits instead).
       await tester.pumpWidget(_buildApp());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('menu')));
+      // Back: open drawer via back navigation.
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(Drawer), findsOneWidget);
 
+      // Simulate the system closing the drawer (tap scrim outside drawer).
+      await tester.tapAt(const Offset(600, 300));
+      await tester.pumpAndSettle();
+      expect(find.byType(Drawer), findsNothing);
+
+      // Back again: canPop=true now — custom handler must NOT fire.
+      // The drawer must NOT re-open; still on notes-list.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-
-      // Drawer is closed by Scaffold's history entry; custom handler not called.
       expect(find.byType(Drawer), findsNothing);
-      // Still on the notes-list page — nothing else changed.
+      expect(find.text('notes-list'), findsOneWidget);
+    });
+
+    testWidgets(
+        'fullSequence_editorToNotesListToDrawerToExit', (tester) async {
+      await tester.pumpWidget(_buildApp(selectedNote: _fakeNote()));
+      await tester.pumpAndSettle();
+      expect(find.text('editor'), findsOneWidget);
+
+      // Step 1: editor → notes list.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('notes-list'), findsOneWidget);
+
+      // Step 2: notes list → opens folder sidebar drawer.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(Drawer), findsOneWidget);
+
+      // Step 3: drawer closes (tap scrim, mirrors system back on real device).
+      await tester.tapAt(const Offset(600, 300));
+      await tester.pumpAndSettle();
+      expect(find.byType(Drawer), findsNothing);
+
+      // Step 4: canPop=true → system exits. Custom handler not called →
+      // drawer not re-opened, page unchanged.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(Drawer), findsNothing);
       expect(find.text('notes-list'), findsOneWidget);
     });
   });

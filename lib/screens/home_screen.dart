@@ -238,17 +238,23 @@ class _NarrowLayout extends ConsumerStatefulWidget {
 class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   int _page = 0;
   bool _drawerOpen = false;
+  // True once the user has navigated back to reveal the folder sidebar drawer.
+  // Persists after the drawer closes so the NEXT back press exits the app
+  // rather than re-opening the drawer.
+  bool _drawerOpenedByBack = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Back is allowed only when the drawer is open on the notes-list page,
-  // which lets the system handler exit the app.
-  bool get _canPop => _page == 0 && _drawerOpen;
+  // Exit is allowed after the folder-sidebar has been revealed and closed.
+  // While the drawer is open the Scaffold's own LocalHistoryEntry handles
+  // back (closing the drawer), so PopScope is not consulted at that point.
+  bool get _canPop => _page == 0 && _drawerOpenedByBack && !_drawerOpen;
 
   void _handleBack() {
     if (_page == 1) {
       ref.read(selectedNoteProvider.notifier).state = null;
-      setState(() => _page = 0);
+      setState(() { _page = 0; _drawerOpenedByBack = false; });
     } else {
+      setState(() => _drawerOpenedByBack = true);
       _scaffoldKey.currentState?.openDrawer();
     }
   }
@@ -257,8 +263,10 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
     if (selectedNote != null && _page == 0) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => setState(() => _page = 1));
+      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() {
+        _page = 1;
+        _drawerOpenedByBack = false;
+      }));
     }
     return PopScope(
       canPop: _canPop,
