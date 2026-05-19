@@ -126,10 +126,13 @@ class SharingService {
   }
 
   // Remove a collaborator from a shared note.
+  // collaboratorSharedBy is intentionally left as-is: the stale entry is
+  // harmless since removed collaborators are no longer in collaboratorEmails.
+  // Mixing FieldValue.delete() + FieldPath with arrayRemove in one update
+  // can cause Firestore rule evaluation issues.
   Future<void> removeCollaborator(String firestoreId, String email) async {
     await _col.doc(firestoreId).update({
       'collaboratorEmails': FieldValue.arrayRemove([email]),
-      FieldPath(['collaboratorSharedBy', email]): FieldValue.delete(),
     });
   }
 
