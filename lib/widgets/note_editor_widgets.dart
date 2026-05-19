@@ -674,31 +674,54 @@ class NoteTitleField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final VoidCallback onChanged;
+  final bool isShared;
+  final VoidCallback? onShare;
 
   const NoteTitleField({
     super.key,
     required this.controller,
     required this.hintText,
     required this.onChanged,
+    this.isShared = false,
+    this.onShare,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-      child: TextField(
-        controller: controller,
-        onChanged: (_) => onChanged(),
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          hintText: hintText,
-          hintStyle: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
+      padding: const EdgeInsets.fromLTRB(24, 16, 8, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: (_) => onChanged(),
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: hintText,
+                hintStyle: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+                suffixIcon: null,
+              ),
+            ),
           ),
-        ),
+          IconButton(
+            icon: Icon(
+              isShared ? Icons.people : Icons.person_add_outlined,
+              size: 22,
+              color: isShared
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.grey,
+            ),
+            tooltip: isShared ? 'Manage sharing' : 'Share note',
+            onPressed: onShare,
+          ),
+        ],
       ),
     );
   }

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shared Note — My Notes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fafafa;
+      color: #1a1a1a;
+      padding: 2rem 1rem;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container { max-width: 480px; width: 100%; text-align: center; }
+    .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .subtitle { color: #555; font-size: 1rem; line-height: 1.6; margin-bottom: 2rem; }
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 1.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .card-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #aaa;
+      margin-bottom: 0.75rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.9rem 1.5rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-bottom: 0.75rem;
+    }
+    .btn:last-child { margin-bottom: 0; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #1a73e8; color: #fff; }
+    .btn-secondary { background: #f0f0f0; color: #1a1a1a; }
+    .footnote { font-size: 0.78rem; color: #aaa; margin-top: 1rem; }
+    .footnote a { color: #1a73e8; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📝</div>
+    <h1>Note shared with you</h1>
+    <p class="subtitle">Someone shared a note using <strong>My Notes</strong>.<br>Open the app to view and collaborate.</p>
+
+    <div class="card" id="app-card">
+      <div class="card-label">Already have the app?</div>
+      <a id="open-btn" class="btn btn-primary" href="#">Open in My Notes</a>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Don't have the app?</div>
+      <a class="btn btn-secondary"
+         href="https://play.google.com/store/apps/details?id=io.mynotes.app"
+         target="_blank" rel="noopener">
+        ⬇ Download on Google Play
+      </a>
+    </div>
+
+    <p class="footnote">
+      My Notes is a private, encrypted note-taking app.<br>
+      <a href="https://thechaos-mynotes.web.app">Learn more</a>
+    </p>
+  </div>
+
+  <script>
+    // Extract the note ID from the URL path: /note/{noteId}
+    const noteId = window.location.pathname.replace(/^\/note\/?/, '').replace(/\/$/, '');
+
+    if (noteId) {
+      // Android intent URL: opens the app directly if installed,
+      // falls back to Google Play if not.
+      const intentUrl =
+        'intent://note/' + noteId +
+        '#Intent;scheme=https;host=thechaos-mynotes.web.app;' +
+        'package=io.mynotes.app;' +
+        'S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dio.mynotes.app;end';
+
+      const openBtn = document.getElementById('open-btn');
+      const isAndroid = /Android/i.test(navigator.userAgent);
+
+      if (isAndroid) {
+        openBtn.href = intentUrl;
+      } else {
+        // Non-Android: direct deep link (works once App Links / Universal Links are configured)
+        openBtn.href = 'https://thechaos-mynotes.web.app/note/' + noteId;
+        openBtn.textContent = 'Open My Notes';
+        // On non-Android platforms where the app isn't available, hide the open button section
+        const isMac = /Mac/i.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent);
+        if (isMac) {
+          document.getElementById('app-card').style.display = 'none';
+        }
+      }
+    }
+  </script>
+</body>
+</html>

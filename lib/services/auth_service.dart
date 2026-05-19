@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'app_logger.dart';
 
@@ -22,6 +23,7 @@ class AuthService {
       // Return null so the user is prompted to sign in interactively.
       final auth = await user.authentication;
       if (auth.accessToken == null) return null;
+      await _signInToFirebase(auth);
       return user;
     } catch (e) {
       AppLogger.instance.warn('AuthService', 'silent sign-in failed', e);
@@ -38,30 +40,43 @@ class AuthService {
     await _googleSignIn.signOut().catchError((_) => null);
     final user = await _googleSignIn.signIn();
     if (user == null) return null;
-    return await _ensureDriveScope(user);
+    final ensured = await _ensureDriveScope(user);
+    await _signInToFirebase(await ensured.authentication);
+    return ensured;
+  }
+
+  Future<void> _signInToFirebase(GoogleSignInAuthentication auth) async {
+    try {
+      final credential = GoogleAuthProvider.credential(
+        idToken: auth.idToken,
+        accessToken: auth.accessToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    } catch (e) {
+      AppLogger.instance.warn('AuthService', 'Firebase sign-in failed', e);
+    }
   }
 
   // Request drive.file explicitly and verify a valid access token is returned.
+  // On macOS, requestScopes may return false even when the scope was already
+  // granted during the sign-in flow. We therefore verify the token directly
+  // and only throw if the token itself is missing.
   Future<GoogleSignInAccount> _ensureDriveScope(
       GoogleSignInAccount user) async {
-    final granted = await _googleSignIn.requestScopes([_kDriveScope]);
-    if (!granted) {
-      throw 'Google Drive access is required for notes sync. '
-          'Please grant Drive permission and try again.';
-    }
+    await _googleSignIn.requestScopes([_kDriveScope]);
     final current = _googleSignIn.currentUser ?? user;
-    // Verify the token actually exists after the scope grant.
     final auth = await current.authentication;
     if (auth.accessToken == null) {
-      AppLogger.instance.warn(
-          'AuthService', 'access token is null after scope grant');
-      throw 'Failed to obtain a valid Drive access token. '
-          'Please try signing in again.';
+      throw 'Google Drive access is required for notes sync. '
+          'Please grant Drive permission and try again.';
     }
     return current;
   }
 
-  Future<void> signOut() => _googleSignIn.signOut();
+  Future<void> signOut() async {
+    await FirebaseAuth.instance.signOut();
+    await _googleSignIn.signOut();
+  }
 
   Future<Map<String, String>?> getAuthHeaders() async {
     final user = _googleSignIn.currentUser;

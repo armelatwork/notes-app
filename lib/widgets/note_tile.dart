@@ -96,13 +96,33 @@ class _NoteTile extends StatelessWidget {
             .withValues(alpha: _kSelectedTileOpacity),
         onTap: onTap,
         onLongPress: isDragMode ? null : () => _showLongPressActions(context),
-        title: Text(
-          note.title.isEmpty ? 'New Note' : note.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              fontSize: 14),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                note.title.isEmpty ? 'New Note' : note.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.w500,
+                    fontSize: 14),
+              ),
+            ),
+            if (note.isShared)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Icon(
+                  note.isSharedByMe
+                      ? Icons.people
+                      : Icons.people_outline,
+                  size: 14,
+                  color: note.isSharedByMe
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey[400],
+                ),
+              ),
+          ],
         ),
         subtitle: Row(
           children: [

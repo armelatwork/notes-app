@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "notes-app-macos"
+  },
+  "targets": {
+    "notes-app-macos": {
+      "hosting": {
+        "main": [
+          "thechaos-mynotes"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

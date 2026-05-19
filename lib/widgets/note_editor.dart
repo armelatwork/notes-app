@@ -13,7 +13,10 @@ import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../providers/editor_menu_provider.dart';
 import '../providers/format_painter_provider.dart';
+import '../providers/sharing_provider.dart';
 import '../services/app_logger.dart';
+import '../services/sharing_service.dart';
+import 'share_dialog.dart';
 import '../services/rich_clipboard_service.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
@@ -223,6 +226,41 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     _imagesAtLoad = currentImages;
     await ref.read(notesProvider.notifier).saveNote(note,
         deletedImageFilenames: deletedImages);
+    // Push to Firestore if this is a shared note.
+    if (note.firestoreId != null) {
+      final user = ref.read(appUserProvider);
+      final inlinedContent = await inlineImagesForSharing(note.content);
+      SharingService.instance.pushUpdate(
+        firestoreId: note.firestoreId!,
+        note: note,
+        contentOverride: inlinedContent,
+        editorUid: user?.id ?? '',
+        editorEmail: user?.email ?? '',
+      ).catchError((e) {
+        AppLogger.instance.warn('NoteEditor', 'Firestore push failed', e);
+      });
+    }
+  }
+
+  void _applyRemoteContent(String content, String title) {
+    try {
+      final json = jsonDecode(content) as List;
+      final doc = Document.fromJson(json);
+      // Replace controller with a new one built from the remote document so
+      // that Quill's internal delta state is fully consistent.
+      _initNoteController(doc);
+      if (title != _titleController.text) {
+        _titleController.text = title;
+      }
+      if (_currentNote != null) {
+        _currentNote!.content = content;
+        _currentNote!.title = title;
+      }
+      if (mounted) setState(() {});
+      AppLogger.instance.info('NoteEditor', 'applied remote update');
+    } catch (e) {
+      AppLogger.instance.warn('NoteEditor', 'failed to apply remote update', e);
+    }
   }
 
   Future<void> _pickAndInsertImage() async {
@@ -249,6 +287,18 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     }
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
+    }
+    // Real-time listener: apply remote changes when this is a shared note
+    // and the current user has no unsaved edits.
+    final firestoreId = note.firestoreId;
+    if (firestoreId != null) {
+      ref.listen(sharedNoteStreamProvider(firestoreId), (_, next) {
+        final remote = next.valueOrNull;
+        if (remote == null || _isDirty || !mounted) return;
+        final user = ref.read(appUserProvider);
+        if (remote.updatedBy == user?.id) return; // own save, skip
+        _applyRemoteContent(remote.content, remote.title);
+      });
     }
     return DropTarget(
       onDragEntered: (_) => setState(() => _dragging = true),
@@ -286,6 +336,19 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           controller: _titleController,
           hintText: _hintTitle,
           onChanged: _scheduleSave,
+          isShared: _currentNote?.isShared ?? false,
+          onShare: _currentNote == null
+              ? null
+              : () => showShareDialog(
+                    context,
+                    _currentNote!,
+                    onNoteUpdated: () {
+                      ref
+                          .read(notesProvider.notifier)
+                          .saveNote(_currentNote!);
+                      if (mounted) setState(() {});
+                    },
+                  ),
         ),
         if (isMacOS) toolbar,
         Expanded(

@@ -32,23 +32,53 @@ const NoteSchema = CollectionSchema(
       name: r'driveFileId',
       type: IsarType.string,
     ),
-    r'folderId': PropertySchema(
+    r'firestoreId': PropertySchema(
       id: 3,
+      name: r'firestoreId',
+      type: IsarType.string,
+    ),
+    r'folderId': PropertySchema(
+      id: 4,
       name: r'folderId',
       type: IsarType.long,
     ),
+    r'isShared': PropertySchema(
+      id: 5,
+      name: r'isShared',
+      type: IsarType.bool,
+    ),
+    r'isSharedByMe': PropertySchema(
+      id: 6,
+      name: r'isSharedByMe',
+      type: IsarType.bool,
+    ),
+    r'isSharedWithMe': PropertySchema(
+      id: 7,
+      name: r'isSharedWithMe',
+      type: IsarType.bool,
+    ),
     r'preview': PropertySchema(
-      id: 4,
+      id: 8,
       name: r'preview',
       type: IsarType.string,
     ),
+    r'sharedByEmail': PropertySchema(
+      id: 9,
+      name: r'sharedByEmail',
+      type: IsarType.string,
+    ),
+    r'sharedWithEmails': PropertySchema(
+      id: 10,
+      name: r'sharedWithEmails',
+      type: IsarType.stringList,
+    ),
     r'title': PropertySchema(
-      id: 5,
+      id: 11,
       name: r'title',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 6,
+      id: 12,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -94,7 +124,26 @@ int _noteEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.firestoreId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.preview.length * 3;
+  {
+    final value = object.sharedByEmail;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.sharedWithEmails.length * 3;
+  {
+    for (var i = 0; i < object.sharedWithEmails.length; i++) {
+      final value = object.sharedWithEmails[i];
+      bytesCount += value.length * 3;
+    }
+  }
   bytesCount += 3 + object.title.length * 3;
   return bytesCount;
 }
@@ -108,10 +157,16 @@ void _noteSerialize(
   writer.writeString(offsets[0], object.content);
   writer.writeDateTime(offsets[1], object.createdAt);
   writer.writeString(offsets[2], object.driveFileId);
-  writer.writeLong(offsets[3], object.folderId);
-  writer.writeString(offsets[4], object.preview);
-  writer.writeString(offsets[5], object.title);
-  writer.writeDateTime(offsets[6], object.updatedAt);
+  writer.writeString(offsets[3], object.firestoreId);
+  writer.writeLong(offsets[4], object.folderId);
+  writer.writeBool(offsets[5], object.isShared);
+  writer.writeBool(offsets[6], object.isSharedByMe);
+  writer.writeBool(offsets[7], object.isSharedWithMe);
+  writer.writeString(offsets[8], object.preview);
+  writer.writeString(offsets[9], object.sharedByEmail);
+  writer.writeStringList(offsets[10], object.sharedWithEmails);
+  writer.writeString(offsets[11], object.title);
+  writer.writeDateTime(offsets[12], object.updatedAt);
 }
 
 Note _noteDeserialize(
@@ -124,11 +179,14 @@ Note _noteDeserialize(
   object.content = reader.readString(offsets[0]);
   object.createdAt = reader.readDateTime(offsets[1]);
   object.driveFileId = reader.readStringOrNull(offsets[2]);
-  object.folderId = reader.readLongOrNull(offsets[3]);
+  object.firestoreId = reader.readStringOrNull(offsets[3]);
+  object.folderId = reader.readLongOrNull(offsets[4]);
   object.id = id;
-  object.preview = reader.readString(offsets[4]);
-  object.title = reader.readString(offsets[5]);
-  object.updatedAt = reader.readDateTime(offsets[6]);
+  object.preview = reader.readString(offsets[8]);
+  object.sharedByEmail = reader.readStringOrNull(offsets[9]);
+  object.sharedWithEmails = reader.readStringList(offsets[10]) ?? [];
+  object.title = reader.readString(offsets[11]);
+  object.updatedAt = reader.readDateTime(offsets[12]);
   return object;
 }
 
@@ -146,12 +204,24 @@ P _noteDeserializeProp<P>(
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 6:
+      return (reader.readBool(offset)) as P;
+    case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -690,6 +760,152 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'firestoreId',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'firestoreId',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'firestoreId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'firestoreId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'firestoreId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'firestoreId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> firestoreIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'firestoreId',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterFilterCondition> folderIdIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -806,6 +1022,35 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> isSharedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isShared',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> isSharedByMeEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isSharedByMe',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> isSharedWithMeEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isSharedWithMe',
+        value: value,
       ));
     });
   }
@@ -935,6 +1180,376 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
         property: r'preview',
         value: '',
       ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'sharedByEmail',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'sharedByEmail',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sharedByEmail',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sharedByEmail',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sharedByEmail',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sharedByEmail',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'sharedByEmail',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'sharedByEmail',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'sharedByEmail',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'sharedByEmail',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sharedByEmail',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedByEmailIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'sharedByEmail',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sharedWithEmails',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sharedWithEmails',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sharedWithEmails',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sharedWithEmails',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'sharedWithEmails',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'sharedWithEmails',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementContains(String value,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'sharedWithEmails',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementMatches(String pattern,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'sharedWithEmails',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sharedWithEmails',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'sharedWithEmails',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedWithEmailsLengthEqualTo(
+      int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'sharedWithEmails',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedWithEmailsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'sharedWithEmails',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedWithEmailsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'sharedWithEmails',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'sharedWithEmails',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+      sharedWithEmailsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'sharedWithEmails',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> sharedWithEmailsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'sharedWithEmails',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
     });
   }
 
@@ -1161,6 +1776,18 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> sortByFirestoreId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByFirestoreIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> sortByFolderId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'folderId', Sort.asc);
@@ -1173,6 +1800,42 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsShared() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsSharedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsSharedByMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedByMe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsSharedByMeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedByMe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsSharedWithMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedWithMe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsSharedWithMeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedWithMe', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> sortByPreview() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'preview', Sort.asc);
@@ -1182,6 +1845,18 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
   QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'preview', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortBySharedByEmail() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sharedByEmail', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortBySharedByEmailDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sharedByEmail', Sort.desc);
     });
   }
 
@@ -1247,6 +1922,18 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> thenByFirestoreId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByFirestoreIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'firestoreId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> thenByFolderId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'folderId', Sort.asc);
@@ -1271,6 +1958,42 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsShared() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsSharedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsSharedByMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedByMe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsSharedByMeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedByMe', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsSharedWithMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedWithMe', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsSharedWithMeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isSharedWithMe', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> thenByPreview() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'preview', Sort.asc);
@@ -1280,6 +2003,18 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
   QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'preview', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenBySharedByEmail() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sharedByEmail', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenBySharedByEmailDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sharedByEmail', Sort.desc);
     });
   }
 
@@ -1329,9 +2064,34 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
+  QueryBuilder<Note, Note, QDistinct> distinctByFirestoreId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'firestoreId', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Note, Note, QDistinct> distinctByFolderId() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'folderId');
+    });
+  }
+
+  QueryBuilder<Note, Note, QDistinct> distinctByIsShared() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isShared');
+    });
+  }
+
+  QueryBuilder<Note, Note, QDistinct> distinctByIsSharedByMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isSharedByMe');
+    });
+  }
+
+  QueryBuilder<Note, Note, QDistinct> distinctByIsSharedWithMe() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isSharedWithMe');
     });
   }
 
@@ -1339,6 +2099,20 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'preview', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Note, Note, QDistinct> distinctBySharedByEmail(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sharedByEmail',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Note, Note, QDistinct> distinctBySharedWithEmails() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sharedWithEmails');
     });
   }
 
@@ -1381,15 +2155,52 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Note, String?, QQueryOperations> firestoreIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'firestoreId');
+    });
+  }
+
   QueryBuilder<Note, int?, QQueryOperations> folderIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'folderId');
     });
   }
 
+  QueryBuilder<Note, bool, QQueryOperations> isSharedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isShared');
+    });
+  }
+
+  QueryBuilder<Note, bool, QQueryOperations> isSharedByMeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isSharedByMe');
+    });
+  }
+
+  QueryBuilder<Note, bool, QQueryOperations> isSharedWithMeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isSharedWithMe');
+    });
+  }
+
   QueryBuilder<Note, String, QQueryOperations> previewProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'preview');
+    });
+  }
+
+  QueryBuilder<Note, String?, QQueryOperations> sharedByEmailProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sharedByEmail');
+    });
+  }
+
+  QueryBuilder<Note, List<String>, QQueryOperations>
+      sharedWithEmailsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sharedWithEmails');
     });
   }
 

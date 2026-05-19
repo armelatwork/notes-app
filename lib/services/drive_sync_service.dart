@@ -126,6 +126,9 @@ class DriveSyncService {
       'folderId': note.folderId,
       'createdAt': note.createdAt.toIso8601String(),
       'updatedAt': note.updatedAt.toIso8601String(),
+      'firestoreId': note.firestoreId,
+      'sharedWithEmails': note.sharedWithEmails,
+      'sharedByEmail': note.sharedByEmail,
     });
     final bytes = utf8.encode(payload);
     final media = drive.Media(Stream.value(bytes), bytes.length,
@@ -182,6 +185,10 @@ class DriveSyncService {
       note.driveFileId = fileId;
       note.createdAt = DateTime.parse(json['createdAt'] as String);
       note.updatedAt = DateTime.parse(json['updatedAt'] as String);
+      note.firestoreId = json['firestoreId'] as String?;
+      note.sharedWithEmails =
+          (json['sharedWithEmails'] as List?)?.cast<String>() ?? [];
+      note.sharedByEmail = json['sharedByEmail'] as String?;
       return note;
     } catch (e) {
       AppLogger.instance.error('DriveSyncService', 'downloadNote $noteId failed', e);
@@ -371,6 +378,10 @@ class DriveSyncService {
       note.driveFileId = driveFileId;
       note.createdAt = DateTime.parse(json['createdAt'] as String);
       note.updatedAt = DateTime.parse(json['updatedAt'] as String);
+      note.firestoreId = json['firestoreId'] as String?;
+      note.sharedWithEmails =
+          (json['sharedWithEmails'] as List?)?.cast<String>() ?? [];
+      note.sharedByEmail = json['sharedByEmail'] as String?;
       return note;
     } catch (e) {
       AppLogger.instance.error('DriveSyncService', 'downloadNoteById failed', e);

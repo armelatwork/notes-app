@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /shared_notes/{noteId} {
+      // Owner or any listed collaborator can read.
+      allow read: if request.auth != null
+        && (request.auth.token.email == resource.data.ownerEmail
+            || request.auth.token.email in resource.data.collaboratorEmails);
+
+      // Only the authenticated owner can create; ownerEmail must match their token.
+      allow create: if request.auth != null
+        && request.auth.token.email == request.resource.data.ownerEmail;
+
+      // Owner can update any field (including collaboratorEmails).
+      // Collaborators can only update content fields, not ownership or the
+      // collaborator list.
+      allow update: if request.auth != null
+        && (
+          request.auth.token.email == resource.data.ownerEmail
+          || (
+            request.auth.token.email in resource.data.collaboratorEmails
+            && request.resource.data.diff(resource.data)
+                .affectedKeys()
+                .hasOnly(['title', 'content', 'preview',
+                          'updatedAt', 'updatedBy', 'updatedByEmail'])
+          )
+        );
+
+      // Only the owner can delete (unshare).
+      allow delete: if request.auth != null
+        && request.auth.token.email == resource.data.ownerEmail;
+    }
+  }
+}

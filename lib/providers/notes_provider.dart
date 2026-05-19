@@ -120,6 +120,32 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     }
   }
 
+  Future<Note> openSharedNote(SharedNoteData data) async {
+    final existing =
+        await DatabaseService.instance.getNoteByFirestoreId(data.firestoreId);
+    final note = existing ?? (Note()
+      ..folderId = null
+      ..createdAt = data.updatedAt
+      ..firestoreId = data.firestoreId);
+    note
+      ..title = data.title
+      ..content = data.content
+      ..preview = data.preview
+      ..sharedByEmail = data.ownerEmail
+      ..updatedAt = data.updatedAt;
+    await DatabaseService.instance.upsertNote(note);
+    await reload();
+    // Queue a Drive push so the sharing metadata survives full syncs.
+    if (ref.read(appUserProvider)?.type == AuthType.google) {
+      ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+      pendingNotes[note.id] = note;
+      pushTimer?.cancel();
+      pushTimer = Timer(
+          const Duration(milliseconds: _kFastPushDebounceMs), _flushPush);
+    }
+    return note;
+  }
+
   void cancelPendingPush() {
     pushTimer?.cancel();
     pushTimer = null;

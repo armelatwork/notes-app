@@ -4,6 +4,7 @@ import '../models/app_user.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
+import '../providers/sharing_provider.dart';
 import '../screens/settings_screen.dart';
 
 part 'folder_sidebar_components.dart';
@@ -35,6 +36,7 @@ class FolderSidebar extends ConsumerWidget {
               label: 'All Notes',
               isSelected: selectedFolder == -1,
               onTap: () {
+                ref.read(sharedSectionProvider.notifier).state = null;
                 ref.read(selectedFolderProvider.notifier).state = -1;
                 _closeDrawer(context);
               },
@@ -44,6 +46,7 @@ class FolderSidebar extends ConsumerWidget {
               label: 'Notes',
               isSelected: selectedFolder == null,
               onTap: () {
+                ref.read(sharedSectionProvider.notifier).state = null;
                 ref.read(selectedFolderProvider.notifier).state = null;
                 _closeDrawer(context);
               },
@@ -77,6 +80,7 @@ class FolderSidebar extends ConsumerWidget {
                     folder: folders[i],
                     isSelected: selectedFolder == folders[i].id,
                     onTap: () {
+                      ref.read(sharedSectionProvider.notifier).state = null;
                       ref.read(selectedFolderProvider.notifier).state =
                           folders[i].id;
                       _closeDrawer(context);
@@ -95,6 +99,28 @@ class FolderSidebar extends ConsumerWidget {
                   child: Center(child: CircularProgressIndicator())),
               error: (e, _) => Expanded(child: Center(child: Text('$e'))),
             ),
+            // Shared sections — only for Google-authenticated users
+            if (appUser?.type == AuthType.google) ...[
+              const Divider(height: 1),
+              _SidebarItem(
+                icon: Icons.people_outline,
+                label: 'Shared with me',
+                isSelected: ref.watch(sharedSectionProvider) == true,
+                onTap: () {
+                  ref.read(sharedSectionProvider.notifier).state = true;
+                  _closeDrawer(context);
+                },
+              ),
+              _SidebarItem(
+                icon: Icons.people,
+                label: 'Shared by me',
+                isSelected: ref.watch(sharedSectionProvider) == false,
+                onTap: () {
+                  ref.read(sharedSectionProvider.notifier).state = false;
+                  _closeDrawer(context);
+                },
+              ),
+            ],
             const Divider(height: 1),
             _UserMenuFooter(appUser: appUser),
           ],

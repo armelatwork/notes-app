@@ -28,6 +28,7 @@ dependencies:
   # Firebase
   firebase_core: ^3.13.0
   cloud_firestore: ^5.6.6
+  firebase_auth: ^5.0.0
 
   # Google auth & Drive
   google_sign_in: ^6.2.2
@@ -59,6 +60,9 @@ dependencies:
 
   # URL launcher for hyperlinks
   url_launcher: ^6.3.1
+
+  # Deep link handling (shared note links)
+  app_links: ^7.0.0
 
   cupertino_icons: ^1.0.8
   package_info_plus: ^9.0.1

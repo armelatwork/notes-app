@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.mynotes.app",
+      "sha256_cert_fingerprints": [
+        "5C:BB:B0:0D:3D:48:7C:28:BD:91:EC:3A:ED:A7:A1:62:21:B4:C9:7B:8E:72:64:74:A7:DE:FF:35:7C:1E:A8:81"
+      ]
+    }
+  }
+]
