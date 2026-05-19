@@ -140,6 +140,11 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
     );
     widget.note.firestoreId = id;
     widget.note.sharedWithEmails = [email];
+    // Eagerly push to Drive so firestoreId survives a signout before the
+    // normal debounced push (15 s) fires. Fire-and-forget is intentional.
+    ref.read(notesProvider.notifier).pushNoteNow(widget.note).catchError((e) {
+      AppLogger.instance.warn('ShareDialog', 'eager Drive push failed', e);
+    });
   }
 
   Future<void> _removeCollaborator(String email) async {
