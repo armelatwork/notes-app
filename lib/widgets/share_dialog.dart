@@ -38,9 +38,7 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
     super.initState();
     _isOwner = widget.note.sharedByEmail == null;
     _collaborators = List.from(widget.note.sharedWithEmails);
-    // Always fetch from Firestore so the owner sees collaborators added by
-    // re-sharing (which don't appear in the local sharedWithEmails list).
-    if (widget.note.firestoreId != null) {
+if (widget.note.firestoreId != null) {
       _loadCollaborators();
     }
   }
@@ -140,11 +138,16 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
     );
     widget.note.firestoreId = id;
     widget.note.sharedWithEmails = [email];
-    // Eagerly push to Drive so firestoreId survives a signout before the
-    // normal debounced push (15 s) fires. Fire-and-forget is intentional.
-    ref.read(notesProvider.notifier).pushNoteNow(widget.note).catchError((e) {
-      AppLogger.instance.warn('ShareDialog', 'eager Drive push failed', e);
-    });
+    // Await the Drive push so firestoreId is in the Drive backup before this
+    // method returns. Fire-and-forget was unreliable: a signout within a few
+    // seconds revoked the auth token before the push completed, leaving the
+    // Drive backup without firestoreId and breaking the sharing state on
+    // next sign-in.
+    try {
+      await ref.read(notesProvider.notifier).pushNoteNow(widget.note);
+    } catch (e) {
+      AppLogger.instance.warn('ShareDialog', 'Drive push after share failed', e);
+    }
   }
 
   Future<void> _removeCollaborator(String email) async {
