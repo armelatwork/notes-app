@@ -50,8 +50,13 @@ class SharedNoteData {
       ownerEmail: d['ownerEmail'] as String? ?? '',
       collaboratorEmails: List<String>.from(
           d['collaboratorEmails'] as List? ?? []),
-      collaboratorSharedBy: sharedByRaw.map(
-          (k, v) => MapEntry(k, v as String? ?? '')),
+        // Skip entries whose value is not a String — these result from a prior
+      // bug where dot-notation was used with dotted email keys, causing
+      // Firestore to create nested maps instead of string values.
+      collaboratorSharedBy: Map.fromEntries(
+          sharedByRaw.entries
+              .where((e) => e.value is String)
+              .map((e) => MapEntry(e.key, e.value as String))),
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedBy: d['updatedBy'] as String? ?? '',
       updatedByEmail: d['updatedByEmail'] as String? ?? '',
@@ -112,9 +117,11 @@ class SharingService {
   // [sharedByEmail] is the email of the user who is doing the sharing.
   Future<void> addCollaborator(
       String firestoreId, String email, String sharedByEmail) async {
+    // Use FieldPath for the nested map key so that dots in email addresses
+    // are treated as literal characters, not Firestore path separators.
     await _col.doc(firestoreId).update({
       'collaboratorEmails': FieldValue.arrayUnion([email]),
-      'collaboratorSharedBy.$email': sharedByEmail,
+      FieldPath(['collaboratorSharedBy', email]): sharedByEmail,
     });
   }
 
@@ -122,7 +129,7 @@ class SharingService {
   Future<void> removeCollaborator(String firestoreId, String email) async {
     await _col.doc(firestoreId).update({
       'collaboratorEmails': FieldValue.arrayRemove([email]),
-      'collaboratorSharedBy.$email': FieldValue.delete(),
+      FieldPath(['collaboratorSharedBy', email]): FieldValue.delete(),
     });
   }
 
