@@ -38,7 +38,9 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
     super.initState();
     _isOwner = widget.note.sharedByEmail == null;
     _collaborators = List.from(widget.note.sharedWithEmails);
-    if (!_isOwner && widget.note.firestoreId != null) {
+    // Always fetch from Firestore so the owner sees collaborators added by
+    // re-sharing (which don't appear in the local sharedWithEmails list).
+    if (widget.note.firestoreId != null) {
       _loadCollaborators();
     }
   }
