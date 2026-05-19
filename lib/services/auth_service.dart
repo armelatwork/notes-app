@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'app_logger.dart';
 
@@ -22,6 +23,7 @@ class AuthService {
       // Return null so the user is prompted to sign in interactively.
       final auth = await user.authentication;
       if (auth.accessToken == null) return null;
+      await _signInToFirebase(auth);
       return user;
     } catch (e) {
       AppLogger.instance.warn('AuthService', 'silent sign-in failed', e);
@@ -38,7 +40,21 @@ class AuthService {
     await _googleSignIn.signOut().catchError((_) => null);
     final user = await _googleSignIn.signIn();
     if (user == null) return null;
-    return await _ensureDriveScope(user);
+    final ensured = await _ensureDriveScope(user);
+    await _signInToFirebase(await ensured.authentication);
+    return ensured;
+  }
+
+  Future<void> _signInToFirebase(GoogleSignInAuthentication auth) async {
+    try {
+      final credential = GoogleAuthProvider.credential(
+        idToken: auth.idToken,
+        accessToken: auth.accessToken,
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    } catch (e) {
+      AppLogger.instance.warn('AuthService', 'Firebase sign-in failed', e);
+    }
   }
 
   // Request drive.file explicitly and verify a valid access token is returned.
@@ -57,7 +73,10 @@ class AuthService {
     return current;
   }
 
-  Future<void> signOut() => _googleSignIn.signOut();
+  Future<void> signOut() async {
+    await FirebaseAuth.instance.signOut();
+    await _googleSignIn.signOut();
+  }
 
   Future<Map<String, String>?> getAuthHeaders() async {
     final user = _googleSignIn.currentUser;
