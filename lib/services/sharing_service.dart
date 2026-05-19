@@ -5,7 +5,11 @@ import 'app_logger.dart';
 
 // Firestore collection: shared_notes/{firestoreId}
 // Fields: title, content, preview, ownerId, ownerEmail,
-//         collaboratorEmails, updatedAt, updatedBy, updatedByEmail
+//         collaboratorEmails, collaboratorSharedBy,
+//         updatedAt, updatedBy, updatedByEmail
+//
+// collaboratorSharedBy: {email -> sharedByEmail} — tracks which user
+// added each collaborator, enabling the sharing chain UI.
 
 class SharedNoteData {
   final String firestoreId;
@@ -15,6 +19,7 @@ class SharedNoteData {
   final String ownerId;
   final String ownerEmail;
   final List<String> collaboratorEmails;
+  final Map<String, String> collaboratorSharedBy;
   final DateTime updatedAt;
   final String updatedBy;
   final String updatedByEmail;
@@ -27,6 +32,7 @@ class SharedNoteData {
     required this.ownerId,
     required this.ownerEmail,
     required this.collaboratorEmails,
+    required this.collaboratorSharedBy,
     required this.updatedAt,
     required this.updatedBy,
     required this.updatedByEmail,
@@ -34,6 +40,7 @@ class SharedNoteData {
 
   factory SharedNoteData.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
+    final sharedByRaw = d['collaboratorSharedBy'] as Map<String, dynamic>? ?? {};
     return SharedNoteData(
       firestoreId: doc.id,
       title: d['title'] as String? ?? '',
@@ -43,6 +50,8 @@ class SharedNoteData {
       ownerEmail: d['ownerEmail'] as String? ?? '',
       collaboratorEmails: List<String>.from(
           d['collaboratorEmails'] as List? ?? []),
+      collaboratorSharedBy: sharedByRaw.map(
+          (k, v) => MapEntry(k, v as String? ?? '')),
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedBy: d['updatedBy'] as String? ?? '',
       updatedByEmail: d['updatedByEmail'] as String? ?? '',
@@ -56,6 +65,7 @@ class SharedNoteData {
         'ownerId': ownerId,
         'ownerEmail': ownerEmail,
         'collaboratorEmails': collaboratorEmails,
+        'collaboratorSharedBy': collaboratorSharedBy,
         'updatedAt': Timestamp.fromDate(updatedAt),
         'updatedBy': updatedBy,
         'updatedByEmail': updatedByEmail,
@@ -88,6 +98,7 @@ class SharingService {
       ownerId: ownerUid,
       ownerEmail: ownerEmail,
       collaboratorEmails: [collaboratorEmail],
+      collaboratorSharedBy: {collaboratorEmail: ownerEmail},
       updatedAt: DateTime.now(),
       updatedBy: ownerUid,
       updatedByEmail: ownerEmail,
@@ -98,9 +109,12 @@ class SharingService {
   }
 
   // Add a collaborator to an existing shared note.
-  Future<void> addCollaborator(String firestoreId, String email) async {
+  // [sharedByEmail] is the email of the user who is doing the sharing.
+  Future<void> addCollaborator(
+      String firestoreId, String email, String sharedByEmail) async {
     await _col.doc(firestoreId).update({
       'collaboratorEmails': FieldValue.arrayUnion([email]),
+      'collaboratorSharedBy.$email': sharedByEmail,
     });
   }
 
@@ -108,6 +122,7 @@ class SharingService {
   Future<void> removeCollaborator(String firestoreId, String email) async {
     await _col.doc(firestoreId).update({
       'collaboratorEmails': FieldValue.arrayRemove([email]),
+      'collaboratorSharedBy.$email': FieldValue.delete(),
     });
   }
 

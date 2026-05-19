@@ -11,7 +11,6 @@ import '../utils/image_utils.dart';
 const _kFirestoreBase = 'https://thechaos-mynotes.web.app/note';
 
 /// Bottom-sheet / dialog for sharing a note with collaborators.
-/// Shows current collaborators, an email input, and a copy-link button.
 class ShareDialog extends ConsumerStatefulWidget {
   final Note note;
   final VoidCallback onNoteUpdated;
@@ -30,18 +29,42 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
   final _emailCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _loading = false;
+  late bool _isOwner;
+  String? _authorEmail;
   late List<String> _collaborators;
 
   @override
   void initState() {
     super.initState();
+    _isOwner = widget.note.sharedByEmail == null;
     _collaborators = List.from(widget.note.sharedWithEmails);
+    if (!_isOwner && widget.note.firestoreId != null) {
+      _loadCollaborators();
+    }
   }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCollaborators() async {
+    setState(() => _loading = true);
+    try {
+      final data =
+          await SharingService.instance.fetchNote(widget.note.firestoreId!);
+      if (data != null && mounted) {
+        setState(() {
+          _authorEmail = data.ownerEmail;
+          _collaborators = data.collaboratorEmails;
+        });
+      }
+    } catch (e) {
+      AppLogger.instance.warn('ShareDialog', 'failed to load collaborators', e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   String? _validateEmail(String? v) {
@@ -60,30 +83,15 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
 
     setState(() => _loading = true);
     try {
-      if (widget.note.firestoreId == null) {
-        await _createShare(email, user);
+      if (_isOwner) {
+        await _addAsOwner(email, user);
       } else {
-        try {
-          await SharingService.instance.addCollaborator(
-              widget.note.firestoreId!, email);
-          widget.note.sharedWithEmails = [..._collaborators, email];
-        } catch (e) {
-          // Firestore document was deleted externally — start fresh.
-          final msg = e.toString().toLowerCase();
-          if (msg.contains('not-found') || msg.contains('no document')) {
-            AppLogger.instance.warn(
-                'ShareDialog', 'stale firestoreId, recreating share', e);
-            widget.note.firestoreId = null;
-            widget.note.sharedWithEmails = [];
-            await _createShare(email, user);
-          } else {
-            rethrow;
-          }
-        }
+        await SharingService.instance.addCollaborator(
+            widget.note.firestoreId!, email, user.email ?? '');
       }
-      setState(() => _collaborators = List.from(widget.note.sharedWithEmails));
+      setState(() => _collaborators = [..._collaborators, email]);
       _emailCtrl.clear();
-      widget.onNoteUpdated();
+      if (_isOwner) widget.onNoteUpdated();
     } catch (e) {
       AppLogger.instance.error('ShareDialog', 'addCollaborator failed', e);
       if (mounted) {
@@ -93,6 +101,29 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _addAsOwner(String email, AppUser user) async {
+    if (widget.note.firestoreId == null) {
+      await _createShare(email, user);
+      return;
+    }
+    try {
+      await SharingService.instance.addCollaborator(
+          widget.note.firestoreId!, email, user.email ?? '');
+      widget.note.sharedWithEmails = [..._collaborators, email];
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('not-found') || msg.contains('no document')) {
+        AppLogger.instance.warn(
+            'ShareDialog', 'stale firestoreId, recreating share', e);
+        widget.note.firestoreId = null;
+        widget.note.sharedWithEmails = [];
+        await _createShare(email, user);
+      } else {
+        rethrow;
+      }
     }
   }
 
@@ -117,8 +148,8 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
           widget.note.firestoreId!, email);
       widget.note.sharedWithEmails =
           _collaborators.where((e) => e != email).toList();
-      setState(() => _collaborators =
-          List.from(widget.note.sharedWithEmails));
+      setState(() =>
+          _collaborators = _collaborators.where((e) => e != email).toList());
       widget.onNoteUpdated();
     } catch (e) {
       AppLogger.instance.error('ShareDialog', 'removeCollaborator failed', e);
@@ -144,6 +175,7 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final currentEmail = ref.read(appUserProvider)?.email;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(context).bottom,
@@ -155,7 +187,14 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Header(onCopyLink: _copyLink),
+              if (_isOwner)
+                _OwnerHeader(onCopyLink: _copyLink)
+              else
+                _CollaboratorHeader(
+                  authorEmail: _authorEmail,
+                  sharedByEmail: widget.note.sharedByEmail,
+                  onCopyLink: _copyLink,
+                ),
               const SizedBox(height: 16),
               _EmailInput(
                 formKey: _formKey,
@@ -168,7 +207,9 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
                 const SizedBox(height: 16),
                 _CollaboratorList(
                   collaborators: _collaborators,
+                  currentEmail: currentEmail,
                   loading: _loading,
+                  canRemove: _isOwner,
                   onRemove: _removeCollaborator,
                 ),
               ],
@@ -180,9 +221,9 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
   }
 }
 
-class _Header extends StatelessWidget {
+class _OwnerHeader extends StatelessWidget {
   final VoidCallback onCopyLink;
-  const _Header({required this.onCopyLink});
+  const _OwnerHeader({required this.onCopyLink});
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +237,62 @@ class _Header extends StatelessWidget {
           icon: const Icon(Icons.link, size: 18),
           label: const Text('Copy link'),
         ),
+      ],
+    );
+  }
+}
+
+class _CollaboratorHeader extends StatelessWidget {
+  final String? authorEmail;
+  final String? sharedByEmail;
+  final VoidCallback onCopyLink;
+
+  const _CollaboratorHeader({
+    required this.authorEmail,
+    required this.sharedByEmail,
+    required this.onCopyLink,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grey = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('Shared note',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: onCopyLink,
+              icon: const Icon(Icons.link, size: 18),
+              label: const Text('Copy link'),
+            ),
+          ],
+        ),
+        if (authorEmail != null) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.person_outline, size: 14, color: grey),
+              const SizedBox(width: 4),
+              Text('Author: $authorEmail',
+                  style: TextStyle(fontSize: 12, color: grey)),
+            ],
+          ),
+        ],
+        if (sharedByEmail != null) ...[
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              Icon(Icons.subdirectory_arrow_right, size: 14, color: grey),
+              const SizedBox(width: 4),
+              Text('Shared with you by: $sharedByEmail',
+                  style: TextStyle(fontSize: 12, color: grey)),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -258,12 +355,16 @@ class _EmailInput extends StatelessWidget {
 
 class _CollaboratorList extends StatelessWidget {
   final List<String> collaborators;
+  final String? currentEmail;
   final bool loading;
+  final bool canRemove;
   final void Function(String) onRemove;
 
   const _CollaboratorList({
     required this.collaborators,
+    required this.currentEmail,
     required this.loading,
+    required this.canRemove,
     required this.onRemove,
   });
 
@@ -275,22 +376,28 @@ class _CollaboratorList extends StatelessWidget {
         const Text('Collaborators',
             style: TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 6),
-        ...collaborators.map((email) => ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(
-                radius: 14,
-                child: Icon(Icons.person_outline, size: 16),
-              ),
-              title: Text(email, style: const TextStyle(fontSize: 14)),
-              trailing: loading
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.close, size: 18),
-                      onPressed: () => onRemove(email),
-                      tooltip: 'Remove',
-                    ),
-            )),
+        ...collaborators.map((email) {
+          final isYou = email == currentEmail;
+          return ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const CircleAvatar(
+              radius: 14,
+              child: Icon(Icons.person_outline, size: 16),
+            ),
+            title: Text(
+              isYou ? '$email (you)' : email,
+              style: const TextStyle(fontSize: 14),
+            ),
+            trailing: (canRemove && !loading)
+                ? IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () => onRemove(email),
+                    tooltip: 'Remove',
+                  )
+                : null,
+          );
+        }),
       ],
     );
   }
