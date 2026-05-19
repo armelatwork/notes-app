@@ -127,11 +127,15 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
       ..folderId = null
       ..createdAt = data.updatedAt
       ..firestoreId = data.firestoreId);
+    final currentEmail = ref.read(appUserProvider)?.email;
+    final directSharer = currentEmail != null
+        ? data.collaboratorSharedBy[currentEmail]
+        : null;
     note
       ..title = data.title
       ..content = data.content
       ..preview = data.preview
-      ..sharedByEmail = data.ownerEmail
+      ..sharedByEmail = directSharer ?? data.ownerEmail
       ..updatedAt = data.updatedAt;
     await DatabaseService.instance.upsertNote(note);
     await reload();
