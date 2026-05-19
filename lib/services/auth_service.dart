@@ -57,13 +57,12 @@ class AuthService {
     }
   }
 
-  // Request drive.file explicitly and verify a valid access token is returned.
-  // On macOS, requestScopes may return false even when the scope was already
-  // granted during the sign-in flow. We therefore verify the token directly
-  // and only throw if the token itself is missing.
+  // Verify the access token is valid after sign-in.
+  // drive.file is already declared in the GoogleSignIn constructor scopes so
+  // calling requestScopes() again is redundant and triggers a second OAuth
+  // popup on macOS. We only need to confirm the token was actually issued.
   Future<GoogleSignInAccount> _ensureDriveScope(
       GoogleSignInAccount user) async {
-    await _googleSignIn.requestScopes([_kDriveScope]);
     final current = _googleSignIn.currentUser ?? user;
     final auth = await current.authentication;
     if (auth.accessToken == null) {
