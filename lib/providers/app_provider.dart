@@ -14,6 +14,8 @@ import '../services/device_service.dart';
 import '../services/drive_sync_service.dart';
 import '../services/encryption_service.dart';
 import '../services/local_auth_service.dart';
+import '../services/persistence_service.dart';
+import '../services/sharing_service.dart';
 import '../services/sync_log_service.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
@@ -104,8 +106,16 @@ class AppUserNotifier extends Notifier<AppUser?> {
   }
 
   Future<void> setGoogleUser(dynamic googleUser) async {
+    final incomingId = googleUser.id as String;
+    // Switching accounts without an explicit sign-out: clear the previous
+    // user's local data so the incoming user starts with a clean slate.
+    if (state != null && state!.id != incomingId) {
+      await DatabaseService.instance.clearAll();
+      await PersistenceService.instance.saveLastFolder(null);
+      await PersistenceService.instance.saveLastNote(null);
+    }
     try {
-      await _initGoogleSession(googleUser.id as String, googleUser);
+      await _initGoogleSession(incomingId, googleUser);
     } catch (e) {
       if (_isAuthScopeError(e)) {
         AppLogger.instance.warn(
@@ -120,6 +130,9 @@ class AppUserNotifier extends Notifier<AppUser?> {
   Future<void> _initGoogleSession(String userId, dynamic googleUser) async {
     final enc = EncryptionService.instance;
     final drv = DriveSyncService.instance;
+    // Always start with a clean folder cache so a stale ID from a previous
+    // session never leaks into the new user's Drive requests.
+    drv.clearCache();
     final api = await drv.getApi();
     if (api == null) return;
     final appFolderId = await drv.getOrCreateAppFolder(api);
@@ -129,7 +142,17 @@ class AppUserNotifier extends Notifier<AppUser?> {
     } else {
       await enc.initForGoogleUser(userId);
       final localKey = await enc.exportCurrentKeyBase64();
-      await drv.uploadEncryptionKey(api, appFolderId, localKey);
+      try {
+        await drv.uploadEncryptionKey(api, appFolderId, localKey);
+      } catch (e) {
+        // The parent folder may have been deleted from Drive between the list
+        // and the create calls. Clear the cache and retry with a fresh folder.
+        AppLogger.instance.warn(
+            'AppUserNotifier', 'uploadEncryptionKey failed, retrying with fresh folder', e);
+        drv.clearCache();
+        final freshFolderId = await drv.getOrCreateAppFolder(api);
+        await drv.uploadEncryptionKey(api, freshFolderId, localKey);
+      }
     }
     state = AppUser(
       id: userId,
@@ -149,6 +172,11 @@ class AppUserNotifier extends Notifier<AppUser?> {
     ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
     if (current?.type == AuthType.google) {
       await AuthService.instance.signOut();
+      // Clear local Isar data so the next Google user starts with a clean
+      // slate. Their notes are safe on Drive and will re-sync on next login.
+      await DatabaseService.instance.clearAll();
+      await PersistenceService.instance.saveLastFolder(null);
+      await PersistenceService.instance.saveLastNote(null);
     } else if (current?.type == AuthType.local) {
       await LocalAuthService.instance.signOut();
     }

@@ -24,6 +24,19 @@ class Note {
   // Drive file ID for sync tracking
   String? driveFileId;
 
+  // Firestore document ID — set when this note is shared via Firestore
+  String? firestoreId;
+
+  // Emails of collaborators this note has been shared with (owner view)
+  List<String> sharedWithEmails = [];
+
+  // Email of the owner who shared this note with the current user
+  String? sharedByEmail;
+
+  bool get isSharedByMe => sharedWithEmails.isNotEmpty;
+  bool get isSharedWithMe => firestoreId != null && !isSharedByMe;
+  bool get isShared => isSharedByMe || isSharedWithMe;
+
   Note();
 
   Note.create({

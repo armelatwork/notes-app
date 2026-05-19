@@ -120,6 +120,21 @@ class DatabaseService {
     });
   }
 
+  Future<Note?> getNoteByFirestoreId(String firestoreId) async {
+    final isar = await db;
+    final all = await isar.notes.where().findAll();
+    for (final n in all) {
+      if (n.firestoreId == firestoreId) return n;
+    }
+    return null;
+  }
+
+  Future<List<Note>> getSharedByMeNotes() async {
+    final isar = await db;
+    final all = await isar.notes.where().sortByUpdatedAtDesc().findAll();
+    return all.where((n) => n.isSharedByMe).toList();
+  }
+
   Future<void> close() async {
     await _isar?.close();
     _isar = null;

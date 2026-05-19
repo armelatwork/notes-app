@@ -42,21 +42,17 @@ class AuthService {
   }
 
   // Request drive.file explicitly and verify a valid access token is returned.
+  // On macOS, requestScopes may return false even when the scope was already
+  // granted during the sign-in flow. We therefore verify the token directly
+  // and only throw if the token itself is missing.
   Future<GoogleSignInAccount> _ensureDriveScope(
       GoogleSignInAccount user) async {
-    final granted = await _googleSignIn.requestScopes([_kDriveScope]);
-    if (!granted) {
-      throw 'Google Drive access is required for notes sync. '
-          'Please grant Drive permission and try again.';
-    }
+    await _googleSignIn.requestScopes([_kDriveScope]);
     final current = _googleSignIn.currentUser ?? user;
-    // Verify the token actually exists after the scope grant.
     final auth = await current.authentication;
     if (auth.accessToken == null) {
-      AppLogger.instance.warn(
-          'AuthService', 'access token is null after scope grant');
-      throw 'Failed to obtain a valid Drive access token. '
-          'Please try signing in again.';
+      throw 'Google Drive access is required for notes sync. '
+          'Please grant Drive permission and try again.';
     }
     return current;
   }
