@@ -152,7 +152,16 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
           _collaborators = _collaborators.where((e) => e != email).toList());
       widget.onNoteUpdated();
     } catch (e) {
-      AppLogger.instance.error('ShareDialog', 'removeCollaborator failed', e);
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('not-found') || msg.contains('no document')) {
+        // Firestore doc was deleted externally — clear all local sharing state.
+        widget.note.firestoreId = null;
+        widget.note.sharedWithEmails = [];
+        setState(() => _collaborators = []);
+        widget.onNoteUpdated();
+      } else {
+        AppLogger.instance.error('ShareDialog', 'removeCollaborator failed', e);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
