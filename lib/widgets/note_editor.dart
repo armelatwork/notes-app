@@ -229,9 +229,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     // Push to Firestore if this is a shared note.
     if (note.firestoreId != null) {
       final user = ref.read(appUserProvider);
+      final inlinedContent = await inlineImagesForSharing(note.content);
       SharingService.instance.pushUpdate(
         firestoreId: note.firestoreId!,
         note: note,
+        contentOverride: inlinedContent,
         editorUid: user?.id ?? '',
         editorEmail: user?.email ?? '',
       ).catchError((e) {

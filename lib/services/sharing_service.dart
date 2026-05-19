@@ -78,11 +78,12 @@ class SharingService {
     required String ownerUid,
     required String ownerEmail,
     required String collaboratorEmail,
+    String? contentOverride,
   }) async {
     final data = SharedNoteData(
       firestoreId: '',
       title: note.title,
-      content: note.content,
+      content: contentOverride ?? note.content,
       preview: note.preview,
       ownerId: ownerUid,
       ownerEmail: ownerEmail,
@@ -116,10 +117,11 @@ class SharingService {
     required Note note,
     required String editorUid,
     required String editorEmail,
+    String? contentOverride,
   }) async {
     await _col.doc(firestoreId).update({
       'title': note.title,
-      'content': note.content,
+      'content': contentOverride ?? note.content,
       'preview': note.preview,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
       'updatedBy': editorUid,

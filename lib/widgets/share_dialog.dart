@@ -6,6 +6,7 @@ import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../services/app_logger.dart';
 import '../services/sharing_service.dart';
+import '../utils/image_utils.dart';
 
 const _kFirestoreBase = 'https://thechaos-mynotes.web.app/note';
 
@@ -96,11 +97,13 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
   }
 
   Future<void> _createShare(String email, AppUser user) async {
+    final inlinedContent = await inlineImagesForSharing(widget.note.content);
     final id = await SharingService.instance.shareNote(
       note: widget.note,
       ownerUid: user.id,
       ownerEmail: user.email ?? '',
       collaboratorEmail: email,
+      contentOverride: inlinedContent,
     );
     widget.note.firestoreId = id;
     widget.note.sharedWithEmails = [email];

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -58,6 +59,9 @@ class NoteImageEmbedBuilder extends EmbedBuilder {
   @override
   Widget build(BuildContext context, EmbedContext embedContext) {
     final ref = embedContext.node.value.data as String;
+    if (isBase64ImageRef(ref)) {
+      return _Base64ImageTile(dataUri: ref, controller: controller);
+    }
     if (!isNewImageRef(ref)) {
       return _LegacyImageTile(path: ref, controller: controller);
     }
@@ -143,6 +147,31 @@ class _ImageTileState extends State<_ImageTile> {
           _showDeleteMenu(context, null, widget.filename, widget.controller),
       child: _frame(Image.file(File(_localPath!), fit: BoxFit.contain)),
     );
+  }
+}
+
+// ── Base64 data-URI tile (shared notes) ──────────────────────────────────────
+
+class _Base64ImageTile extends StatelessWidget {
+  final String dataUri;
+  final QuillController controller;
+  const _Base64ImageTile({required this.dataUri, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final comma = dataUri.indexOf(',');
+      if (comma == -1) return _frame(const Text('[Invalid image]'));
+      final bytes = base64Decode(dataUri.substring(comma + 1));
+      return GestureDetector(
+        onSecondaryTapUp: (d) =>
+            _showDeleteMenu(context, d, dataUri, controller),
+        onLongPress: () => _showDeleteMenu(context, null, dataUri, controller),
+        child: _frame(Image.memory(bytes, fit: BoxFit.contain)),
+      );
+    } catch (_) {
+      return _frame(const Text('[Image load error]'));
+    }
   }
 }
 
