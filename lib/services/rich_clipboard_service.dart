@@ -15,10 +15,15 @@ import 'clipboard_table_handler.dart';
 // External apps ignore unknown types and see HTML or plain text instead.
 final _kQuillDeltaFormat = CustomValueFormat<String>(
   applicationId: 'app.mynotes.quill-delta',
-  // value is Uint8List on macOS/iOS; decode bytes → JSON string.
-  onDecode: (value, _) async {
-    if (value is Uint8List) return utf8.decode(value);
-    return value as String?;
+  // In super_clipboard 0.9.x, onDecode receives PlatformDataProvider, not raw
+  // bytes. Call getData() to resolve the actual bytes before decoding.
+  onDecode: (value, platformType) async {
+    final raw = value is PlatformDataProvider
+        ? await value.getData(platformType)
+        : value;
+    if (raw is Uint8List) return utf8.decode(raw);
+    if (raw is String) return raw;
+    return null;
   },
   // Encode the JSON string as UTF-8 bytes for the platform clipboard.
   onEncode: (value, _) => utf8.encode(value),

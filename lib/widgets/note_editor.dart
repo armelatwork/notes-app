@@ -183,6 +183,11 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     }
     _initNoteController(doc);
     setState(() {});
+    if (defaultTargetPlatform == TargetPlatform.macOS) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
+    }
   }
 
   void _initNoteController(Document doc) {
