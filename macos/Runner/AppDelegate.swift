@@ -3,6 +3,9 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var menuObservation: NSKeyValueObservation?
+  private var isSettingMenu = false
+
   override func applicationDidFinishLaunching(_ notification: Notification) {
     if let icon = NSImage(named: "AppIcon") {
       NSApp.applicationIconImage = icon
@@ -42,20 +45,25 @@ class AppDelegate: FlutterAppDelegate {
       }
     }
 
-    // Call super first so Flutter finishes its own initialisation (which may
-    // reset NSApp.mainMenu), then apply our menu on top.
+    // Let Flutter finish its own initialisation before we set our menu.
     super.applicationDidFinishLaunching(notification)
     setupAppMenu()
-  }
 
-  // Flutter rebuilds the widget tree on login/logout and can reset
-  // NSApp.mainMenu. Reapply our menu each time the app becomes active so
-  // Cmd+Q and the other standard items are always present.
-  override func applicationDidBecomeActive(_ notification: Notification) {
-    setupAppMenu()
+    // Flutter resets NSApp.mainMenu on every widget-tree rebuild (login /
+    // logout). Observe the property and reapply our menu whenever it changes
+    // to something we did not set ourselves.
+    menuObservation = NSApp.observe(\.mainMenu, options: [.new]) { [weak self] _, change in
+      guard let self = self, !self.isSettingMenu else { return }
+      if change.newValue??.item(withTitle: "My Notes") == nil {
+        DispatchQueue.main.async { self.setupAppMenu() }
+      }
+    }
   }
 
   private func setupAppMenu() {
+    isSettingMenu = true
+    defer { isSettingMenu = false }
+
     let mainMenu = NSMenu()
     let appMenuItem = NSMenuItem()
     mainMenu.addItem(appMenuItem)
