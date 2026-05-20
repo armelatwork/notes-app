@@ -1,11 +1,93 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/app_user.dart';
 import '../providers/app_provider.dart';
+import '../services/app_logger.dart';
 
 const _kWebsiteUrl = 'https://thechaos-mynotes.web.app';
+
+String _deleteErrorReason(Object e) {
+  if (e is SocketException) return 'No internet connection.';
+  if (e is TimeoutException) return 'The request timed out.';
+  final s = e.toString().toLowerCase();
+  if (s.contains('drive') || s.contains('googleapis')) {
+    return 'Google Drive is unavailable.';
+  }
+  if (s.contains('firestore') || s.contains('cloud_firestore')) {
+    return 'Could not reach Firestore.';
+  }
+  return 'An unexpected error occurred.';
+}
+
+Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete account'),
+      content: const Text(
+        'This will permanently delete all your notes, folders, and your '
+        'Drive backup. This cannot be undone.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+          child: const Text('Delete everything'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const AlertDialog(
+      content: Row(children: [
+        CircularProgressIndicator(),
+        SizedBox(width: 16),
+        Expanded(child: Text('Deleting account…')),
+      ]),
+    ),
+  );
+
+  try {
+    await ref.read(appUserProvider.notifier).deleteAccount();
+    // Pop the loading dialog and the Settings screen in one step so
+    // AuthGate's AuthScreen (already showing since state = null) is revealed.
+    if (context.mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  } catch (e) {
+    AppLogger.instance.error('SettingsScreen', 'deleteAccount failed', e);
+    if (!context.mounted) return;
+    Navigator.pop(context); // dismiss loading dialog
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Deletion failed'),
+        content: Text(
+          'Could not delete all your data. Your account has not been deleted. '
+          'Please try again. Reason: ${_deleteErrorReason(e)}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 final _packageInfoProvider = FutureProvider<PackageInfo>(
   (_) => PackageInfo.fromPlatform(),
@@ -46,6 +128,16 @@ class SettingsScreen extends ConsumerWidget {
               Navigator.pop(context);
               ref.read(appUserProvider.notifier).signOut();
             },
+          ),
+          const Divider(),
+          _SectionHeader(label: 'Danger Zone'),
+          ListTile(
+            leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
+            title: const Text('Delete account',
+                style: TextStyle(color: Colors.red)),
+            subtitle: const Text(
+                'Permanently deletes all notes, folders, and Drive backup'),
+            onTap: () => _confirmDeleteAccount(context, ref),
           ),
           const Divider(),
           _SectionHeader(label: 'About'),

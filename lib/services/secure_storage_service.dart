@@ -58,4 +58,12 @@ class SecureStorageService {
     data.remove(key);
     await _writeAll(data);
   }
+
+  Future<void> deleteKeys(List<String> keys) async {
+    final data = await _readAll();
+    for (final key in keys) {
+      data.remove(key);
+    }
+    await _writeAll(data);
+  }
 }

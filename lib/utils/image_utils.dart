@@ -6,6 +6,15 @@ import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
 
+/// Deletes the entire note_images directory and all its contents.
+/// Used during account deletion. Non-critical: images are sandboxed so
+/// failure is logged and swallowed rather than aborting the deletion.
+Future<void> deleteLocalImages() async {
+  final appDir = await getApplicationDocumentsDirectory();
+  final dir = Directory(p.join(appDir.path, 'note_images'));
+  if (await dir.exists()) await dir.delete(recursive: true);
+}
+
 /// Returns the absolute local path for a UUID image filename,
 /// creating the note_images directory if it does not exist yet.
 Future<String> imageLocalPath(String filename) async {

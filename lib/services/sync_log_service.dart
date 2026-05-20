@@ -58,6 +58,8 @@ class SyncLogService {
 
   String? _cachedFileId;
 
+  void clearCache() => _cachedFileId = null;
+
   // ── Polling helpers ────────────────────────────────────────────────────────
 
   /// Returns the Drive server modifiedTime of sync_log.json, or null if absent.
@@ -75,7 +77,7 @@ class SyncLogService {
       _cachedFileId = r.files!.first.id;
       return r.files!.first.modifiedTime?.toIso8601String();
     } catch (e) {
-      AppLogger.instance.error('SyncLogService', 'fetchLogModifiedTime failed', e);
+      AppLogger.instance.warn('SyncLogService', 'fetchLogModifiedTime failed', e);
       return null;
     }
   }
@@ -109,6 +111,7 @@ class SyncLogService {
       final maxSeq = all.isEmpty ? lastSeq : all.map((e) => e.seq).reduce((a, b) => a > b ? a : b);
       return (entries: newer, maxSeq: maxSeq);
     } catch (e) {
+      if (e.toString().contains('status: 404')) _cachedFileId = null;
       AppLogger.instance.error('SyncLogService', 'fetchEntriesSince failed', e);
       return null;
     }
@@ -180,8 +183,19 @@ class SyncLogService {
     final media = drive.Media(Stream.value(bytes), bytes.length,
         contentType: _jsonMime);
     if (existingId != null) {
-      await api.files.update(drive.File()..name = _kFileName, existingId,
-          uploadMedia: media);
+      try {
+        await api.files.update(drive.File()..name = _kFileName, existingId,
+            uploadMedia: media);
+      } catch (e) {
+        if (!e.toString().contains('status: 404')) rethrow;
+        // Stale cached file ID — create a fresh sync_log.json.
+        _cachedFileId = null;
+        final created = await api.files.create(
+          drive.File()..name = _kFileName..parents = [appFolderId],
+          uploadMedia: media,
+        );
+        _cachedFileId = created.id;
+      }
     } else {
       final created = await api.files.create(
         drive.File()..name = _kFileName..parents = [appFolderId],
@@ -241,7 +255,8 @@ class SyncLogService {
       final oldestSeq =
           (entries.first as Map<String, dynamic>)['seq'] as int;
       return lastSeq < oldestSeq - 1;
-    } catch (_) {
+    } catch (e) {
+      if (e.toString().contains('status: 404')) _cachedFileId = null;
       return false;
     }
   }

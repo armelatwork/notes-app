@@ -1,32 +1,5 @@
 part of 'folder_sidebar.dart';
 
-Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Delete account'),
-      content: const Text(
-        'This will permanently delete all your notes, folders, and your '
-        'Drive backup. This cannot be undone.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(backgroundColor: Colors.red),
-          child: const Text('Delete everything'),
-        ),
-      ],
-    ),
-  );
-  if (confirmed == true) {
-    await ref.read(appUserProvider.notifier).deleteAccount();
-  }
-}
-
 // ── User menu footer ──────────────────────────────────────────────────────────
 
 class _UserMenuFooter extends ConsumerWidget {
@@ -48,8 +21,6 @@ class _UserMenuFooter extends ConsumerWidget {
           );
         } else if (value == 'signout') {
           ref.read(appUserProvider.notifier).signOut();
-        } else if (value == 'delete_account') {
-          await _confirmDeleteAccount(context, ref);
         }
       },
       itemBuilder: (_) => <PopupMenuEntry<String>>[
@@ -67,15 +38,6 @@ class _UserMenuFooter extends ConsumerWidget {
             Icon(Icons.logout, size: 18),
             SizedBox(width: 10),
             Text('Sign out'),
-          ]),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'delete_account',
-          child: Row(children: const [
-            Icon(Icons.delete_forever_outlined, size: 18, color: Colors.red),
-            SizedBox(width: 10),
-            Text('Delete account', style: TextStyle(color: Colors.red)),
           ]),
         ),
       ],

@@ -162,34 +162,13 @@ class DriveSyncService {
   Future<Note?> downloadNote(
       drive.DriveApi api, String appFolderId, int noteId) async {
     try {
-      final enc = EncryptionService.instance;
-      if (!enc.isInitialized) return null;
+      if (!EncryptionService.instance.isInitialized) return null;
       final r = await api.files.list(
         q: "name='note_$noteId.json' and '$appFolderId' in parents and trashed=false",
-        spaces: 'drive',
-        $fields: 'files(id)',
+        spaces: 'drive', $fields: 'files(id)',
       );
       if (r.files?.isEmpty != false) return null;
-      final fileId = r.files!.first.id!;
-      final media = await api.files.get(
-        fileId,
-        downloadOptions: drive.DownloadOptions.fullMedia,
-      ) as drive.Media;
-      final json = jsonDecode(await _readMedia(media)) as Map<String, dynamic>;
-      final note = Note.create(
-        title: await enc.decrypt(json['title'] as String),
-        content: await enc.decrypt(json['content'] as String),
-        folderId: json['folderId'] as int?,
-      );
-      note.id = json['id'] as int;
-      note.driveFileId = fileId;
-      note.createdAt = DateTime.parse(json['createdAt'] as String);
-      note.updatedAt = DateTime.parse(json['updatedAt'] as String);
-      note.firestoreId = json['firestoreId'] as String?;
-      note.sharedWithEmails =
-          (json['sharedWithEmails'] as List?)?.cast<String>() ?? [];
-      note.sharedByEmail = json['sharedByEmail'] as String?;
-      return note;
+      return await downloadNoteById(api, r.files!.first.id!);
     } catch (e) {
       AppLogger.instance.error('DriveSyncService', 'downloadNote $noteId failed', e);
       return null;
@@ -404,7 +383,9 @@ class DriveSyncService {
           "mimeType='application/vnd.google-apps.folder' and trashed=false",
       spaces: 'drive', $fields: 'files(id)',
     );
-    if (r.files?.isNotEmpty == true) await api.files.delete(r.files!.first.id!);
+    for (final file in r.files ?? []) {
+      await api.files.delete(file.id!);
+    }
   }
   Future<String> _readMedia(drive.Media media) async {
     final chunks = <int>[];

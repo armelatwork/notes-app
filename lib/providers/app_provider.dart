@@ -133,6 +133,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     // Always start with a clean folder cache so a stale ID from a previous
     // session never leaks into the new user's Drive requests.
     drv.clearCache();
+    SyncLogService.instance.clearCache();
     final api = await drv.getApi();
     if (api == null) return;
     final appFolderId = await drv.getOrCreateAppFolder(api);
@@ -167,6 +168,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
   Future<void> signOut() async {
     final current = state;
     DriveSyncService.instance.clearCache();
+    SyncLogService.instance.clearCache();
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
     ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
@@ -188,21 +190,57 @@ class AppUserNotifier extends Notifier<AppUser?> {
     state = null;
   }
 
+  // Remote data (Firestore + Drive) is deleted first. If any remote step fails
+  // after all retries, the method throws and local data is left intact so the
+  // user can retry. Local data is only wiped once every remote deletion succeeds.
+  // State reset always runs even if the final signOut throws (e.g. keychain error).
   Future<void> deleteAccount() async {
     final current = state;
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
     ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
-    await DatabaseService.instance.clearAll();
+
+    // Step 1 — remote cleanup (throws on failure so local data stays intact).
     if (current?.type == AuthType.google) {
-      final api = await DriveSyncService.instance.getApi();
-      if (api != null) {
+      await _cleanupFirestoreSharing(current!);
+      await _withRetry(() async {
+        final api = await DriveSyncService.instance.getApi();
+        if (api == null) throw Exception('Could not connect to Google Drive');
         await DriveSyncService.instance.deleteAppData(api);
-      }
-      await AuthService.instance.signOut();
-    } else if (current?.type == AuthType.local) {
-      await LocalAuthService.instance.signOut();
+      }, 'Drive deletion');
     }
+
+    // Step 2 — local data cleanup.
+    await DatabaseService.instance.clearAll();
+    try {
+      await deleteLocalImages();
+    } catch (e) {
+      AppLogger.instance.warn('AppUserNotifier', 'failed to delete local images', e);
+    }
+    try {
+      await PersistenceService.instance.saveLastFolder(null);
+      await PersistenceService.instance.saveLastNote(null);
+    } catch (e) {
+      AppLogger.instance.warn('AppUserNotifier', 'failed to clear persistence', e);
+    }
+
+    // Step 3 — auth signOut. A 10 s timeout ensures a hanging Firebase
+    // keychain call (common on macOS without a developer certificate) never
+    // blocks the state reset. The try-catch handles both throws and timeouts.
+    try {
+      if (current?.type == AuthType.google) {
+        await AuthService.instance.signOut()
+            .timeout(const Duration(seconds: 10));
+      } else if (current?.type == AuthType.local) {
+        await LocalAuthService.instance.deleteAccount();
+      }
+    } catch (e) {
+      AppLogger.instance.warn('AppUserNotifier', 'signOut during deleteAccount failed', e);
+    }
+
+    // Step 4 — state reset always runs.
+    DriveSyncService.instance.clearCache();
+    SyncLogService.instance.clearCache();
     EncryptionService.instance.clear();
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);
@@ -210,10 +248,44 @@ class AppUserNotifier extends Notifier<AppUser?> {
     ref.read(selectedFolderProvider.notifier).state = null;
     state = null;
   }
+
+  Future<void> _cleanupFirestoreSharing(AppUser user) async {
+    await _withRetry(
+        () => SharingService.instance.deleteAllOwnedSharedNotes(user.id),
+        'Firestore owned notes');
+    if (user.email == null) return;
+    await _withRetry(
+        () => SharingService.instance.removeFromAllSharedNotes(user.email!),
+        'Firestore collaborator removal');
+  }
 }
 
 final appUserProvider =
     NotifierProvider<AppUserNotifier, AppUser?>(AppUserNotifier.new);
+
+// ── Retry helper ──────────────────────────────────────────────────────────────
+
+const _kDeleteMaxAttempts = 3;
+const _kDeleteAttemptTimeout = Duration(seconds: 10);
+const _kDeleteRetryDelay = Duration(seconds: 2);
+
+/// Retries [fn] up to [_kDeleteMaxAttempts] times, each with a
+/// [_kDeleteAttemptTimeout] deadline. Throws the last error if all fail.
+Future<T> _withRetry<T>(Future<T> Function() fn, String tag) async {
+  Object? lastError;
+  for (var i = 0; i < _kDeleteMaxAttempts; i++) {
+    try {
+      return await fn().timeout(_kDeleteAttemptTimeout);
+    } catch (e) {
+      lastError = e;
+      AppLogger.instance.warn('deleteAccount', '$tag attempt ${i + 1} failed', e);
+      if (i < _kDeleteMaxAttempts - 1) {
+        await Future.delayed(_kDeleteRetryDelay);
+      }
+    }
+  }
+  throw lastError!;
+}
 
 // ── Selected folder / note / search ───────────────────────────────────────────
 

@@ -53,7 +53,12 @@ class AuthService {
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
     } catch (e) {
-      AppLogger.instance.warn('AuthService', 'Firebase sign-in failed', e);
+      if (e.toString().contains('keychain-error')) {
+        // Expected on macOS without a developer certificate — not actionable.
+        AppLogger.instance.debug('AuthService', 'Firebase sign-in skipped (keychain unavailable)');
+      } else {
+        AppLogger.instance.warn('AuthService', 'Firebase sign-in failed', e);
+      }
     }
   }
 
@@ -81,7 +86,8 @@ class AuthService {
     final user = _googleSignIn.currentUser;
     if (user == null) return null;
     try {
-      final auth = await user.authentication;
+      final auth = await user.authentication
+          .timeout(const Duration(seconds: 8));
       final token = auth.accessToken;
       if (token == null) {
         AppLogger.instance.warn('AuthService', 'null access token in getAuthHeaders');
