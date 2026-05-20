@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,7 +36,34 @@ class NotesApp extends StatelessWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system,
-      home: const AuthGate(),
+      home: Platform.isMacOS
+          ? PlatformMenuBar(
+              menus: [
+                PlatformMenu(
+                  label: 'My Notes',
+                  menus: [
+                    PlatformMenuItemGroup(members: [
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.about),
+                    ]),
+                    PlatformMenuItemGroup(members: [
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.hide),
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.hideOtherApplications),
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.showAllApplications),
+                    ]),
+                    PlatformMenuItemGroup(members: [
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.quit),
+                    ]),
+                  ],
+                ),
+              ],
+              child: const AuthGate(),
+            )
+          : const AuthGate(),
     );
   }
 }
