@@ -167,6 +167,21 @@ class AppUserNotifier extends Notifier<AppUser?> {
 
   Future<void> signOut() async {
     final current = state;
+    // Flush pending Drive uploads before revoking auth or clearing caches.
+    // Without this, notes/folders modified just before logout are lost: the
+    // debounce timer is cancelled, data never reaches Drive, and clearAll()
+    // then wipes the local copy on the next line.
+    if (current?.type == AuthType.google) {
+      try {
+        await Future.wait([
+          ref.read(notesProvider.notifier).flushAndDrain(),
+          ref.read(foldersProvider.notifier).flushNow(),
+        ]).timeout(const Duration(seconds: 15));
+      } catch (e) {
+        AppLogger.instance.warn(
+            'AppUserNotifier', 'pre-logout sync flush failed or timed out', e);
+      }
+    }
     DriveSyncService.instance.clearCache();
     SyncLogService.instance.clearCache();
     ref.read(notesProvider.notifier).cancelPendingPush();

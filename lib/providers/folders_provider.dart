@@ -23,6 +23,20 @@ class FoldersNotifier extends AsyncNotifier<List<Folder>> {
 
   void cancelPendingPush() => _pushTimer?.cancel();
 
+  /// Fires any pending folder index push immediately and awaits it.
+  /// Returns immediately if no push was pending.
+  Future<void> flushNow() async {
+    if (_pushTimer == null) return;
+    _pushTimer!.cancel();
+    _pushTimer = null;
+    if (ref.read(appUserProvider)?.type != AuthType.google) return;
+    try {
+      await _uploadIndexAndLog(op: 'upsert');
+    } catch (e) {
+      AppLogger.instance.warn('FoldersNotifier', 'pre-logout folder flush failed', e);
+    }
+  }
+
   Future<Folder> createFolder(String name, {int? parentId}) async {
     final folder = Folder.create(name: name, parentId: parentId);
     final id = await DatabaseService.instance.saveFolder(folder);
