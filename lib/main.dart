@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,7 +54,34 @@ class NotesApp extends StatelessWidget {
         useMaterial3: true,
       ),
       themeMode: ThemeMode.system,
-      home: const AuthGate(),
+      home: Platform.isMacOS
+          ? PlatformMenuBar(
+              menus: [
+                PlatformMenu(
+                  label: 'My Notes',
+                  menus: [
+                    PlatformMenuItemGroup(members: [
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.about),
+                    ]),
+                    PlatformMenuItemGroup(members: [
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.hide),
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.hideOtherApplications),
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.showAllApplications),
+                    ]),
+                    PlatformMenuItemGroup(members: [
+                      PlatformProvidedMenuItem(
+                          type: PlatformProvidedMenuItemType.quit),
+                    ]),
+                  ],
+                ),
+              ],
+              child: const AuthGate(),
+            )
+          : const AuthGate(),
     );
   }
 }
