@@ -2,11 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../models/app_user.dart';
 import '../models/folder.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../providers/sharing_provider.dart';
 import '../services/sharing_service.dart';
+import 'share_dialog.dart';
 
 part 'note_tile.dart';
 
@@ -26,6 +28,8 @@ class NotesListPanel extends ConsumerWidget {
     final notesAsync = ref.watch(notesProvider);
     final selectedNote = ref.watch(selectedNoteProvider);
     final selectedFolder = ref.watch(selectedFolderProvider);
+    final isGoogleUser =
+        ref.watch(appUserProvider)?.type == AuthType.google;
 
     return Container(
       decoration: BoxDecoration(
@@ -69,6 +73,12 @@ class NotesListPanel extends ConsumerWidget {
                               ref.read(notesProvider.notifier).deleteNote(note.id),
                           onMoveToFolder: () =>
                               _showFolderPicker(context, ref, note),
+                          onShare: isGoogleUser
+                              ? () => showShareDialog(context, note,
+                                  onNoteUpdated: () => ref
+                                      .read(notesProvider.notifier)
+                                      .reload())
+                              : null,
                         );
                         if (!supportsDrag) return tile;
                         final draggable = LongPressDraggable<Note>(
@@ -287,6 +297,14 @@ class _SharedNotesPanel extends ConsumerWidget {
                       .openSharedNote(data);
                   ref.read(selectedNoteProvider.notifier).state = note;
                 },
+                onShare: () async {
+                  final note = await ref
+                      .read(notesProvider.notifier)
+                      .openSharedNote(data);
+                  if (context.mounted) {
+                    showShareDialog(context, note, onNoteUpdated: () {});
+                  }
+                },
               );
             },
           );
@@ -320,6 +338,9 @@ class _SharedNotesPanel extends ConsumerWidget {
                   ref.read(notesProvider.notifier).deleteNote(note.id);
                 },
                 onMoveToFolder: () => _showFolderPicker(context, ref, note),
+                onShare: () => showShareDialog(context, note,
+                    onNoteUpdated: () =>
+                        ref.read(notesProvider.notifier).reload()),
               );
             },
           );
@@ -356,54 +377,3 @@ class _SharedPanelHeader extends StatelessWidget {
   }
 }
 
-class _SharedWithMeTile extends StatelessWidget {
-  final SharedNoteData data;
-  final bool isSelected;
-  final VoidCallback onTap;
-  const _SharedWithMeTile(
-      {required this.data, required this.isSelected, required this.onTap});
-
-  String _formatDate(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inDays == 0) return DateFormat.jm().format(dt);
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < _kRecentDaysThreshold) return DateFormat.EEEE().format(dt);
-    return DateFormat.yMd().format(dt);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      dense: true,
-      selected: isSelected,
-      selectedTileColor: Theme.of(context)
-          .colorScheme
-          .primary
-          .withValues(alpha: _kSelectedTileOpacity),
-      onTap: onTap,
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              data.title.isEmpty ? 'New Note' : data.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Icon(Icons.people_outline, size: 16, color: Colors.grey[500]),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        '${_formatDate(data.updatedAt)} · ${data.ownerEmail}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-      ),
-    );
-  }
-}
