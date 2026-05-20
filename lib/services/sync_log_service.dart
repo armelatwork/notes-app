@@ -111,6 +111,7 @@ class SyncLogService {
       final maxSeq = all.isEmpty ? lastSeq : all.map((e) => e.seq).reduce((a, b) => a > b ? a : b);
       return (entries: newer, maxSeq: maxSeq);
     } catch (e) {
+      if (e.toString().contains('status: 404')) _cachedFileId = null;
       AppLogger.instance.error('SyncLogService', 'fetchEntriesSince failed', e);
       return null;
     }
@@ -254,7 +255,8 @@ class SyncLogService {
       final oldestSeq =
           (entries.first as Map<String, dynamic>)['seq'] as int;
       return lastSeq < oldestSeq - 1;
-    } catch (_) {
+    } catch (e) {
+      if (e.toString().contains('status: 404')) _cachedFileId = null;
       return false;
     }
   }
