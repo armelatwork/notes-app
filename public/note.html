@@ -70,12 +70,18 @@
       <a id="open-btn" class="btn btn-primary" href="#">Open in My Notes</a>
     </div>
 
-    <div class="card">
+    <div class="card" id="download-card">
       <div class="card-label">Don't have the app?</div>
-      <a class="btn btn-secondary"
-         href="https://play.google.com/store/apps/details?id=io.mynotes.app"
-         target="_blank" rel="noopener">
-        ⬇ Download on Google Play
+      <a id="download-btn-macos" class="btn btn-secondary"
+         href="https://github.com/armelatwork/notes-app/releases/download/v1.4.0/MyNotes-1.4.0.dmg"
+         style="display:none">
+        ⬇ Download for macOS (.dmg)
+      </a>
+      <a id="download-btn-android" class="btn btn-secondary"
+         href="https://github.com/armelatwork/notes-app/releases/download/v1.4.0/app-release.apk"
+         target="_blank" rel="noopener"
+         style="display:none">
+        ⬇ Download for Android (.apk)
       </a>
     </div>
 
@@ -86,33 +92,32 @@
   </div>
 
   <script>
-    // Extract the note ID from the URL path: /note/{noteId}
     const noteId = window.location.pathname.replace(/^\/note\/?/, '').replace(/\/$/, '');
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isMac = /Mac/i.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent);
 
+    // ── "Open in app" button ──────────────────────────────────────────────────
     if (noteId) {
-      // Android intent URL: opens the app directly if installed,
-      // falls back to Google Play if not.
-      const intentUrl =
-        'intent://note/' + noteId +
-        '#Intent;scheme=https;host=thechaos-mynotes.web.app;' +
-        'package=io.mynotes.app;' +
-        'S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dio.mynotes.app;end';
-
       const openBtn = document.getElementById('open-btn');
-      const isAndroid = /Android/i.test(navigator.userAgent);
-
       if (isAndroid) {
-        openBtn.href = intentUrl;
+        // Android intent URL: opens the app if installed, falls back to the APK.
+        openBtn.href =
+          'intent://note/' + noteId +
+          '#Intent;scheme=https;host=thechaos-mynotes.web.app;' +
+          'package=io.mynotes.app;' +
+          'S.browser_fallback_url=https%3A%2F%2Fgithub.com%2Farmelatwork%2Fnotes-app%2Freleases%2Fdownload%2Fv1.4.0%2Fapp-release.apk;end';
       } else {
-        // Non-Android: direct deep link (works once App Links / Universal Links are configured)
-        openBtn.href = 'https://thechaos-mynotes.web.app/note/' + noteId;
-        openBtn.textContent = 'Open My Notes';
-        // On non-Android platforms where the app isn't available, hide the open button section
-        const isMac = /Mac/i.test(navigator.userAgent) && !/iPhone|iPad/.test(navigator.userAgent);
-        if (isMac) {
-          document.getElementById('app-card').style.display = 'none';
-        }
+        // macOS: no Universal Links configured yet — hide the "open" card.
+        document.getElementById('app-card').style.display = 'none';
       }
+    }
+
+    // ── Download button — show the right platform ─────────────────────────────
+    if (isMac) {
+      document.getElementById('download-btn-macos').style.display = 'inline-flex';
+    } else {
+      // Android and anything else (Windows, Linux, unknown) default to Android.
+      document.getElementById('download-btn-android').style.display = 'inline-flex';
     }
   </script>
 </body>
