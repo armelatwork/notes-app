@@ -4,6 +4,10 @@ import FlutterMacOS
 @main
 class AppDelegate: FlutterAppDelegate {
   override func applicationDidFinishLaunching(_ notification: Notification) {
+    if let icon = NSImage(named: "AppIcon") {
+      NSApp.applicationIconImage = icon
+    }
+
     let controller = mainFlutterWindow?.contentViewController as? FlutterViewController
     guard let controller = controller else { return }
 
