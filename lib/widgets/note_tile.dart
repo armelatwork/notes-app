@@ -1,5 +1,108 @@
 part of 'notes_list_panel.dart';
 
+// ── Shared-with-me tile ────────────────────────────────────────────────────────
+
+class _SharedWithMeTile extends StatelessWidget {
+  final SharedNoteData data;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback? onShare;
+
+  const _SharedWithMeTile({
+    required this.data,
+    required this.isSelected,
+    required this.onTap,
+    this.onShare,
+  });
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inDays == 0) return DateFormat.jm().format(dt);
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < _kRecentDaysThreshold) return DateFormat.EEEE().format(dt);
+    return DateFormat.yMd().format(dt);
+  }
+
+  void _showContextMenu(BuildContext context, TapUpDetails details) async {
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        details.globalPosition.dx,
+        details.globalPosition.dy,
+        details.globalPosition.dx + 1,
+        details.globalPosition.dy + 1,
+      ),
+      items: const [
+        PopupMenuItem(value: 'share', child: Text('Share')),
+      ],
+    );
+    if (result == 'share') onShare?.call();
+  }
+
+  void _showLongPressActions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.share_outlined),
+              title: const Text('Share'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onShare?.call();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+          ? (details) => _showContextMenu(context, details)
+          : null,
+      child: ListTile(
+        dense: true,
+        selected: isSelected,
+        selectedTileColor: Theme.of(context)
+            .colorScheme
+            .primary
+            .withValues(alpha: _kSelectedTileOpacity),
+        onTap: onTap,
+        onLongPress: () => _showLongPressActions(context),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                data.title.isEmpty ? 'New Note' : data.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Icon(Icons.people_outline, size: 16, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+        subtitle: Text(
+          '${_formatDate(data.updatedAt)} · ${data.ownerEmail}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> _showFolderPicker(
     BuildContext context, WidgetRef ref, Note note) async {
   final folders = ref.read(foldersProvider).valueOrNull ?? [];
@@ -62,6 +165,7 @@ class _NoteTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onMoveToFolder;
+  final VoidCallback? onShare;
 
   const _NoteTile({
     required this.note,
@@ -70,6 +174,7 @@ class _NoteTile extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onMoveToFolder,
+    this.onShare,
   });
 
   String _formatDate(DateTime dt) {
@@ -150,6 +255,15 @@ class _NoteTile extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (onShare != null)
+              ListTile(
+                leading: const Icon(Icons.share_outlined),
+                title: const Text('Share'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onShare!();
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.drive_file_move_outlined),
               title: const Text('Move to Folder'),
@@ -206,11 +320,14 @@ class _NoteTile extends StatelessWidget {
         details.globalPosition.dx + 1,
         details.globalPosition.dy + 1,
       ),
-      items: const [
-        PopupMenuItem(value: 'move', child: Text('Move to Folder')),
-        PopupMenuItem(value: 'delete', child: Text('Delete Note')),
+      items: [
+        if (onShare != null)
+          const PopupMenuItem(value: 'share', child: Text('Share')),
+        const PopupMenuItem(value: 'move', child: Text('Move to Folder')),
+        const PopupMenuItem(value: 'delete', child: Text('Delete Note')),
       ],
     );
+    if (result == 'share') onShare?.call();
     if (result == 'move') onMoveToFolder();
     if (result == 'delete') onDelete();
   }
