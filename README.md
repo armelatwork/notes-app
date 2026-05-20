@@ -92,6 +92,28 @@ The macOS menu bar Edit menu supports the following actions with standard shortc
 - Click a link in the editor to open it in the browser.
 - Right-click linked text to choose **Edit Link** and update or remove the link.
 
+### Note Sharing
+
+Share a note with other Google account users for real-time collaborative viewing and editing. Sharing requires a Google account on both sides.
+
+#### How to share
+
+1. Open a note and tap the **share icon** in the top toolbar.
+2. Enter the recipient's Google email address and tap **Add**.
+3. Use **Copy link** to share a direct web link to the note.
+
+#### Collaborators
+
+- The note owner can add or remove collaborators at any time.
+- Collaborators can view, edit, and re-share the note with additional people.
+- The sharing dialog shows who originally shared the note with you.
+
+#### Privacy and limitations
+
+> **Shared notes are not end-to-end encrypted.** Content is stored in Firestore and is accessible to anyone who has the share link. Do not share sensitive or private information using this feature.
+
+- **Images:** Images up to 600 KB are embedded in the shared note. If a single image exceeds 600 KB, or the total image payload across all images exceeds 800 KB, the oversized images are replaced with a placeholder message for recipients. The original images on the owner's device are unaffected.
+
 ### Folders
 
 - Create folders using the **+** button in the sidebar.
