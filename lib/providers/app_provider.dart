@@ -212,33 +212,39 @@ class AppUserNotifier extends Notifier<AppUser?> {
     }
 
     // Step 2 — local data cleanup.
-    AppLogger.instance.info('deleteAccount', 'step 2: local cleanup');
+    AppLogger.instance.info('deleteAccount', 'step 2a: clearAll');
     await DatabaseService.instance.clearAll();
+    AppLogger.instance.info('deleteAccount', 'step 2b: deleteLocalImages');
     try {
       await deleteLocalImages();
     } catch (e) {
-      AppLogger.instance.warn('AppUserNotifier', 'failed to delete local images', e);
+      AppLogger.instance.warn('deleteAccount', 'deleteLocalImages failed', e);
     }
+    AppLogger.instance.info('deleteAccount', 'step 2c: clearPersistence');
     try {
       await PersistenceService.instance.saveLastFolder(null);
       await PersistenceService.instance.saveLastNote(null);
     } catch (e) {
-      AppLogger.instance.warn('AppUserNotifier', 'failed to clear persistence during deleteAccount', e);
+      AppLogger.instance.warn('deleteAccount', 'clearPersistence failed', e);
     }
 
-    // Step 3 — auth signOut. Wrapped so keychain/network errors (e.g.
-    // firebase_auth/keychain-error on macOS) never block the state reset below.
+    // Step 3 — auth signOut. A 10 s timeout ensures a hanging Firebase
+    // keychain call (common on macOS without a developer certificate) never
+    // blocks the state reset. The try-catch handles both throws and timeouts.
+    AppLogger.instance.info('deleteAccount', 'step 3: signOut');
     try {
       if (current?.type == AuthType.google) {
-        await AuthService.instance.signOut();
+        await AuthService.instance.signOut()
+            .timeout(const Duration(seconds: 10));
       } else if (current?.type == AuthType.local) {
         await LocalAuthService.instance.deleteAccount();
       }
     } catch (e) {
-      AppLogger.instance.warn('AppUserNotifier', 'signOut during deleteAccount failed', e);
+      AppLogger.instance.warn('deleteAccount', 'signOut failed', e);
     }
 
     // Step 4 — state reset always runs.
+    AppLogger.instance.info('deleteAccount', 'step 4: state reset');
     EncryptionService.instance.clear();
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);
