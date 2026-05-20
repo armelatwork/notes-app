@@ -101,8 +101,21 @@ class DatabaseService {
   }
 
   /// Inserts or replaces a note WITHOUT updating updatedAt — used during sync.
+  ///
+  /// When a note arrives from Drive sync with a firestoreId that already belongs
+  /// to an Isar record (created earlier by openSharedNote), we merge the Drive
+  /// metadata (driveFileId) onto the existing record instead of creating a
+  /// second one. Without this, every full sync creates a duplicate.
   Future<void> upsertNote(Note note) async {
     final isar = await db;
+    if (note.firestoreId != null && note.id > 0) {
+      final existing = await getNoteByFirestoreId(note.firestoreId!);
+      if (existing != null && existing.id != note.id) {
+        if (note.driveFileId != null) existing.driveFileId = note.driveFileId;
+        await isar.writeTxn(() => isar.notes.put(existing));
+        return;
+      }
+    }
     await isar.writeTxn(() => isar.notes.put(note));
   }
 

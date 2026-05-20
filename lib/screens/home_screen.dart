@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import '../models/app_user.dart';
+import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../providers/sharing_provider.dart';
 import '../services/app_logger.dart';
@@ -146,13 +147,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Future<void> _reconcileSharedNotes(Set<String> validFirestoreIds) async {
+  Future<void> _reconcileSharedNotes(
+      Set<String> validFirestoreIds, List<SharedNoteData> allShared) async {
     final all = await DatabaseService.instance.getNotes(allNotes: true);
+
+    // Deduplicate: if multiple Isar records share the same firestoreId (from a
+    // prior concurrent-write race), keep the most recently updated one.
+    final byFirestoreId = <String, List<Note>>{};
+    for (final note in all) {
+      if (note.firestoreId != null) {
+        byFirestoreId.putIfAbsent(note.firestoreId!, () => []).add(note);
+      }
+    }
+    for (final duplicates in byFirestoreId.values) {
+      if (duplicates.length <= 1) continue;
+      duplicates.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      for (final dup in duplicates.skip(1)) {
+        if (ref.read(selectedNoteProvider)?.id == dup.id) {
+          ref.read(selectedNoteProvider.notifier).state = duplicates.first;
+        }
+        await ref.read(notesProvider.notifier).deleteNote(dup.id);
+      }
+    }
+
+    // Remove orphaned Isar mirrors whose share was revoked while offline.
     for (final note in all) {
       if (note.sharedByEmail != null &&
           note.firestoreId != null &&
           !validFirestoreIds.contains(note.firestoreId)) {
         await _removeRevokedSharedNote(note.firestoreId!);
+      }
+    }
+
+    // Add shared notes present in Firestore but missing from Isar (covers the
+    // case where Isar was cleared while a share was active).
+    final existingIds = byFirestoreId.keys.toSet();
+    for (final data in allShared) {
+      if (!existingIds.contains(data.firestoreId)) {
+        await ref.read(notesProvider.notifier).openSharedNote(data);
       }
     }
   }
@@ -254,22 +286,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             .map((n) => n.firestoreId)
             .toSet();
         final currentIds = notes.map((n) => n.firestoreId).toSet();
-        // Mirror newly shared notes into Isar.
-        for (final data in notes) {
-          if (!prevIds.contains(data.firestoreId)) {
-            unawaited(ref.read(notesProvider.notifier).openSharedNote(data));
-          }
-        }
-        // Delete Isar mirrors for shares that were revoked.
-        for (final id in prevIds) {
-          if (!currentIds.contains(id)) {
-            unawaited(_removeRevokedSharedNote(id));
-          }
-        }
-        // On first emission, reconcile orphaned mirrors from previous sessions
-        // where the share was revoked while the app was closed.
-        if (prev?.valueOrNull == null) {
-          unawaited(_reconcileSharedNotes(currentIds));
+        final newNotes =
+            notes.where((d) => !prevIds.contains(d.firestoreId)).toList();
+        final revokedIds =
+            prevIds.where((id) => !currentIds.contains(id)).toList();
+        final isFirstEmission = prev?.valueOrNull == null;
+        // Run all Isar mutations sequentially in one async block so no two
+        // writes race, and reconciliation always runs after all writes settle.
+        if (newNotes.isNotEmpty || revokedIds.isNotEmpty || isFirstEmission) {
+          unawaited(() async {
+            for (final data in newNotes) {
+              await ref.read(notesProvider.notifier).openSharedNote(data);
+            }
+            for (final id in revokedIds) {
+              await _removeRevokedSharedNote(id);
+            }
+            if (isFirstEmission) {
+              await _reconcileSharedNotes(currentIds, notes);
+            }
+          }());
         }
       },
     );
