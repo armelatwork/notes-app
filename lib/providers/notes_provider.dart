@@ -12,6 +12,10 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   final List<Note> _pendingMoves = [];
   Timer? _moveTimer;
   Future<void> _pushQueue = Future.value();
+  // Guards against duplicate Isar records when openSharedNote is called
+  // concurrently for the same firestoreId (e.g. ref.listen + user tap).
+  // All concurrent callers receive the same Future and share one DB write.
+  final Map<String, Future<Note>> _openSharedNoteCache = {};
 
   @override
   Future<List<Note>> build() => _load();
@@ -120,7 +124,16 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     }
   }
 
-  Future<Note> openSharedNote(SharedNoteData data) async {
+  Future<Note> openSharedNote(SharedNoteData data) {
+    final fid = data.firestoreId;
+    if (_openSharedNoteCache.containsKey(fid)) return _openSharedNoteCache[fid]!;
+    final future = _doOpenSharedNote(data);
+    _openSharedNoteCache[fid] = future;
+    future.whenComplete(() => _openSharedNoteCache.remove(fid));
+    return future;
+  }
+
+  Future<Note> _doOpenSharedNote(SharedNoteData data) async {
     final existing =
         await DatabaseService.instance.getNoteByFirestoreId(data.firestoreId);
     final note = existing ?? (Note()
