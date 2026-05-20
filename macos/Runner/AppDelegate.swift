@@ -3,8 +3,6 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
-  private var menuTimer: Timer?
-
   override func applicationDidFinishLaunching(_ notification: Notification) {
     if let icon = NSImage(named: "AppIcon") {
       NSApp.applicationIconImage = icon
@@ -44,17 +42,23 @@ class AppDelegate: FlutterAppDelegate {
       }
     }
 
+    // Dart calls "restore" on this channel after logout so the app menu
+    // reappears once Flutter has finished its widget-tree rebuild.
+    let appMenuChannel = FlutterMethodChannel(
+      name: "com.armelchao.notesApp/appMenu",
+      binaryMessenger: controller.engine.binaryMessenger)
+    appMenuChannel.setMethodCallHandler { [weak self] call, result in
+      if call.method == "restore" {
+        self?.setupAppMenu()
+        result(nil)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     // Let Flutter finish its own initialisation before we set our menu.
     super.applicationDidFinishLaunching(notification)
     setupAppMenu()
-
-    // Flutter resets NSApp.mainMenu on every widget-tree rebuild (login /
-    // logout). Poll once per second and reapply if it has been cleared.
-    menuTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-      if NSApp.mainMenu?.item(withTitle: "My Notes") == nil {
-        self?.setupAppMenu()
-      }
-    }
   }
 
   private func setupAppMenu() {
