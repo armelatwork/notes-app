@@ -58,6 +58,8 @@ class SyncLogService {
 
   String? _cachedFileId;
 
+  void clearCache() => _cachedFileId = null;
+
   // ── Polling helpers ────────────────────────────────────────────────────────
 
   /// Returns the Drive server modifiedTime of sync_log.json, or null if absent.
@@ -180,8 +182,19 @@ class SyncLogService {
     final media = drive.Media(Stream.value(bytes), bytes.length,
         contentType: _jsonMime);
     if (existingId != null) {
-      await api.files.update(drive.File()..name = _kFileName, existingId,
-          uploadMedia: media);
+      try {
+        await api.files.update(drive.File()..name = _kFileName, existingId,
+            uploadMedia: media);
+      } catch (e) {
+        if (!e.toString().contains('status: 404')) rethrow;
+        // Stale cached file ID — create a fresh sync_log.json.
+        _cachedFileId = null;
+        final created = await api.files.create(
+          drive.File()..name = _kFileName..parents = [appFolderId],
+          uploadMedia: media,
+        );
+        _cachedFileId = created.id;
+      }
     } else {
       final created = await api.files.create(
         drive.File()..name = _kFileName..parents = [appFolderId],

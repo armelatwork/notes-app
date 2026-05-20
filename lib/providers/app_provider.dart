@@ -133,6 +133,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     // Always start with a clean folder cache so a stale ID from a previous
     // session never leaks into the new user's Drive requests.
     drv.clearCache();
+    SyncLogService.instance.clearCache();
     final api = await drv.getApi();
     if (api == null) return;
     final appFolderId = await drv.getOrCreateAppFolder(api);
@@ -167,6 +168,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
   Future<void> signOut() async {
     final current = state;
     DriveSyncService.instance.clearCache();
+    SyncLogService.instance.clearCache();
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
     ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
@@ -246,6 +248,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     // Step 4 — state reset always runs.
     AppLogger.instance.info('deleteAccount', 'step 4: state reset');
     DriveSyncService.instance.clearCache();
+    SyncLogService.instance.clearCache();
     EncryptionService.instance.clear();
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);
