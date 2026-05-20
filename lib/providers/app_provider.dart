@@ -245,6 +245,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
 
     // Step 4 — state reset always runs.
     AppLogger.instance.info('deleteAccount', 'step 4: state reset');
+    DriveSyncService.instance.clearCache();
     EncryptionService.instance.clear();
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);

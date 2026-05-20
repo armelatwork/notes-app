@@ -190,6 +190,9 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
       if (isStorageQuotaExceeded(e)) {
         ref.read(driveStorageAlertProvider.notifier).state =
             const DriveStorageAlert(severity: DriveStorageSeverity.exceeded);
+      } else if (e.toString().contains('status: 404')) {
+        DriveSyncService.instance.clearCache();
+        AppLogger.instance.warn('NotesNotifier', 'push failed (stale folder), cache cleared', e);
       } else {
         AppLogger.instance.error('NotesNotifier', 'push failed', e);
       }
