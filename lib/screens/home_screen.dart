@@ -146,13 +146,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Future<void> _reconcileSharedNotes(Set<String> validFirestoreIds) async {
+  Future<void> _reconcileSharedNotes(
+      Set<String> validFirestoreIds, List<SharedNoteData> allShared) async {
     final all = await DatabaseService.instance.getNotes(allNotes: true);
+
+    // Remove orphaned Isar mirrors whose share was revoked while offline.
     for (final note in all) {
       if (note.sharedByEmail != null &&
           note.firestoreId != null &&
           !validFirestoreIds.contains(note.firestoreId)) {
         await _removeRevokedSharedNote(note.firestoreId!);
+      }
+    }
+
+    // Add shared notes that are in Firestore but missing from Isar.
+    // This covers the case where the Isar DB was cleared while the share was
+    // still active — the firestoreId was already in prevIds so openSharedNote
+    // was not called for it again, leaving the note absent from All Notes.
+    final existingIds = all
+        .where((n) => n.firestoreId != null)
+        .map((n) => n.firestoreId!)
+        .toSet();
+    for (final data in allShared) {
+      if (!existingIds.contains(data.firestoreId)) {
+        await ref.read(notesProvider.notifier).openSharedNote(data);
       }
     }
   }
@@ -254,11 +271,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             .map((n) => n.firestoreId)
             .toSet();
         final currentIds = notes.map((n) => n.firestoreId).toSet();
-        // Mirror newly shared notes into Isar.
-        for (final data in notes) {
-          if (!prevIds.contains(data.firestoreId)) {
-            unawaited(ref.read(notesProvider.notifier).openSharedNote(data));
-          }
+        // Mirror newly shared notes into Isar — run sequentially so concurrent
+        // reload() calls don't race and produce a stale final state.
+        final newNotes =
+            notes.where((d) => !prevIds.contains(d.firestoreId)).toList();
+        if (newNotes.isNotEmpty) {
+          unawaited(() async {
+            for (final data in newNotes) {
+              await ref.read(notesProvider.notifier).openSharedNote(data);
+            }
+          }());
         }
         // Delete Isar mirrors for shares that were revoked.
         for (final id in prevIds) {
@@ -267,9 +289,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           }
         }
         // On first emission, reconcile orphaned mirrors from previous sessions
-        // where the share was revoked while the app was closed.
+        // where the share was revoked while the app was closed, and fill any
+        // notes present in Firestore but missing from Isar.
         if (prev?.valueOrNull == null) {
-          unawaited(_reconcileSharedNotes(currentIds));
+          unawaited(_reconcileSharedNotes(currentIds, notes));
         }
       },
     );
