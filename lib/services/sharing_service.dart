@@ -199,4 +199,35 @@ class SharingService {
     await _col.doc(firestoreId).delete();
     AppLogger.instance.info('SharingService', 'unshared $firestoreId');
   }
+
+  // Delete all Firestore shared-note documents owned by the given user.
+  // Used during account deletion so collaborators lose access immediately.
+  Future<void> deleteAllOwnedSharedNotes(String ownerUid) async {
+    final snap = await _col.where('ownerId', isEqualTo: ownerUid).get();
+    await Future.wait(snap.docs.map((doc) => _col.doc(doc.id).delete()));
+    AppLogger.instance.info(
+        'SharingService', 'deleted ${snap.docs.length} owned shared notes');
+  }
+
+  // Remove the given email from every shared note's collaborator list.
+  // Used during account deletion so the user no longer appears as a
+  // collaborator on notes they did not own.
+  Future<void> removeFromAllSharedNotes(String email) async {
+    final snap = await _col
+        .where('collaboratorEmails', arrayContains: email)
+        .get();
+    await Future.wait(snap.docs.map((doc) async {
+      try {
+        await _col.doc(doc.id).update({
+          'collaboratorEmails': FieldValue.arrayRemove([email]),
+        });
+      } catch (e) {
+        // Doc deleted externally between query and update — safe to skip.
+        final s = e.toString().toLowerCase();
+        if (!s.contains('not-found') && !s.contains('no document')) rethrow;
+      }
+    }));
+    AppLogger.instance.info(
+        'SharingService', 'removed $email from ${snap.docs.length} shared notes');
+  }
 }

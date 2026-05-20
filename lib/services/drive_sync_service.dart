@@ -404,7 +404,9 @@ class DriveSyncService {
           "mimeType='application/vnd.google-apps.folder' and trashed=false",
       spaces: 'drive', $fields: 'files(id)',
     );
-    if (r.files?.isNotEmpty == true) await api.files.delete(r.files!.first.id!);
+    for (final file in r.files ?? []) {
+      await api.files.delete(file.id!);
+    }
   }
   Future<String> _readMedia(drive.Media media) async {
     final chunks = <int>[];

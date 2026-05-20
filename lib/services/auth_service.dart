@@ -53,7 +53,12 @@ class AuthService {
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
     } catch (e) {
-      AppLogger.instance.warn('AuthService', 'Firebase sign-in failed', e);
+      if (e.toString().contains('keychain-error')) {
+        // Expected on macOS without a developer certificate — not actionable.
+        AppLogger.instance.debug('AuthService', 'Firebase sign-in skipped (keychain unavailable)');
+      } else {
+        AppLogger.instance.warn('AuthService', 'Firebase sign-in failed', e);
+      }
     }
   }
 

@@ -188,21 +188,53 @@ class AppUserNotifier extends Notifier<AppUser?> {
     state = null;
   }
 
+  // Remote data (Firestore + Drive) is deleted first. If any remote step fails
+  // after all retries, the method throws and local data is left intact so the
+  // user can retry. Local data is only wiped once every remote deletion succeeds.
+  // State reset always runs even if the final signOut throws (e.g. keychain error).
   Future<void> deleteAccount() async {
     final current = state;
     ref.read(notesProvider.notifier).cancelPendingPush();
     ref.read(foldersProvider.notifier).cancelPendingPush();
     ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
-    await DatabaseService.instance.clearAll();
+
+    // Step 1 — remote cleanup (throws on failure so local data stays intact).
     if (current?.type == AuthType.google) {
-      final api = await DriveSyncService.instance.getApi();
-      if (api != null) {
+      await _cleanupFirestoreSharing(current!);
+      await _withRetry(() async {
+        final api = await DriveSyncService.instance.getApi();
+        if (api == null) throw Exception('Could not connect to Google Drive');
         await DriveSyncService.instance.deleteAppData(api);
-      }
-      await AuthService.instance.signOut();
-    } else if (current?.type == AuthType.local) {
-      await LocalAuthService.instance.signOut();
+      });
     }
+
+    // Step 2 — local data cleanup.
+    await DatabaseService.instance.clearAll();
+    try {
+      await deleteLocalImages();
+    } catch (e) {
+      AppLogger.instance.warn('AppUserNotifier', 'failed to delete local images', e);
+    }
+    try {
+      await PersistenceService.instance.saveLastFolder(null);
+      await PersistenceService.instance.saveLastNote(null);
+    } catch (e) {
+      AppLogger.instance.warn('AppUserNotifier', 'failed to clear persistence during deleteAccount', e);
+    }
+
+    // Step 3 — auth signOut. Wrapped so keychain/network errors (e.g.
+    // firebase_auth/keychain-error on macOS) never block the state reset below.
+    try {
+      if (current?.type == AuthType.google) {
+        await AuthService.instance.signOut();
+      } else if (current?.type == AuthType.local) {
+        await LocalAuthService.instance.deleteAccount();
+      }
+    } catch (e) {
+      AppLogger.instance.warn('AppUserNotifier', 'signOut during deleteAccount failed', e);
+    }
+
+    // Step 4 — state reset always runs.
     EncryptionService.instance.clear();
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);
@@ -210,10 +242,41 @@ class AppUserNotifier extends Notifier<AppUser?> {
     ref.read(selectedFolderProvider.notifier).state = null;
     state = null;
   }
+
+  Future<void> _cleanupFirestoreSharing(AppUser user) async {
+    await _withRetry(
+        () => SharingService.instance.deleteAllOwnedSharedNotes(user.id));
+    if (user.email == null) return;
+    await _withRetry(
+        () => SharingService.instance.removeFromAllSharedNotes(user.email!));
+  }
 }
 
 final appUserProvider =
     NotifierProvider<AppUserNotifier, AppUser?>(AppUserNotifier.new);
+
+// ── Retry helper ──────────────────────────────────────────────────────────────
+
+const _kDeleteMaxAttempts = 3;
+const _kDeleteAttemptTimeout = Duration(seconds: 10);
+const _kDeleteRetryDelay = Duration(seconds: 2);
+
+/// Retries [fn] up to [_kDeleteMaxAttempts] times, each with a
+/// [_kDeleteAttemptTimeout] deadline. Throws the last error if all fail.
+Future<T> _withRetry<T>(Future<T> Function() fn) async {
+  Object? lastError;
+  for (var i = 0; i < _kDeleteMaxAttempts; i++) {
+    try {
+      return await fn().timeout(_kDeleteAttemptTimeout);
+    } catch (e) {
+      lastError = e;
+      if (i < _kDeleteMaxAttempts - 1) {
+        await Future.delayed(_kDeleteRetryDelay);
+      }
+    }
+  }
+  throw lastError!;
+}
 
 // ── Selected folder / note / search ───────────────────────────────────────────
 

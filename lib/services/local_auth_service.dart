@@ -33,6 +33,10 @@ class LocalAuthService {
     // Encryption key is held only in memory and cleared by EncryptionService.
   }
 
+  Future<void> deleteAccount() async {
+    await _storage.deleteKeys([_usernameKey, _hashKey, _saltKey]);
+  }
+
   Future<AppUser?> signIn(String username, String password) async {
     final storedUsername = await _storage.read(_usernameKey);
     final storedHash = await _storage.read(_hashKey);
