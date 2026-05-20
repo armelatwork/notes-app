@@ -202,38 +202,31 @@ class AppUserNotifier extends Notifier<AppUser?> {
 
     // Step 1 — remote cleanup (throws on failure so local data stays intact).
     if (current?.type == AuthType.google) {
-      AppLogger.instance.info('deleteAccount', 'step 1a: Firestore cleanup');
       await _cleanupFirestoreSharing(current!);
-      AppLogger.instance.info('deleteAccount', 'step 1b: Drive deletion');
       await _withRetry(() async {
         final api = await DriveSyncService.instance.getApi();
         if (api == null) throw Exception('Could not connect to Google Drive');
         await DriveSyncService.instance.deleteAppData(api);
       }, 'Drive deletion');
-      AppLogger.instance.info('deleteAccount', 'step 1b: Drive deletion complete');
     }
 
     // Step 2 — local data cleanup.
-    AppLogger.instance.info('deleteAccount', 'step 2a: clearAll');
     await DatabaseService.instance.clearAll();
-    AppLogger.instance.info('deleteAccount', 'step 2b: deleteLocalImages');
     try {
       await deleteLocalImages();
     } catch (e) {
-      AppLogger.instance.warn('deleteAccount', 'deleteLocalImages failed', e);
+      AppLogger.instance.warn('AppUserNotifier', 'failed to delete local images', e);
     }
-    AppLogger.instance.info('deleteAccount', 'step 2c: clearPersistence');
     try {
       await PersistenceService.instance.saveLastFolder(null);
       await PersistenceService.instance.saveLastNote(null);
     } catch (e) {
-      AppLogger.instance.warn('deleteAccount', 'clearPersistence failed', e);
+      AppLogger.instance.warn('AppUserNotifier', 'failed to clear persistence', e);
     }
 
     // Step 3 — auth signOut. A 10 s timeout ensures a hanging Firebase
     // keychain call (common on macOS without a developer certificate) never
     // blocks the state reset. The try-catch handles both throws and timeouts.
-    AppLogger.instance.info('deleteAccount', 'step 3: signOut');
     try {
       if (current?.type == AuthType.google) {
         await AuthService.instance.signOut()
@@ -242,11 +235,10 @@ class AppUserNotifier extends Notifier<AppUser?> {
         await LocalAuthService.instance.deleteAccount();
       }
     } catch (e) {
-      AppLogger.instance.warn('deleteAccount', 'signOut failed', e);
+      AppLogger.instance.warn('AppUserNotifier', 'signOut during deleteAccount failed', e);
     }
 
     // Step 4 — state reset always runs.
-    AppLogger.instance.info('deleteAccount', 'step 4: state reset');
     DriveSyncService.instance.clearCache();
     SyncLogService.instance.clearCache();
     EncryptionService.instance.clear();
@@ -282,7 +274,6 @@ const _kDeleteRetryDelay = Duration(seconds: 2);
 Future<T> _withRetry<T>(Future<T> Function() fn, String tag) async {
   Object? lastError;
   for (var i = 0; i < _kDeleteMaxAttempts; i++) {
-    AppLogger.instance.info('deleteAccount', '$tag attempt ${i + 1}/$_kDeleteMaxAttempts');
     try {
       return await fn().timeout(_kDeleteAttemptTimeout);
     } catch (e) {
