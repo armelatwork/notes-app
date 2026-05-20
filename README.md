@@ -30,6 +30,8 @@ Sign out via the user menu at the bottom of the sidebar.
 - **Move to folder (Android):** long-press a note and choose **Move to Folder** from the bottom sheet.
 - **Delete (macOS):** right-click a note and choose **Delete Note**.
 - **Delete (Android):** long-press a note and choose **Delete** from the bottom sheet.
+- **Share (macOS):** right-click any note in the list and choose **Share** to open the share dialog without opening the note.
+- **Share (Android):** long-press any note in the list and choose **Share** from the bottom sheet.
 
 ### Rich Text Editor
 
@@ -98,15 +100,15 @@ Share a note with other Google account users for real-time collaborative viewing
 
 #### How to share
 
-1. Open a note and tap the **share icon** in the top toolbar.
+1. Open a note and tap the **share icon** in the top toolbar, **or** right-click (macOS) / long-press (Android) a note in the list and choose **Share**.
 2. Enter the recipient's Google email address and tap **Add**.
 3. Use **Copy link** to share a direct web link to the note.
 
 #### Collaborators
 
 - The note owner can add or remove collaborators at any time.
-- Collaborators can view, edit, and re-share the note with additional people.
-- The sharing dialog shows who originally shared the note with you.
+- Collaborators can view, edit, and add additional people to a shared note. Only the owner can remove collaborators.
+- The sharing dialog shows who originally shared the note with you and who added you to it.
 
 #### Privacy and limitations
 
@@ -161,7 +163,7 @@ Accessible via the user menu (bottom of the sidebar → your name):
 
 - Account name and email
 - Google Drive sync location (*Notes app/*)
-- Sign out
+- **Sign out** — pending notes and folders are uploaded to Drive before signing out. A progress dialog shows on slow connections with the option to wait or discard unsynced changes.
 - **Delete account** — permanently deletes all notes, folders, Drive backup, and Firestore sharing data
 
 ### Encryption

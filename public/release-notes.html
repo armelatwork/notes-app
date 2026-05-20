@@ -86,12 +86,20 @@
       <ul>
         <li><strong>Note sharing</strong> — share a note with other Google account users for real-time collaborative viewing and editing. Tap the share icon in the note toolbar, add recipients by Google email address, and use Copy Link to share a direct web link.</li>
         <li><strong>Share attribution</strong> — the sharing dialog shows who originally shared a note with you, and tracks the chain when a collaborator re-shares with someone else.</li>
+        <li><strong>Share from the note list</strong> — right-click a note (macOS) or long-press (Android) to open the Share dialog without opening the note first. Available in All Notes, folder views, Shared by me, and Shared with me.</li>
+        <li><strong>Forward sharing</strong> — collaborators can add additional people to a shared note directly from the Share dialog. Only the note owner can remove collaborators.</li>
+        <li><strong>Safe sign-out</strong> — pending notes and folders are uploaded to Drive before signing out. A progress dialog shows on slow connections, with a "Sign out &amp; discard unsynced changes" option if you prefer not to wait.</li>
       </ul>
 
       <div class="section-label">Bug Fixes</div>
       <ul>
+        <li>Notes created or edited just before logout are no longer lost on the next login.</li>
+        <li>Shared notes no longer appear as duplicates in All Notes after logging out and back in.</li>
+        <li>Ghost shared notes (revoked shares still in the Drive backup) no longer reappear on every login.</li>
+        <li>The "Shared by me" list now accurately reflects the current collaborator state from Firestore.</li>
         <li>macOS: copying formatted text from one note and pasting into another now correctly preserves all formatting (bold, italic, headings, lists, colours, and more).</li>
         <li>macOS: Google Sign-In no longer shows a second OAuth permission popup.</li>
+        <li>Text fields auto-focus: the username field on the login screen and the email field in the Share dialog are focused immediately so you can type without clicking.</li>
       </ul>
 
       <div class="section-label">Limitations</div>
