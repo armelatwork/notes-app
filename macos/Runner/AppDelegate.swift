@@ -7,6 +7,7 @@ class AppDelegate: FlutterAppDelegate {
     if let icon = NSImage(named: "AppIcon") {
       NSApp.applicationIconImage = icon
     }
+    setupAppMenu()
     let controller = mainFlutterWindow?.contentViewController as? FlutterViewController
     guard let controller = controller else { return }
 
@@ -42,6 +43,33 @@ class AppDelegate: FlutterAppDelegate {
     }
 
     super.applicationDidFinishLaunching(notification)
+  }
+
+  private func setupAppMenu() {
+    let mainMenu = NSMenu()
+    let appMenuItem = NSMenuItem()
+    mainMenu.addItem(appMenuItem)
+    let appMenu = NSMenu()
+    appMenuItem.submenu = appMenu
+    appMenu.addItem(withTitle: "About My Notes",
+                    action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+                    keyEquivalent: "")
+    appMenu.addItem(.separator())
+    appMenu.addItem(withTitle: "Hide My Notes",
+                    action: #selector(NSApplication.hide(_:)),
+                    keyEquivalent: "h")
+    let hideOthers = appMenu.addItem(withTitle: "Hide Others",
+                                     action: #selector(NSApplication.hideOtherApplications(_:)),
+                                     keyEquivalent: "h")
+    hideOthers.keyEquivalentModifierMask = [.command, .option]
+    appMenu.addItem(withTitle: "Show All",
+                    action: #selector(NSApplication.unhideAllApplications(_:)),
+                    keyEquivalent: "")
+    appMenu.addItem(.separator())
+    appMenu.addItem(withTitle: "Quit My Notes",
+                    action: #selector(NSApplication.terminate(_:)),
+                    keyEquivalent: "q")
+    NSApp.mainMenu = mainMenu
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
