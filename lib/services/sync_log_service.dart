@@ -77,7 +77,7 @@ class SyncLogService {
       _cachedFileId = r.files!.first.id;
       return r.files!.first.modifiedTime?.toIso8601String();
     } catch (e) {
-      AppLogger.instance.error('SyncLogService', 'fetchLogModifiedTime failed', e);
+      AppLogger.instance.warn('SyncLogService', 'fetchLogModifiedTime failed', e);
       return null;
     }
   }
