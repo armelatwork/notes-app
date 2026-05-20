@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import '../models/app_user.dart';
 import '../models/note.dart';
 import '../providers/app_provider.dart';
 import '../services/app_logger.dart';
+import '../services/database_service.dart';
 import '../services/sharing_service.dart';
 import '../utils/image_utils.dart';
 
@@ -55,10 +57,31 @@ if (widget.note.firestoreId != null) {
       final data =
           await SharingService.instance.fetchNote(widget.note.firestoreId!);
       if (data != null && mounted) {
+        final remote = data.collaboratorEmails;
         setState(() {
           _authorEmail = data.ownerEmail;
-          _collaborators = data.collaboratorEmails;
+          _collaborators = remote;
         });
+        // If the owner's local sharedWithEmails is out of sync with Firestore
+        // (e.g. a collaborator was removed by another client or a partial
+        // account-deletion run), correct the local note so "Shared by me"
+        // reflects reality and queue a Drive push to persist the fix.
+        if (_isOwner &&
+            widget.note.sharedWithEmails.toSet() != remote.toSet()) {
+          widget.note.sharedWithEmails = List.from(remote);
+          await DatabaseService.instance.upsertNote(widget.note);
+          await ref.read(notesProvider.notifier).reload();
+          unawaited(
+            ref
+                .read(notesProvider.notifier)
+                .pushNoteNow(widget.note)
+                .catchError((Object e) {
+              AppLogger.instance.warn(
+                  'ShareDialog', 'Drive push after collaborator sync failed', e);
+            }),
+          );
+          widget.onNoteUpdated();
+        }
       }
     } catch (e) {
       AppLogger.instance.warn('ShareDialog', 'failed to load collaborators', e);
