@@ -61,7 +61,11 @@ Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
 
   try {
     await ref.read(appUserProvider.notifier).deleteAccount();
-    if (context.mounted) Navigator.pop(context); // dismiss loading dialog
+    // Pop the loading dialog and the Settings screen in one step so
+    // AuthGate's AuthScreen (already showing since state = null) is revealed.
+    if (context.mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   } catch (e) {
     AppLogger.instance.error('SettingsScreen', 'deleteAccount failed', e);
     if (!context.mounted) return;
