@@ -200,15 +200,19 @@ class AppUserNotifier extends Notifier<AppUser?> {
 
     // Step 1 — remote cleanup (throws on failure so local data stays intact).
     if (current?.type == AuthType.google) {
+      AppLogger.instance.info('deleteAccount', 'step 1a: Firestore cleanup');
       await _cleanupFirestoreSharing(current!);
+      AppLogger.instance.info('deleteAccount', 'step 1b: Drive deletion');
       await _withRetry(() async {
         final api = await DriveSyncService.instance.getApi();
         if (api == null) throw Exception('Could not connect to Google Drive');
         await DriveSyncService.instance.deleteAppData(api);
-      });
+      }, 'Drive deletion');
+      AppLogger.instance.info('deleteAccount', 'step 1b: Drive deletion complete');
     }
 
     // Step 2 — local data cleanup.
+    AppLogger.instance.info('deleteAccount', 'step 2: local cleanup');
     await DatabaseService.instance.clearAll();
     try {
       await deleteLocalImages();
@@ -245,10 +249,12 @@ class AppUserNotifier extends Notifier<AppUser?> {
 
   Future<void> _cleanupFirestoreSharing(AppUser user) async {
     await _withRetry(
-        () => SharingService.instance.deleteAllOwnedSharedNotes(user.id));
+        () => SharingService.instance.deleteAllOwnedSharedNotes(user.id),
+        'Firestore owned notes');
     if (user.email == null) return;
     await _withRetry(
-        () => SharingService.instance.removeFromAllSharedNotes(user.email!));
+        () => SharingService.instance.removeFromAllSharedNotes(user.email!),
+        'Firestore collaborator removal');
   }
 }
 
@@ -263,13 +269,15 @@ const _kDeleteRetryDelay = Duration(seconds: 2);
 
 /// Retries [fn] up to [_kDeleteMaxAttempts] times, each with a
 /// [_kDeleteAttemptTimeout] deadline. Throws the last error if all fail.
-Future<T> _withRetry<T>(Future<T> Function() fn) async {
+Future<T> _withRetry<T>(Future<T> Function() fn, String tag) async {
   Object? lastError;
   for (var i = 0; i < _kDeleteMaxAttempts; i++) {
+    AppLogger.instance.info('deleteAccount', '$tag attempt ${i + 1}/$_kDeleteMaxAttempts');
     try {
       return await fn().timeout(_kDeleteAttemptTimeout);
     } catch (e) {
       lastError = e;
+      AppLogger.instance.warn('deleteAccount', '$tag attempt ${i + 1} failed', e);
       if (i < _kDeleteMaxAttempts - 1) {
         await Future.delayed(_kDeleteRetryDelay);
       }

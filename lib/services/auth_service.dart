@@ -86,7 +86,8 @@ class AuthService {
     final user = _googleSignIn.currentUser;
     if (user == null) return null;
     try {
-      final auth = await user.authentication;
+      final auth = await user.authentication
+          .timeout(const Duration(seconds: 8));
       final token = auth.accessToken;
       if (token == null) {
         AppLogger.instance.warn('AuthService', 'null access token in getAuthHeaders');
