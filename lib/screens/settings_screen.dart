@@ -58,7 +58,7 @@ Future<void> _signOut(BuildContext context, WidgetRef ref) async {
               if (!syncDone.isCompleted) syncDone.complete();
               Navigator.pop(ctx);
             },
-            child: const Text('Sign out anyway'),
+            child: const Text('Sign out & discard unsynced changes'),
           ),
         ],
       );
