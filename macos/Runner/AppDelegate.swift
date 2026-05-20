@@ -7,7 +7,7 @@ class AppDelegate: FlutterAppDelegate {
     if let icon = NSImage(named: "AppIcon") {
       NSApp.applicationIconImage = icon
     }
-    setupAppMenu()
+
     let controller = mainFlutterWindow?.contentViewController as? FlutterViewController
     guard let controller = controller else { return }
 
@@ -42,7 +42,17 @@ class AppDelegate: FlutterAppDelegate {
       }
     }
 
+    // Call super first so Flutter finishes its own initialisation (which may
+    // reset NSApp.mainMenu), then apply our menu on top.
     super.applicationDidFinishLaunching(notification)
+    setupAppMenu()
+  }
+
+  // Flutter rebuilds the widget tree on login/logout and can reset
+  // NSApp.mainMenu. Reapply our menu each time the app becomes active so
+  // Cmd+Q and the other standard items are always present.
+  override func applicationDidBecomeActive(_ notification: Notification) {
+    setupAppMenu()
   }
 
   private func setupAppMenu() {
