@@ -47,6 +47,20 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Fastlane — service account key and generated metadata
+# Fastlane — service account key, generated metadata, and build reports
 android/fastlane/google-play-key.json
 android/fastlane/metadata/
+android/fastlane/README.md
+android/fastlane/report.xml
+
+# Android nested build output (root /build/ rule does not cover this)
+android/build/
+
+# macOS app distribution artifacts
+*.dmg
+
+# Firebase local cache
+.firebase/
+
+# Flutter DevTools local config
+devtools_options.yaml
