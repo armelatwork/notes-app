@@ -61,7 +61,7 @@ Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
 
   try {
     await ref.read(appUserProvider.notifier).deleteAccount();
-    // On success the app navigates away as state resets — no pop needed.
+    if (context.mounted) Navigator.pop(context); // dismiss loading dialog
   } catch (e) {
     AppLogger.instance.error('SettingsScreen', 'deleteAccount failed', e);
     if (!context.mounted) return;
