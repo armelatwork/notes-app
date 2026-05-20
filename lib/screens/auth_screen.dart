@@ -165,6 +165,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
                 TextField(
                   controller: _usernameController,
+                  autofocus: true,
                   decoration: const InputDecoration(
                     labelText: 'Username',
                     border: OutlineInputBorder(),

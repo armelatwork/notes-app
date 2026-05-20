@@ -342,6 +342,7 @@ class _EmailInput extends StatelessWidget {
           Expanded(
             child: TextFormField(
               controller: controller,
+              autofocus: true,
               decoration: const InputDecoration(
                 hintText: 'Google email address',
                 border: OutlineInputBorder(),
