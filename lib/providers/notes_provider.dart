@@ -173,6 +173,10 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     pendingDeletedImages.clear();
   }
 
+  /// True when there are note writes or moves waiting for their debounce timer.
+  bool get hasPendingSync =>
+      pendingNotes.isNotEmpty || _pendingMoves.isNotEmpty;
+
   /// Bypasses all debounce timers and returns a future that resolves when every
   /// queued Drive upload has completed (or failed). Used by sign-out to avoid
   /// losing notes that were created or edited just before the user logged out.

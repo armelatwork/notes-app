@@ -23,6 +23,52 @@ String _deleteErrorReason(Object e) {
   return 'An unexpected error occurred.';
 }
 
+Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+  final notifier = ref.read(notesProvider.notifier);
+  if (!notifier.hasPendingSync) {
+    await ref.read(appUserProvider.notifier).signOut();
+    return;
+  }
+
+  // There are unsaved notes still waiting on their debounce timer. Show a
+  // dialog so the user knows what's happening, and let them bail early if
+  // they prefer not to wait.
+  final syncDone = Completer<void>();
+  notifier.flushAndDrain().then((_) {
+    if (!syncDone.isCompleted) syncDone.complete();
+  });
+
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      syncDone.future.then((_) {
+        if (ctx.mounted) Navigator.pop(ctx);
+      });
+      return AlertDialog(
+        title: const Text('Saving your notes…'),
+        content: const Row(children: [
+          CircularProgressIndicator(),
+          SizedBox(width: 16),
+          Expanded(child: Text('Syncing with Drive before signing out.')),
+        ]),
+        actions: [
+          TextButton(
+            onPressed: () {
+              if (!syncDone.isCompleted) syncDone.complete();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Sign out anyway'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (!context.mounted) return;
+  await ref.read(appUserProvider.notifier).signOut();
+}
+
 Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -124,10 +170,7 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sign out'),
-            onTap: () {
-              Navigator.pop(context);
-              ref.read(appUserProvider.notifier).signOut();
-            },
+            onTap: () => _signOut(context, ref),
           ),
           const Divider(),
           _SectionHeader(label: 'Danger Zone'),
