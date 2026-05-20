@@ -144,6 +144,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       final local = await DatabaseService.instance.getNotes(allNotes: true);
       if (local.isEmpty) await _checkDriveForFirstSync();
       _startPolling();
+      // Run orphan cleanup after Drive sync has fully populated Isar.
+      // The Firestore stream can fire before _fullSync finishes, so relying
+      // on the stream's first emission for reconciliation races with _fullSync
+      // and misses ghost notes that come back from the Drive backup.
+      await _cleanOrphanedSharedNotes();
+    }
+  }
+
+  Future<void> _cleanOrphanedSharedNotes() async {
+    final user = ref.read(appUserProvider);
+    if (user?.email == null || !mounted) return;
+    try {
+      final allShared =
+          await SharingService.instance.fetchSharedWithMe(user!.email!);
+      final validIds = allShared.map((d) => d.firestoreId).toSet();
+      await _reconcileSharedNotes(validIds, allShared);
+    } catch (e) {
+      AppLogger.instance.warn(
+          'HomeScreen', 'orphaned shared-note cleanup failed', e);
     }
   }
 
@@ -290,19 +309,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             notes.where((d) => !prevIds.contains(d.firestoreId)).toList();
         final revokedIds =
             prevIds.where((id) => !currentIds.contains(id)).toList();
-        final isFirstEmission = prev?.valueOrNull == null;
-        // Run all Isar mutations sequentially in one async block so no two
-        // writes race, and reconciliation always runs after all writes settle.
-        if (newNotes.isNotEmpty || revokedIds.isNotEmpty || isFirstEmission) {
+        if (newNotes.isNotEmpty || revokedIds.isNotEmpty) {
           unawaited(() async {
             for (final data in newNotes) {
               await ref.read(notesProvider.notifier).openSharedNote(data);
             }
             for (final id in revokedIds) {
               await _removeRevokedSharedNote(id);
-            }
-            if (isFirstEmission) {
-              await _reconcileSharedNotes(currentIds, notes);
             }
           }());
         }
