@@ -6,10 +6,9 @@
 
 - **Note sharing** — share a note with other Google account users for real-time collaborative viewing and editing. Tap the share icon in the note toolbar to add collaborators by Google email address or copy a web link to the note.
 - **Share attribution** — the sharing dialog shows who originally shared a note with you, and tracks the chain when a collaborator re-shares with someone else.
-- **Clipboard formatting preserved on macOS** — copying rich text from one note and pasting into another now preserves all formatting (bold, italic, headings, lists, colours, and more).
-
 ### Fixed
 
+- macOS: copying formatted text from one note and pasting into another now correctly preserves all formatting (bold, italic, headings, lists, colours, and more).
 - Google Sign-In on macOS no longer shows a second OAuth permission popup.
 
 ### Known limitations
