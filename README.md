@@ -162,6 +162,7 @@ Accessible via the user menu (bottom of the sidebar → your name):
 - Account name and email
 - Google Drive sync location (*Notes app/*)
 - Sign out
+- **Delete account** — permanently deletes all notes, folders, Drive backup, and Firestore sharing data
 
 ### Encryption
 
