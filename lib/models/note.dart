@@ -34,7 +34,7 @@ class Note {
   String? sharedByEmail;
 
   bool get isSharedByMe => sharedWithEmails.isNotEmpty;
-  bool get isSharedWithMe => firestoreId != null && !isSharedByMe;
+  bool get isSharedWithMe => sharedByEmail != null;
   bool get isShared => isSharedByMe || isSharedWithMe;
 
   Note();
