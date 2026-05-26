@@ -164,6 +164,7 @@ Accessible via the user menu (bottom of the sidebar → your name):
 - Account name and email
 - Google Drive sync location (*Notes app/*)
 - **Sign out** — pending notes and folders are uploaded to Drive before signing out. A progress dialog shows on slow connections with the option to wait or discard unsynced changes.
+- **Send Feedback** — opens an in-app form to report a bug or suggest an improvement. Submissions are delivered directly to the developer. One submission per session.
 - **Delete account** — permanently deletes all notes, folders, Drive backup, and Firestore sharing data
 
 ### Encryption
