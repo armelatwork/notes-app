@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Notes — Play Store Description</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      padding: 2rem 1rem;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
+
+    /* ── Preview ── */
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #999;
+      margin-bottom: 1rem;
+    }
+    .preview {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      padding: 2rem;
+      margin-bottom: 2rem;
+      line-height: 1.7;
+    }
+    .preview h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+    .preview .tagline {
+      color: #555;
+      font-size: 0.97rem;
+      margin-bottom: 1.5rem;
+    }
+    .feature-group { margin-bottom: 1.25rem; }
+    .feature-group h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .feature-group p {
+      font-size: 0.92rem;
+      color: #333;
+      padding-left: 1.75rem;
+    }
+    .warning {
+      font-size: 0.85rem;
+      color: #b45309;
+      background: #fef3c7;
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      margin-top: 0.4rem;
+      margin-left: 1.75rem;
+    }
+
+    /* ── Plain text copy box ── */
+    .copy-box {
+      background: #1e1e1e;
+      border-radius: 14px;
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+    }
+    .copy-box .section-title { color: #666; margin-bottom: 0.75rem; }
+    .copy-hint {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 1rem;
+    }
+    .copy-hint span {
+      background: #333;
+      color: #ccc;
+      border-radius: 4px;
+      padding: 0.1rem 0.4rem;
+      font-family: monospace;
+      font-size: 0.78rem;
+    }
+    textarea {
+      width: 100%;
+      background: #2d2d2d;
+      color: #e8e8e8;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 0.88rem;
+      line-height: 1.65;
+      resize: vertical;
+      min-height: 520px;
+      outline: none;
+    }
+    textarea:focus { border-color: #1a73e8; }
+    .copy-btn {
+      margin-top: 0.75rem;
+      padding: 0.6rem 1.2rem;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .copy-btn:hover { opacity: 0.85; }
+    .copy-btn.copied { background: #188038; }
+
+    /* ── Char counter ── */
+    .char-count {
+      font-size: 0.78rem;
+      color: #666;
+      margin-top: 0.4rem;
+      text-align: right;
+    }
+    .char-count.over { color: #dc2626; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div style="margin-bottom: 2rem;">
+      <h1 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 0.4rem;">📝 My Notes — Play Store Description</h1>
+      <p style="color: #555; font-size: 0.95rem; line-height: 1.6;">
+        Use this page to compose and copy your Play Store listing description.
+        The <strong>Preview</strong> section shows how the content reads.
+        The <strong>Plain text</strong> section at the bottom is what you paste into
+        <strong>Google Play Console → Store listing → Full description</strong>.
+        Play Console accepts plain text only — emojis render correctly, HTML tags do not.
+      </p>
+    </div>
+
+    <div class="section-title">Preview</div>
+    <div class="preview">
+      <h2>My Notes — Private, Encrypted Notes</h2>
+      <p class="tagline">Keep your thoughts safe and in sync across all your devices.</p>
+
+      <p style="font-size:0.93rem;color:#333;margin-bottom:1.25rem;">
+        My Notes is a rich-text note-taking app built for people who care about privacy.
+        Write, organise, and sync your notes across Android and macOS — with every note
+        encrypted end-to-end before it ever leaves your device. No subscriptions, no ads,
+        no data sharing. Just your notes, secured by your own Google Drive.
+      </p>
+
+      <div class="feature-group">
+        <h3>✍️ Rich Text Editor</h3>
+        <p>Bold, italic, underline, strikethrough, 6 heading levels, ordered lists, bullet lists, checklists, and full undo/redo. Choose from system fonts or bundled decorative fonts (Nunito, Pacifico, Roboto Mono, and more). Set text colour, highlight colour, and font size.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>🖌️ Format Painter</h3>
+        <p>Copy formatting from one piece of text and apply it to another in one tap. Activate with the paint-brush icon in the toolbar.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>📋 Rich Clipboard</h3>
+        <p>Paste from Google Docs, web browsers, and other apps — bold, headings, bullet lists, and tables are preserved automatically.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>🔗 Hyperlinks &amp; Images</h3>
+        <p>Attach URLs to any text. Insert images from your gallery or paste them directly from the clipboard. Long-press a link to edit or remove it.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>📁 Folders &amp; Organisation</h3>
+        <p>Organise notes into folders. Move notes with a long-press. Search across all notes by title and body content.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>🔗 Note Sharing</h3>
+        <p>Share notes with other Google account users for real-time collaborative editing. Add collaborators by email, copy a web link, and manage access — all from within the app.</p>
+        <div class="warning">⚠️ Shared notes are stored in Firestore and are not end-to-end encrypted. Do not share sensitive information.</div>
+      </div>
+
+      <div class="feature-group">
+        <h3>🔒 End-to-End Encryption</h3>
+        <p>Every note is encrypted with AES-256-GCM before leaving your device. Your encryption key lives only in your Google Drive — never on a third-party server. No ads, no analytics, no data sharing.</p>
+        <div class="warning">⚠️ Exception: shared notes are stored unencrypted in Firestore. Do not share sensitive information.</div>
+      </div>
+
+      <div class="feature-group">
+        <h3>☁️ Google Drive Sync</h3>
+        <p>Changes sync across your devices within seconds using an incremental log. Only changed notes are downloaded, keeping bandwidth usage minimal. Works offline — notes are cached locally and sync when you reconnect.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>👤 No Google Account Required</h3>
+        <p>Sign in with a local username and password instead. Your encryption key is derived from your password and never written to disk.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>🗑️ Account Deletion</h3>
+        <p>Delete your account and all associated data (local + Drive) directly from the app. Cannot be undone.</p>
+      </div>
+
+      <div class="feature-group">
+        <h3>💬 Send Feedback</h3>
+        <p>Found a bug or have a suggestion? Use the in-app feedback form in Settings.</p>
+      </div>
+    </div>
+
+    <div class="copy-box">
+      <div class="section-title">Plain text — paste this into Play Console</div>
+      <p class="copy-hint">Select all inside the box <span>⌘A</span> then copy <span>⌘C</span>, or use the button below.</p>
+      <textarea id="plain-text" readonly>My Notes — Private, Encrypted Notes
+
+Keep your thoughts safe and in sync across all your devices.
+
+My Notes is a rich-text note-taking app built for people who care about privacy. Write, organise, and sync your notes across Android and macOS — with every note encrypted end-to-end before it ever leaves your device. No subscriptions, no ads, no data sharing. Just your notes, secured by your own Google Drive.
+
+✍️ Rich Text Editor
+Bold, italic, underline, strikethrough, 6 heading levels, ordered lists, bullet lists, checklists, and full undo/redo. Choose from system fonts or bundled decorative fonts (Nunito, Pacifico, Roboto Mono, and more). Set text colour, highlight colour, and font size.
+
+🖌️ Format Painter
+Copy formatting from one piece of text and apply it to another in one tap. Activate with the paint-brush icon in the toolbar.
+
+📋 Rich Clipboard
+Paste from Google Docs, web browsers, and other apps — bold, headings, bullet lists, and tables are preserved automatically.
+
+🔗 Hyperlinks & Images
+Attach URLs to any text. Insert images from your gallery or paste them directly from the clipboard. Long-press a link to edit or remove it.
+
+📁 Folders & Organisation
+Organise notes into folders. Move notes with a long-press. Search across all notes by title and body content.
+
+🤝 Note Sharing
+Share notes with other Google account users for real-time collaborative editing. Add collaborators by email, copy a web link, and manage access — all from within the app.
+
+⚠️ Shared notes are stored in Firestore and are not end-to-end encrypted. Do not share sensitive information.
+
+🔒 End-to-End Encryption
+Every note is encrypted with AES-256-GCM before leaving your device. Your encryption key lives only in your Google Drive — never on a third-party server. No ads, no analytics, no data sharing.
+
+⚠️ Exception: shared notes are stored unencrypted in Firestore. Do not share sensitive information.
+
+☁️ Google Drive Sync
+Changes sync across your devices within seconds. Only changed notes are downloaded, keeping bandwidth usage minimal. Works offline — notes are cached locally and sync when you reconnect.
+
+👤 No Google Account Required
+Sign in with a local username and password instead. Your encryption key is derived from your password and never written to disk.
+
+🗑️ Account Deletion
+Delete your account and all associated data directly from the app. Cannot be undone.
+
+💬 SEND FEEDBACK
+Found a bug or have a suggestion? Use the in-app feedback form in Settings → Send Feedback.</textarea>
+      <div class="char-count" id="char-count"></div>
+      <button class="copy-btn" id="copy-btn" onclick="copyText()">Copy to clipboard</button>
+    </div>
+
+  </div>
+
+  <script>
+    const textarea = document.getElementById('plain-text');
+    const counter = document.getElementById('char-count');
+    const limit = 4000;
+
+    function updateCount() {
+      const len = textarea.value.length;
+      counter.textContent = len + ' / ' + limit + ' characters';
+      counter.className = 'char-count' + (len > limit ? ' over' : '');
+    }
+    updateCount();
+
+    function copyText() {
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy to clipboard';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
