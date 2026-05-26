@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/app_user.dart';
 import '../providers/app_provider.dart';
 import '../services/app_logger.dart';
+import '../widgets/feedback_dialog.dart';
 
 const _kWebsiteUrl = 'https://thechaos-mynotes.web.app';
 
@@ -181,6 +182,17 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: const Text(
                 'Permanently deletes all notes, folders, and Drive backup'),
             onTap: () => _confirmDeleteAccount(context, ref),
+          ),
+          const Divider(),
+          _SectionHeader(label: 'Support'),
+          ListTile(
+            leading: const Icon(Icons.feedback_outlined),
+            title: const Text('Send Feedback'),
+            subtitle: const Text('Report a bug or suggest an improvement'),
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (_) => const FeedbackDialog(),
+            ),
           ),
           const Divider(),
           _SectionHeader(label: 'About'),

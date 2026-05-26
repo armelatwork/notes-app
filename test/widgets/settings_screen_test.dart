@@ -28,18 +28,35 @@ void main() {
       await tester.pumpWidget(_wrap());
       await tester.pump();
 
+      await tester.scrollUntilVisible(find.text('Website'), 100);
+
       expect(find.text('Website'), findsOneWidget);
       expect(find.textContaining('thechaos-mynotes.web.app'), findsOneWidget);
     });
 
     testWidgets('versionTile_showsVersionFromPackageInfo', (tester) async {
       await tester.pumpWidget(_wrap());
-      // Let the FutureProvider resolve.
       await tester.pumpAndSettle();
 
       // Version text visible once PackageInfo resolves (platform-dependent in
       // tests; we verify the tile itself is always present).
       expect(find.text('Version'), findsOneWidget);
+    });
+  });
+
+  group('SettingsScreen — Support section', () {
+    testWidgets('build_rendersSupportSectionHeader', (tester) async {
+      await tester.pumpWidget(_wrap());
+      await tester.pump();
+
+      expect(find.text('SUPPORT'), findsOneWidget);
+    });
+
+    testWidgets('build_rendersSendFeedbackTile', (tester) async {
+      await tester.pumpWidget(_wrap());
+      await tester.pump();
+
+      expect(find.text('Send Feedback'), findsOneWidget);
     });
   });
 }
