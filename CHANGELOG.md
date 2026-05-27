@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1] — 2026-05-27
+
+### Fixed
+
+- Android: Google Sign-In now works correctly on Play Store installs. The Play Store signing certificate was missing from the Firebase OAuth configuration, causing sign-in to fail with error code 10 on devices that installed the app from the Play Store.
+
 ## [1.5.0] — 2026-05-20
 
 ### Added
