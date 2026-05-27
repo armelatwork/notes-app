@@ -166,6 +166,7 @@ class _NoteTile extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onMoveToFolder;
   final VoidCallback? onShare;
+  final VoidCallback? onPin;
 
   const _NoteTile({
     required this.note,
@@ -175,6 +176,7 @@ class _NoteTile extends StatelessWidget {
     required this.onDelete,
     required this.onMoveToFolder,
     this.onShare,
+    this.onPin,
   });
 
   String _formatDate(DateTime dt) {
@@ -214,6 +216,12 @@ class _NoteTile extends StatelessWidget {
                     fontSize: 14),
               ),
             ),
+            if (note.isPinned)
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Icon(Icons.push_pin,
+                    size: 13, color: Theme.of(context).colorScheme.primary),
+              ),
             if (note.isShared)
               Padding(
                 padding: const EdgeInsets.only(left: 4),
@@ -255,6 +263,17 @@ class _NoteTile extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (onPin != null)
+              ListTile(
+                leading: Icon(note.isPinned
+                    ? Icons.push_pin_outlined
+                    : Icons.push_pin),
+                title: Text(note.isPinned ? 'Unpin' : 'Pin Note'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onPin!();
+                },
+              ),
             if (onShare != null)
               ListTile(
                 leading: const Icon(Icons.share_outlined),
@@ -321,12 +340,17 @@ class _NoteTile extends StatelessWidget {
         details.globalPosition.dy + 1,
       ),
       items: [
+        if (onPin != null)
+          PopupMenuItem(
+              value: 'pin',
+              child: Text(note.isPinned ? 'Unpin Note' : 'Pin Note')),
         if (onShare != null)
           const PopupMenuItem(value: 'share', child: Text('Share')),
         const PopupMenuItem(value: 'move', child: Text('Move to Folder')),
         const PopupMenuItem(value: 'delete', child: Text('Delete Note')),
       ],
     );
+    if (result == 'pin') onPin?.call();
     if (result == 'share') onShare?.call();
     if (result == 'move') onMoveToFolder();
     if (result == 'delete') onDelete();

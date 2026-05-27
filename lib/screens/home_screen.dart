@@ -22,6 +22,7 @@ import '../widgets/folder_sidebar.dart';
 import '../widgets/note_editor.dart';
 import '../widgets/macos_edit_menu.dart';
 import '../widgets/notes_list_panel.dart';
+import '../widgets/share_dialog.dart';
 
 part 'home_screen_sync.dart';
 
@@ -399,6 +400,8 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
   @override
   Widget build(BuildContext context) {
     final selectedNote = ref.watch(selectedNoteProvider);
+    final isGoogleUser =
+        ref.watch(appUserProvider)?.type == AuthType.google;
     if (selectedNote != null && _page == 0) {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => setState(() => _page = 1));
@@ -422,6 +425,36 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
                 icon: const Icon(Icons.menu),
                 onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
+            if (_page == 1 && selectedNote != null) ...[
+              if (isGoogleUser)
+                IconButton(
+                  icon: Icon(selectedNote.isShared
+                      ? Icons.people
+                      : Icons.person_add_outlined),
+                  tooltip: selectedNote.isShared
+                      ? 'Manage sharing'
+                      : 'Share note',
+                  onPressed: () => showShareDialog(
+                    context,
+                    selectedNote,
+                    onNoteUpdated: () =>
+                        ref.read(notesProvider.notifier).reload(),
+                  ),
+                ),
+              IconButton(
+                icon: Icon(
+                  selectedNote.isPinned
+                      ? Icons.push_pin
+                      : Icons.push_pin_outlined,
+                  color: selectedNote.isPinned
+                      ? null
+                      : Colors.grey.withValues(alpha: 0.5),
+                ),
+                tooltip: selectedNote.isPinned ? 'Unpin note' : 'Pin note',
+                onPressed: () =>
+                    ref.read(notesProvider.notifier).togglePin(selectedNote),
+              ),
+            ],
           ],
         ),
         drawer: const Drawer(child: FolderSidebar()),

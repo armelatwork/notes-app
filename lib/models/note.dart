@@ -33,6 +33,8 @@ class Note {
   // Email of the owner who shared this note with the current user
   String? sharedByEmail;
 
+  bool isPinned = false;
+
   bool get isSharedByMe => sharedWithEmails.isNotEmpty;
   bool get isSharedWithMe => sharedByEmail != null;
   bool get isShared => isSharedByMe || isSharedWithMe;

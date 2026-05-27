@@ -129,6 +129,7 @@ class DriveSyncService {
       'firestoreId': note.firestoreId,
       'sharedWithEmails': note.sharedWithEmails,
       'sharedByEmail': note.sharedByEmail,
+      'isPinned': note.isPinned,
     });
     final bytes = utf8.encode(payload);
     final media = drive.Media(Stream.value(bytes), bytes.length,
@@ -361,6 +362,7 @@ class DriveSyncService {
       note.sharedWithEmails =
           (json['sharedWithEmails'] as List?)?.cast<String>() ?? [];
       note.sharedByEmail = json['sharedByEmail'] as String?;
+      note.isPinned = json['isPinned'] as bool? ?? false;
       return note;
     } catch (e) {
       AppLogger.instance.error('DriveSyncService', 'downloadNoteById failed', e);
