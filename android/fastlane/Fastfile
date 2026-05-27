@@ -26,6 +26,18 @@ platform :android do
     )
   end
 
+  desc "Upload AAB to Google Play closed testing (alpha) track"
+  lane :closed do
+    upload_to_play_store(
+      track:                   "alpha",
+      aab:                     "../build/app/outputs/bundle/release/app-release.aab",
+      release_status:          "completed",
+      skip_upload_apk:         true,
+      skip_upload_images:      true,
+      skip_upload_screenshots: true,
+    )
+  end
+
   desc "Promote internal build to production"
   lane :promote_to_production do
     upload_to_play_store(
