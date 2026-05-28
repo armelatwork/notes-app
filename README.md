@@ -116,11 +116,23 @@ Share a note with other Google account users for real-time collaborative viewing
 
 - **Images:** Images up to 600 KB are embedded in the shared note. If a single image exceeds 600 KB, or the total image payload across all images exceeds 800 KB, the oversized images are replaced with a placeholder message for recipients. The original images on the owner's device are unaffected.
 
+### Pinned Notes
+
+Pin important notes so they always appear at the top of every view.
+
+- **Pin / unpin (macOS):** click the **pin icon** in the note title bar, or right-click a note in the list and choose **Pin Note / Unpin Note**.
+- **Pin / unpin (Android):** tap the **pin icon** in the top bar while editing, or long-press a note in the list and choose **Pin Note / Unpin Note**.
+- **Pinned Notes** sidebar entry — shows only pinned notes in one place.
+- In **All Notes**, **Notes (inbox)**, and every folder view, pinned notes appear in a sticky **Pinned** group at the top; unpinned notes follow below.
+- A small pin indicator on each note tile shows pinned status at a glance.
+- Pin state syncs to Google Drive for Google accounts (visible on all your devices).
+
 ### Folders
 
 - Create folders using the **+** button in the sidebar.
 - Rename or delete a folder via its context menu (⋮).
 - Deleting a folder moves its notes to the root inbox — notes are never lost.
+- **Pinned Notes** shows only pinned notes.
 - **All Notes** shows every note regardless of folder.
 - **Notes (inbox)** shows only notes not assigned to a folder.
 - On Android, tapping a folder in the drawer closes it automatically and shows the folder contents.
