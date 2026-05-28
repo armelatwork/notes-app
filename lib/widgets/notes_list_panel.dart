@@ -11,6 +11,7 @@ import '../services/sharing_service.dart';
 import 'share_dialog.dart';
 
 part 'note_tile.dart';
+part 'shared_notes_panel.dart';
 
 const _kSelectedTileOpacity = 0.12;
 const _kRecentDaysThreshold = 7;
@@ -75,7 +76,7 @@ class NotesListPanel extends ConsumerWidget {
                                 ref.read(notesProvider.notifier).reload())
                         : null,
                     onPin: () =>
-                        ref.read(notesProvider.notifier).togglePin(note),
+                        ref.read(notesProvider.notifier).togglePin(note.id),
                   );
                   if (!supportsDrag) return tile;
                   final draggable = LongPressDraggable<Note>(
@@ -111,7 +112,7 @@ class NotesListPanel extends ConsumerWidget {
                   );
                 }
 
-                final isPinnedView = selectedFolder == -2;
+                final isPinnedView = selectedFolder == kFolderPinnedNotes;
                 final pinned = isPinnedView
                     ? <Note>[]
                     : notes.where((n) => n.isPinned).toList();
@@ -183,8 +184,8 @@ class _PanelHeader extends ConsumerWidget {
   const _PanelHeader({required this.selectedFolder});
 
   String _title(WidgetRef ref) {
-    if (selectedFolder == -2) return 'Pinned Notes';
-    if (selectedFolder == -1) return 'All Notes';
+    if (selectedFolder == kFolderPinnedNotes) return 'Pinned Notes';
+    if (selectedFolder == kFolderAllNotes) return 'All Notes';
     if (selectedFolder == null) return 'Notes';
     final folders = ref.watch(foldersProvider).valueOrNull ?? [];
     final folder = folders.where((f) => f.id == selectedFolder).firstOrNull;
@@ -252,7 +253,8 @@ class _PanelFooter extends ConsumerWidget {
             tooltip: 'New Note',
             onPressed: () async {
               final folderId =
-                  (selectedFolder == -1 || selectedFolder == -2)
+                  (selectedFolder == kFolderAllNotes ||
+                          selectedFolder == kFolderPinnedNotes)
                       ? null
                       : selectedFolder;
               final note = await ref
@@ -273,7 +275,7 @@ class _EmptyState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isPinnedView = selectedFolder == -2;
+    final isPinnedView = selectedFolder == kFolderPinnedNotes;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -295,7 +297,7 @@ class _EmptyState extends ConsumerWidget {
               label: const Text('New Note'),
               onPressed: () async {
                 final folderId =
-                    selectedFolder == -1 ? null : selectedFolder;
+                    selectedFolder == kFolderAllNotes ? null : selectedFolder;
                 final note = await ref
                     .read(notesProvider.notifier)
                     .createNote(folderId: folderId);
@@ -309,138 +311,4 @@ class _EmptyState extends ConsumerWidget {
   }
 }
 
-// ── Shared notes panel ─────────────────────────────────────────────────────────
-
-class _SharedNotesPanel extends ConsumerWidget {
-  final bool isSharedWithMe;
-  const _SharedNotesPanel({required this.isSharedWithMe});
-
-  BoxDecoration _containerDecoration(BuildContext context) => BoxDecoration(
-        border: Border(
-          right: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-          left: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-        ),
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-      );
-
-  Widget _emptyState(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.people_outline, size: 48, color: Colors.grey[400]),
-            const SizedBox(height: 12),
-            Text(
-              isSharedWithMe ? 'No notes shared with you' : 'No notes shared',
-              style: TextStyle(color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selectedNote = ref.watch(selectedNoteProvider);
-    final title = isSharedWithMe ? 'Shared with me' : 'Shared by me';
-
-    Widget body;
-    if (isSharedWithMe) {
-      final notesAsync = ref.watch(sharedWithMeProvider);
-      body = notesAsync.when(
-        data: (notes) {
-          if (notes.isEmpty) return _emptyState(context);
-          return ListView.separated(
-            itemCount: notes.length,
-            separatorBuilder: (_, index) => Divider(
-                height: 1,
-                color: Theme.of(context).colorScheme.outlineVariant),
-            itemBuilder: (_, i) {
-              final data = notes[i];
-              return _SharedWithMeTile(
-                data: data,
-                isSelected: selectedNote?.firestoreId == data.firestoreId,
-                onTap: () async {
-                  final note = await ref
-                      .read(notesProvider.notifier)
-                      .openSharedNote(data);
-                  ref.read(selectedNoteProvider.notifier).state = note;
-                },
-                onShare: () async {
-                  final note = await ref
-                      .read(notesProvider.notifier)
-                      .openSharedNote(data);
-                  if (context.mounted) {
-                    showShareDialog(context, note, onNoteUpdated: () {});
-                  }
-                },
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
-      );
-    } else {
-      final notesAsync = ref.watch(localSharedByMeProvider);
-      body = notesAsync.when(
-        data: (notes) {
-          if (notes.isEmpty) return _emptyState(context);
-          return ListView.separated(
-            itemCount: notes.length,
-            separatorBuilder: (_, index) => Divider(
-                height: 1,
-                color: Theme.of(context).colorScheme.outlineVariant),
-            itemBuilder: (_, i) {
-              final note = notes[i];
-              return _NoteTile(
-                note: note,
-                isSelected: selectedNote?.id == note.id,
-                isDragMode: false,
-                onTap: () =>
-                    ref.read(selectedNoteProvider.notifier).state = note,
-                onDelete: () async {
-                  if (note.firestoreId != null) {
-                    await SharingService.instance
-                        .unshareNote(note.firestoreId!);
-                  }
-                  ref.read(notesProvider.notifier).deleteNote(note.id);
-                },
-                onMoveToFolder: () => _showFolderPicker(context, ref, note),
-                onShare: () => showShareDialog(context, note,
-                    onNoteUpdated: () =>
-                        ref.read(notesProvider.notifier).reload()),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
-      );
-    }
-
-    return Container(
-      decoration: _containerDecoration(context),
-      child: Column(
-        children: [
-          _SharedPanelHeader(title: title),
-          const Divider(height: 1),
-          Expanded(child: body),
-        ],
-      ),
-    );
-  }
-}
-
-class _SharedPanelHeader extends StatelessWidget {
-  final String title;
-  const _SharedPanelHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-    );
-  }
-}
 

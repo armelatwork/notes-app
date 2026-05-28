@@ -30,15 +30,26 @@ class _PinTrackingNotifier extends NotesNotifier {
   }
 
   @override
-  Future<void> togglePin(Note note) async {
-    note.isPinned = !note.isPinned;
-    _store.removeWhere((n) => n.id == note.id);
-    _store.add(note);
+  Future<void> togglePin(int noteId) async {
+    final idx = _store.indexWhere((n) => n.id == noteId);
+    if (idx == -1) return;
+    // Create a copy to mimic a fresh DB read — different reference so that
+    // Riverpod fires a notification on selectedNoteProvider.
+    final original = _store[idx];
+    final toggled = Note.create(
+        title: original.title, content: original.content)
+      ..id = original.id
+      ..isPinned = !original.isPinned
+      ..folderId = original.folderId;
+    _store[idx] = toggled;
     state = AsyncData(List.from(_store));
+    if (ref.read(selectedNoteProvider)?.id == noteId) {
+      ref.read(selectedNoteProvider.notifier).state = toggled;
+    }
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
     ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     // ignore: invalid_use_of_visible_for_testing_member
-    pendingNotes[note.id] = note;
+    pendingNotes[noteId] = toggled;
     // ignore: invalid_use_of_visible_for_testing_member
     pushTimer?.cancel();
     // ignore: invalid_use_of_visible_for_testing_member
@@ -104,7 +115,7 @@ void main() {
       final note = _makeNote(isPinned: false);
       notifier.seedNote(note);
 
-      await container.read(notesProvider.notifier).togglePin(note);
+      await container.read(notesProvider.notifier).togglePin(note.id);
 
       final notes = container.read(notesProvider).valueOrNull ?? [];
       expect(notes.first.isPinned, isTrue);
@@ -119,7 +130,7 @@ void main() {
       final note = _makeNote(isPinned: true);
       notifier.seedNote(note);
 
-      await container.read(notesProvider.notifier).togglePin(note);
+      await container.read(notesProvider.notifier).togglePin(note.id);
 
       final notes = container.read(notesProvider).valueOrNull ?? [];
       expect(notes.first.isPinned, isFalse);
@@ -134,7 +145,7 @@ void main() {
       final note = _makeNote();
       notifier.seedNote(note);
 
-      await container.read(notesProvider.notifier).togglePin(note);
+      await container.read(notesProvider.notifier).togglePin(note.id);
 
       // ignore: invalid_use_of_visible_for_testing_member
       expect(notifier.pendingNotes, isEmpty);
@@ -150,7 +161,7 @@ void main() {
         final note = _makeNote();
         notifier.seedNote(note);
 
-        await container.read(notesProvider.notifier).togglePin(note);
+        await container.read(notesProvider.notifier).togglePin(note.id);
 
         // ignore: invalid_use_of_visible_for_testing_member
         expect(notifier.pendingNotes.containsKey(note.id), isTrue);
@@ -172,10 +183,37 @@ void main() {
       notifier.seedNote(note);
       container.read(selectedNoteProvider.notifier).state = note;
 
-      await container.read(notesProvider.notifier).togglePin(note);
+      await container.read(notesProvider.notifier).togglePin(note.id);
 
       final selected = container.read(selectedNoteProvider);
       expect(selected?.isPinned, isTrue);
+    });
+
+    // Regression: the original togglePin mutated the note in place and called
+    // selectedNoteProvider.state = sameObject. Riverpod uses reference equality
+    // and skipped the notification, so the pin icon never rebuilt. The fix loads
+    // a fresh object from the DB (different reference), guaranteeing a Riverpod
+    // notification. This test verifies that selectedNoteProvider is notified
+    // after togglePin by tracking listener call count.
+    test('togglePin_notifiesSelectedNoteProviderListeners', () async {
+      final notifier = _PinTrackingNotifier();
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      final note = _makeNote(isPinned: false);
+      notifier.seedNote(note);
+      container.read(selectedNoteProvider.notifier).state = note;
+
+      var notificationCount = 0;
+      container.listen(selectedNoteProvider, (_, _) => notificationCount++);
+
+      await container.read(notesProvider.notifier).togglePin(note.id);
+
+      expect(notificationCount, greaterThan(0),
+          reason: 'selectedNoteProvider must fire after togglePin '
+              'so the pin icon rebuilds in the UI');
+      expect(container.read(selectedNoteProvider)?.isPinned, isTrue);
     });
   });
 }
