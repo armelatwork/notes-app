@@ -32,6 +32,16 @@ class FolderSidebar extends ConsumerWidget {
           children: [
             _SidebarHeader(appUser: appUser),
             _SidebarItem(
+              icon: Icons.push_pin,
+              label: 'Pinned Notes',
+              isSelected: selectedFolder == -2,
+              onTap: () {
+                ref.read(sharedSectionProvider.notifier).state = null;
+                ref.read(selectedFolderProvider.notifier).state = -2;
+                _closeDrawer(context);
+              },
+            ),
+            _SidebarItem(
               icon: Icons.notes,
               label: 'All Notes',
               isSelected: selectedFolder == -1,

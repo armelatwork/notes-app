@@ -42,43 +42,48 @@ const NoteSchema = CollectionSchema(
       name: r'folderId',
       type: IsarType.long,
     ),
-    r'isShared': PropertySchema(
+    r'isPinned': PropertySchema(
       id: 5,
+      name: r'isPinned',
+      type: IsarType.bool,
+    ),
+    r'isShared': PropertySchema(
+      id: 6,
       name: r'isShared',
       type: IsarType.bool,
     ),
     r'isSharedByMe': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'isSharedByMe',
       type: IsarType.bool,
     ),
     r'isSharedWithMe': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isSharedWithMe',
       type: IsarType.bool,
     ),
     r'preview': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'preview',
       type: IsarType.string,
     ),
     r'sharedByEmail': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'sharedByEmail',
       type: IsarType.string,
     ),
     r'sharedWithEmails': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'sharedWithEmails',
       type: IsarType.stringList,
     ),
     r'title': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'title',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -159,14 +164,15 @@ void _noteSerialize(
   writer.writeString(offsets[2], object.driveFileId);
   writer.writeString(offsets[3], object.firestoreId);
   writer.writeLong(offsets[4], object.folderId);
-  writer.writeBool(offsets[5], object.isShared);
-  writer.writeBool(offsets[6], object.isSharedByMe);
-  writer.writeBool(offsets[7], object.isSharedWithMe);
-  writer.writeString(offsets[8], object.preview);
-  writer.writeString(offsets[9], object.sharedByEmail);
-  writer.writeStringList(offsets[10], object.sharedWithEmails);
-  writer.writeString(offsets[11], object.title);
-  writer.writeDateTime(offsets[12], object.updatedAt);
+  writer.writeBool(offsets[5], object.isPinned);
+  writer.writeBool(offsets[6], object.isShared);
+  writer.writeBool(offsets[7], object.isSharedByMe);
+  writer.writeBool(offsets[8], object.isSharedWithMe);
+  writer.writeString(offsets[9], object.preview);
+  writer.writeString(offsets[10], object.sharedByEmail);
+  writer.writeStringList(offsets[11], object.sharedWithEmails);
+  writer.writeString(offsets[12], object.title);
+  writer.writeDateTime(offsets[13], object.updatedAt);
 }
 
 Note _noteDeserialize(
@@ -182,11 +188,12 @@ Note _noteDeserialize(
   object.firestoreId = reader.readStringOrNull(offsets[3]);
   object.folderId = reader.readLongOrNull(offsets[4]);
   object.id = id;
-  object.preview = reader.readString(offsets[8]);
-  object.sharedByEmail = reader.readStringOrNull(offsets[9]);
-  object.sharedWithEmails = reader.readStringList(offsets[10]) ?? [];
-  object.title = reader.readString(offsets[11]);
-  object.updatedAt = reader.readDateTime(offsets[12]);
+  object.isPinned = reader.readBool(offsets[5]);
+  object.preview = reader.readString(offsets[9]);
+  object.sharedByEmail = reader.readStringOrNull(offsets[10]);
+  object.sharedWithEmails = reader.readStringList(offsets[11]) ?? [];
+  object.title = reader.readString(offsets[12]);
+  object.updatedAt = reader.readDateTime(offsets[13]);
   return object;
 }
 
@@ -214,14 +221,16 @@ P _noteDeserializeProp<P>(
     case 7:
       return (reader.readBool(offset)) as P;
     case 8:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 9:
-      return (reader.readStringOrNull(offset)) as P;
-    case 10:
-      return (reader.readStringList(offset) ?? []) as P;
-    case 11:
       return (reader.readString(offset)) as P;
+    case 10:
+      return (reader.readStringOrNull(offset)) as P;
+    case 11:
+      return (reader.readStringList(offset) ?? []) as P;
     case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1026,6 +1035,15 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterFilterCondition> isPinnedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isPinned',
+        value: value,
+      ));
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterFilterCondition> isSharedEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -1800,6 +1818,18 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsPinned() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByIsPinnedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> sortByIsShared() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isShared', Sort.asc);
@@ -1958,6 +1988,18 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsPinned() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByIsPinnedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isPinned', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> thenByIsShared() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isShared', Sort.asc);
@@ -2077,6 +2119,12 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
+  QueryBuilder<Note, Note, QDistinct> distinctByIsPinned() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isPinned');
+    });
+  }
+
   QueryBuilder<Note, Note, QDistinct> distinctByIsShared() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isShared');
@@ -2164,6 +2212,12 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
   QueryBuilder<Note, int?, QQueryOperations> folderIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'folderId');
+    });
+  }
+
+  QueryBuilder<Note, bool, QQueryOperations> isPinnedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isPinned');
     });
   }
 

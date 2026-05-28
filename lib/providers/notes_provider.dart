@@ -20,10 +20,14 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   @override
   Future<List<Note>> build() => _load();
 
-  Future<List<Note>> _load() {
+  Future<List<Note>> _load() async {
     final folderId = ref.watch(selectedFolderProvider);
     final query = ref.watch(searchQueryProvider);
     if (query.isNotEmpty) return DatabaseService.instance.searchNotes(query);
+    if (folderId == -2) {
+      final all = await DatabaseService.instance.getNotes(allNotes: true);
+      return all.where((n) => n.isPinned).toList();
+    }
     if (folderId == -1) return DatabaseService.instance.getNotes(allNotes: true);
     return DatabaseService.instance.getNotes(folderId: folderId);
   }
@@ -67,6 +71,21 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     pushTimer?.cancel();
     final debounce = titleChanged ? _kFastPushDebounceMs : _kPushDebounceMs;
     pushTimer = Timer(Duration(milliseconds: debounce), _flushPush);
+  }
+
+  Future<void> togglePin(Note note) async {
+    note.isPinned = !note.isPinned;
+    await DatabaseService.instance.saveNote(note);
+    await reload();
+    if (ref.read(selectedNoteProvider)?.id == note.id) {
+      ref.read(selectedNoteProvider.notifier).state = note;
+    }
+    if (ref.read(appUserProvider)?.type != AuthType.google) return;
+    ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+    pendingNotes[note.id] = note;
+    pushTimer?.cancel();
+    pushTimer =
+        Timer(const Duration(milliseconds: _kFastPushDebounceMs), _flushPush);
   }
 
   Future<void> moveNote(Note note, int? folderId) async {

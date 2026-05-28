@@ -676,6 +676,8 @@ class NoteTitleField extends StatelessWidget {
   final VoidCallback onChanged;
   final bool isShared;
   final VoidCallback? onShare;
+  final bool isPinned;
+  final VoidCallback? onPin;
 
   const NoteTitleField({
     super.key,
@@ -684,10 +686,13 @@ class NoteTitleField extends StatelessWidget {
     required this.onChanged,
     this.isShared = false,
     this.onShare,
+    this.isPinned = false,
+    this.onPin,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 8, 0),
       child: Row(
@@ -710,17 +715,32 @@ class NoteTitleField extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            icon: Icon(
-              isShared ? Icons.people : Icons.person_add_outlined,
-              size: 22,
-              color: isShared
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey,
-            ),
-            tooltip: isShared ? 'Manage sharing' : 'Share note',
-            onPressed: onShare,
-          ),
+          if (isMacOS) ...[
+            if (onShare != null)
+              IconButton(
+                icon: Icon(
+                  isShared ? Icons.people : Icons.person_add_outlined,
+                  size: 22,
+                  color: isShared
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey,
+                ),
+                tooltip: isShared ? 'Manage sharing' : 'Share note',
+                onPressed: onShare,
+              ),
+            if (onPin != null)
+              IconButton(
+                icon: Icon(
+                  isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                  size: 22,
+                  color: isPinned
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey.withValues(alpha: 0.5),
+                ),
+                tooltip: isPinned ? 'Unpin note' : 'Pin note',
+                onPressed: onPin,
+              ),
+          ],
         ],
       ),
     );
