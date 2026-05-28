@@ -402,6 +402,7 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
     final selectedNote = ref.watch(selectedNoteProvider);
     final isGoogleUser =
         ref.watch(appUserProvider)?.type == AuthType.google;
+    ref.watch(notesProvider); // rebuild AppBar when notes reload (pin toggle)
     if (selectedNote != null && _page == 0) {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => setState(() => _page = 1));

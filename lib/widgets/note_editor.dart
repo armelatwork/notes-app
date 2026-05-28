@@ -357,8 +357,12 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           isPinned: _currentNote?.isPinned ?? false,
           onPin: _currentNote == null
               ? null
-              : () =>
-                  ref.read(notesProvider.notifier).togglePin(_currentNote!),
+              : () async {
+                  await ref
+                      .read(notesProvider.notifier)
+                      .togglePin(_currentNote!);
+                  if (mounted) setState(() {});
+                },
         ),
         if (isMacOS) toolbar,
         Expanded(
