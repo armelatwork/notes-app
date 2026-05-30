@@ -90,14 +90,104 @@ void main() {
       expect(newlineOp.attributes?['indent'], 1);
     });
 
-    test('colorSpanWithMarginLeft_appliesIndentAndPreservesColor', () {
+    test('colorSpanWithMarginLeft_appliesIndentAndPreservesIntentionalColor', () {
+      // Uses #cc0000 (dark red, high saturation) — intentional, must be kept.
+      // Near-black colors like #333333 are stripped; see process_stripsNeutralColors.
       final result = _processHtml(
           '<p style="margin-left: 36pt;">'
-          '<span style="color: #333333;">Text</span></p>');
+          '<span style="color: #cc0000;">Text</span></p>');
       final ops = result.toList();
       expect(ops.any((op) => op.attributes?['color'] != null), isTrue);
       final newlineOp = ops.lastWhere((op) => op.data == '\n');
       expect(newlineOp.attributes?['indent'], 1);
+    });
+  });
+
+  // ── Neutral colour stripping ───────────────────────────────────────────────
+  //
+  // Near-black and near-white colours are default web text colours, not
+  // intentional formatting. Stripping them lets pasted text inherit the
+  // editor's theme colour (white in dark mode, black in light mode).
+
+  group('process_stripsNeutralColors', () {
+    test('pureBlackHex_removesColorAttribute', () {
+      final result = _processHtml(
+          '<p><span style="color: #000000;">Text</span></p>');
+      expect(result.toList().every((op) => op.attributes?['color'] == null),
+          isTrue);
+    });
+
+    test('nearBlackHex333_removesColorAttribute', () {
+      final result = _processHtml(
+          '<p><span style="color: #333333;">Text</span></p>');
+      expect(result.toList().every((op) => op.attributes?['color'] == null),
+          isTrue);
+    });
+
+    test('nearBlackRgb_removesColorAttribute', () {
+      final result = _processHtml(
+          '<p><span style="color: rgb(0, 0, 0);">Text</span></p>');
+      expect(result.toList().every((op) => op.attributes?['color'] == null),
+          isTrue);
+    });
+
+    test('nearBlackRgba87pct_removesColorAttribute', () {
+      // Google Sheets and Material Design often use rgba(0,0,0,0.87).
+      final result = _processHtml(
+          '<p><span style="color: rgba(0, 0, 0, 0.87);">Text</span></p>');
+      expect(result.toList().every((op) => op.attributes?['color'] == null),
+          isTrue);
+    });
+
+    test('pureWhiteHex_removesColorAttribute', () {
+      final result = _processHtml(
+          '<p><span style="color: #ffffff;">Text</span></p>');
+      expect(result.toList().every((op) => op.attributes?['color'] == null),
+          isTrue);
+    });
+
+    test('nearWhiteEee_removesColorAttribute', () {
+      final result = _processHtml(
+          '<p><span style="color: #eeeeee;">Text</span></p>');
+      expect(result.toList().every((op) => op.attributes?['color'] == null),
+          isTrue);
+    });
+
+    test('intentionalRedColor_preservesColorAttribute', () {
+      final result = _processHtml(
+          '<p><span style="color: #cc0000;">Text</span></p>');
+      expect(result.toList().any((op) => op.attributes?['color'] != null),
+          isTrue);
+    });
+
+    test('intentionalBlueColor_preservesColorAttribute', () {
+      final result = _processHtml(
+          '<p><span style="color: #0000ff;">Text</span></p>');
+      expect(result.toList().any((op) => op.attributes?['color'] != null),
+          isTrue);
+    });
+
+    test('eightDigitArgbBlack_removesColorAttribute', () {
+      // flutter_quill_delta_from_html converts rgb(0,0,0) → #FF000000
+      // and rgba(0,0,0,0.87) → #DE000000 (alpha-prefix hex, AARRGGBB).
+      final delta = Delta()..insert('Text', {'color': '#FF000000'});
+      final result = processor.process(delta);
+      expect(result.toList().first.attributes?['color'], isNull);
+    });
+
+    test('eightDigitArgbBlack87pct_removesColorAttribute', () {
+      final delta = Delta()..insert('Text', {'color': '#DE000000'});
+      final result = processor.process(delta);
+      expect(result.toList().first.attributes?['color'], isNull);
+    });
+
+    test('strippingNeutralColorPreservesOtherAttributes', () {
+      final delta = Delta()
+        ..insert('Text', {'color': '#000000', 'bold': true});
+      final result = processor.process(delta);
+      final op = result.toList().first;
+      expect(op.attributes?['color'], isNull);
+      expect(op.attributes?['bold'], isTrue);
     });
   });
 

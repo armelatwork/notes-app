@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase_options.dart';
+import 'providers/app_provider.dart';
 import 'services/app_logger.dart';
 import 'utils/font_utils.dart';
 import 'widgets/auth_gate.dart';
@@ -26,11 +27,12 @@ void main() async {
   runApp(const ProviderScope(child: NotesApp()));
 }
 
-class NotesApp extends StatelessWidget {
+class NotesApp extends ConsumerWidget {
   const NotesApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
       title: 'My Notes',
       debugShowCheckedModeBanner: false,
@@ -52,7 +54,7 @@ class NotesApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       home: const AuthGate(),
     );
   }

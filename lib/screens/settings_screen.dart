@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/app_user.dart';
 import '../providers/app_provider.dart';
 import '../services/app_logger.dart';
+import '../services/persistence_service.dart';
 import '../widgets/feedback_dialog.dart';
 
 const _kWebsiteUrl = 'https://thechaos-mynotes.web.app';
@@ -168,6 +169,9 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ],
           const Divider(),
+          _SectionHeader(label: 'Appearance'),
+          const _ThemePicker(),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sign out'),
@@ -238,6 +242,43 @@ class _SectionHeader extends StatelessWidget {
               fontWeight: FontWeight.bold,
               letterSpacing: 0.8,
             ),
+      ),
+    );
+  }
+}
+
+class _ThemePicker extends ConsumerWidget {
+  const _ThemePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SegmentedButton<ThemeMode>(
+        segments: const [
+          ButtonSegment(
+            value: ThemeMode.system,
+            icon: Icon(Icons.brightness_auto),
+            label: Text('System'),
+          ),
+          ButtonSegment(
+            value: ThemeMode.light,
+            icon: Icon(Icons.light_mode),
+            label: Text('Light'),
+          ),
+          ButtonSegment(
+            value: ThemeMode.dark,
+            icon: Icon(Icons.dark_mode),
+            label: Text('Dark'),
+          ),
+        ],
+        selected: {themeMode},
+        onSelectionChanged: (selection) {
+          final mode = selection.first;
+          ref.read(themeModeProvider.notifier).state = mode;
+          PersistenceService.instance.saveThemeMode(mode);
+        },
       ),
     );
   }

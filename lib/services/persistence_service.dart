@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PersistenceService {
@@ -6,6 +7,7 @@ class PersistenceService {
 
   static const _folderKey = 'last_folder_id';
   static const _noteKey = 'last_note_id';
+  static const _themeModeKey = 'theme_mode';
 
   // -1 means "All Notes", null means "No folder selected (root)"
   Future<void> saveLastFolder(int? folderId) async {
@@ -34,5 +36,19 @@ class PersistenceService {
   Future<int?> loadLastNote() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_noteKey);
+  }
+
+  Future<void> saveThemeMode(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeModeKey, mode.name);
+  }
+
+  Future<ThemeMode> loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_themeModeKey);
+    return ThemeMode.values.firstWhere(
+      (m) => m.name == value,
+      orElse: () => ThemeMode.system,
+    );
   }
 }
