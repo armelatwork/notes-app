@@ -304,6 +304,9 @@ Future<T> _withRetry<T>(Future<T> Function() fn, String tag) async {
 
 // ── Selected folder / note / search ───────────────────────────────────────────
 
+const kFolderAllNotes = -1;
+const kFolderPinnedNotes = -2;
+
 final selectedFolderProvider = StateProvider<int?>((ref) => null);
 final selectedNoteProvider = StateProvider<Note?>((ref) => null);
 final searchQueryProvider = StateProvider<String>((ref) => '');

@@ -289,6 +289,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (note == null) return const NoteEmptyPlaceholder();
     if (note.id != _currentNote?.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadNote(note));
+    } else if (_currentNote != null &&
+        note.isPinned != _currentNote!.isPinned) {
+      _currentNote!.isPinned = note.isPinned;
     }
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
@@ -357,12 +360,9 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
           isPinned: _currentNote?.isPinned ?? false,
           onPin: _currentNote == null
               ? null
-              : () async {
-                  await ref
-                      .read(notesProvider.notifier)
-                      .togglePin(_currentNote!);
-                  if (mounted) setState(() {});
-                },
+              : () => ref
+                  .read(notesProvider.notifier)
+                  .togglePin(_currentNote!.id),
         ),
         if (isMacOS) toolbar,
         Expanded(

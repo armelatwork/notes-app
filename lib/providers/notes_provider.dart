@@ -24,11 +24,11 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     final folderId = ref.watch(selectedFolderProvider);
     final query = ref.watch(searchQueryProvider);
     if (query.isNotEmpty) return DatabaseService.instance.searchNotes(query);
-    if (folderId == -2) {
+    if (folderId == kFolderPinnedNotes) {
       final all = await DatabaseService.instance.getNotes(allNotes: true);
       return all.where((n) => n.isPinned).toList();
     }
-    if (folderId == -1) return DatabaseService.instance.getNotes(allNotes: true);
+    if (folderId == kFolderAllNotes) return DatabaseService.instance.getNotes(allNotes: true);
     return DatabaseService.instance.getNotes(folderId: folderId);
   }
 
@@ -73,16 +73,18 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     pushTimer = Timer(Duration(milliseconds: debounce), _flushPush);
   }
 
-  Future<void> togglePin(Note note) async {
+  Future<void> togglePin(int noteId) async {
+    final note = await DatabaseService.instance.getNote(noteId);
+    if (note == null) return;
     note.isPinned = !note.isPinned;
     await DatabaseService.instance.saveNote(note);
     await reload();
-    if (ref.read(selectedNoteProvider)?.id == note.id) {
+    if (ref.read(selectedNoteProvider)?.id == noteId) {
       ref.read(selectedNoteProvider.notifier).state = note;
     }
     if (ref.read(appUserProvider)?.type != AuthType.google) return;
     ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
-    pendingNotes[note.id] = note;
+    pendingNotes[noteId] = note;
     pushTimer?.cancel();
     pushTimer =
         Timer(const Duration(milliseconds: _kFastPushDebounceMs), _flushPush);

@@ -34,20 +34,22 @@ class FolderSidebar extends ConsumerWidget {
             _SidebarItem(
               icon: Icons.push_pin,
               label: 'Pinned Notes',
-              isSelected: selectedFolder == -2,
+              isSelected: selectedFolder == kFolderPinnedNotes,
               onTap: () {
                 ref.read(sharedSectionProvider.notifier).state = null;
-                ref.read(selectedFolderProvider.notifier).state = -2;
+                ref.read(selectedFolderProvider.notifier).state =
+                    kFolderPinnedNotes;
                 _closeDrawer(context);
               },
             ),
             _SidebarItem(
               icon: Icons.notes,
               label: 'All Notes',
-              isSelected: selectedFolder == -1,
+              isSelected: selectedFolder == kFolderAllNotes,
               onTap: () {
                 ref.read(sharedSectionProvider.notifier).state = null;
-                ref.read(selectedFolderProvider.notifier).state = -1;
+                ref.read(selectedFolderProvider.notifier).state =
+                    kFolderAllNotes;
                 _closeDrawer(context);
               },
             ),

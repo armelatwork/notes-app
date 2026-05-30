@@ -134,7 +134,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _sessionRestored = true;
     final lastFolderId = await PersistenceService.instance.loadLastFolder();
     final lastNoteId = await PersistenceService.instance.loadLastNote();
-    ref.read(selectedFolderProvider.notifier).state = lastFolderId ?? -1;
+    ref.read(selectedFolderProvider.notifier).state =
+        lastFolderId ?? kFolderAllNotes;
     if (lastNoteId != null) {
       final note = await DatabaseService.instance.getNote(lastNoteId);
       if (note != null && mounted) {
@@ -402,7 +403,6 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
     final selectedNote = ref.watch(selectedNoteProvider);
     final isGoogleUser =
         ref.watch(appUserProvider)?.type == AuthType.google;
-    ref.watch(notesProvider); // rebuild AppBar when notes reload (pin toggle)
     if (selectedNote != null && _page == 0) {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => setState(() => _page = 1));
@@ -453,7 +453,7 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
                 ),
                 tooltip: selectedNote.isPinned ? 'Unpin note' : 'Pin note',
                 onPressed: () =>
-                    ref.read(notesProvider.notifier).togglePin(selectedNote),
+                    ref.read(notesProvider.notifier).togglePin(selectedNote.id),
               ),
             ],
           ],
