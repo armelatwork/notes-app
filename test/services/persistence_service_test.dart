@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/services/persistence_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,6 +72,42 @@ void main() {
       await persistence.saveLastFolder(10);
       await persistence.saveLastNote(5);
       expect(await persistence.loadLastFolder(), 10);
+    });
+  });
+
+  group('PersistenceService – themeMode', () {
+    test('loadThemeMode_withNothingSaved_returnsSystem', () async {
+      expect(await persistence.loadThemeMode(), ThemeMode.system);
+    });
+
+    test('saveThemeMode_thenLoad_roundTripsLight', () async {
+      await persistence.saveThemeMode(ThemeMode.light);
+      expect(await persistence.loadThemeMode(), ThemeMode.light);
+    });
+
+    test('saveThemeMode_thenLoad_roundTripsDark', () async {
+      await persistence.saveThemeMode(ThemeMode.dark);
+      expect(await persistence.loadThemeMode(), ThemeMode.dark);
+    });
+
+    test('saveThemeMode_thenLoad_roundTripsSystem', () async {
+      await persistence.saveThemeMode(ThemeMode.system);
+      expect(await persistence.loadThemeMode(), ThemeMode.system);
+    });
+
+    test('saveThemeMode_overwrite_replacesValue', () async {
+      await persistence.saveThemeMode(ThemeMode.light);
+      await persistence.saveThemeMode(ThemeMode.dark);
+      expect(await persistence.loadThemeMode(), ThemeMode.dark);
+    });
+
+    test('themeMode_isIndependentOfFolderAndNote', () async {
+      await persistence.saveLastFolder(5);
+      await persistence.saveLastNote(10);
+      await persistence.saveThemeMode(ThemeMode.dark);
+      expect(await persistence.loadLastFolder(), 5);
+      expect(await persistence.loadLastNote(), 10);
+      expect(await persistence.loadThemeMode(), ThemeMode.dark);
     });
   });
 }

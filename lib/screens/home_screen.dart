@@ -132,6 +132,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _restoreSession() async {
     if (_sessionRestored) return;
     _sessionRestored = true;
+    final themeMode = await PersistenceService.instance.loadThemeMode();
+    ref.read(themeModeProvider.notifier).state = themeMode;
     final lastFolderId = await PersistenceService.instance.loadLastFolder();
     final lastNoteId = await PersistenceService.instance.loadLastNote();
     ref.read(selectedFolderProvider.notifier).state =
