@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.0] — 2026-05-29
+
+### Added
+
+- **Theme picker** — choose Light, Dark, or System in Settings → Appearance. The preference is saved and restored on next launch.
+
+### Fixed
+
+- Pasting text from external sources (Google Docs, Sheets, web pages) no longer forces a black colour on the text, causing it to be invisible in dark mode. Near-black and near-white colour attributes are stripped on paste so text inherits the editor's theme colour.
+
 ## [1.5.1] — 2026-05-27
 
 ### Fixed
