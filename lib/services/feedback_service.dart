@@ -29,6 +29,8 @@ class FeedbackService {
 
   bool get hasSubmittedThisSession => _submittedThisSession;
 
+  void reset() => _submittedThisSession = false;
+
   Future<void> submit({
     required String message,
     String? senderEmail,

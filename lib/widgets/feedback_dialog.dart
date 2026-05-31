@@ -104,11 +104,21 @@ class _FeedbackDialogState extends ConsumerState<FeedbackDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Found a bug or have a suggestion? Let us know.'),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 13,
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             TextFormField(
               controller: _messageController,
               maxLength: _maxLength,
-              maxLines: 5,
+              maxLines: 4,
               autofocus: true,
               decoration: const InputDecoration(
                 hintText: 'Describe the issue or idea…',
@@ -118,16 +128,6 @@ class _FeedbackDialogState extends ConsumerState<FeedbackDialog> {
                   ? 'Please enter at least $_minLength characters.'
                   : null,
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                _error!,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 13,
-                ),
-              ),
-            ],
           ],
         ),
       ),
