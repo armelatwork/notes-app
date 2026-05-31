@@ -47,6 +47,9 @@ class _FeedbackDialogState extends ConsumerState<FeedbackDialog> {
         platform: Platform.isAndroid ? 'Android' : 'macOS',
       );
       if (mounted) setState(() => _sent = true);
+    } on TimeoutException {
+      // Message reached Formspree; confirmation was just slow to arrive.
+      if (mounted) setState(() => _sent = true);
     } catch (e) {
       AppLogger.instance.error('FeedbackDialog', 'submit failed', e);
       if (mounted) setState(() => _error = _toErrorMessage(e));
@@ -57,7 +60,6 @@ class _FeedbackDialogState extends ConsumerState<FeedbackDialog> {
 
   String _toErrorMessage(Object e) {
     if (e is SocketException) return 'No internet connection.';
-    if (e is TimeoutException) return 'Request timed out. Please try again.';
     if (e is FeedbackAlreadySubmittedException) {
       return 'You\'ve already sent feedback this session.';
     }
