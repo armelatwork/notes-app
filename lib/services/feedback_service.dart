@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:http/http.dart' as http;
 
 const _kFormspreeEndpoint = 'https://formspree.io/f/mjgzpkpb';
@@ -35,19 +37,27 @@ class FeedbackService {
   }) async {
     if (_submittedThisSession) throw FeedbackAlreadySubmittedException();
 
-    final response = await _client
-        .post(
-          Uri.parse(_kFormspreeEndpoint),
-          headers: {'Accept': 'application/json'},
-          body: {
-            'message': message,
-            'email': senderEmail ?? '',
-            '_platform': platform,
-            '_version': appVersion,
-            '_gotcha': '',
-          },
-        )
-        .timeout(_kTimeout);
+    final http.Response response;
+    try {
+      response = await _client
+          .post(
+            Uri.parse(_kFormspreeEndpoint),
+            headers: {'Accept': 'application/json'},
+            body: {
+              'message': message,
+              'email': senderEmail ?? '',
+              '_platform': platform,
+              '_version': appVersion,
+              '_gotcha': '',
+            },
+          )
+          .timeout(_kTimeout);
+    } on TimeoutException {
+      // The request was dispatched and Formspree likely received it.
+      // Mark as submitted to prevent a duplicate send on retry.
+      _submittedThisSession = true;
+      rethrow;
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw FeedbackSubmissionException(response.statusCode);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -133,6 +135,54 @@ void main() {
 
       // Assert
       expect(service.hasSubmittedThisSession, isFalse);
+    });
+
+    test('submit_withTimeout_marksSessionAsSubmitted', () async {
+      // Arrange — client times out after the request is dispatched
+      final client =
+          MockClient((_) async => throw TimeoutException('timeout'));
+      final service = _serviceWith(client);
+
+      // Act
+      try {
+        await service.submit(
+          message: _kArgs.message,
+          appVersion: _kArgs.appVersion,
+          platform: _kArgs.platform,
+        );
+      } on TimeoutException {
+        // expected — testing behaviour after the timeout
+      }
+
+      // Assert — message likely reached Formspree; block a duplicate
+      expect(service.hasSubmittedThisSession, isTrue);
+    });
+
+    test('submit_afterTimeout_throwsFeedbackAlreadySubmittedException',
+        () async {
+      // Arrange — first call times out
+      final client =
+          MockClient((_) async => throw TimeoutException('timeout'));
+      final service = _serviceWith(client);
+      try {
+        await service.submit(
+          message: _kArgs.message,
+          appVersion: _kArgs.appVersion,
+          platform: _kArgs.platform,
+        );
+      } on TimeoutException {
+        // expected — testing behaviour after the timeout
+      }
+
+      // Act & Assert — second call must be blocked
+      expect(
+        () => service.submit(
+          message: _kArgs.message,
+          appVersion: _kArgs.appVersion,
+          platform: _kArgs.platform,
+        ),
+        throwsA(isA<FeedbackAlreadySubmittedException>()),
+      );
     });
   });
 }
