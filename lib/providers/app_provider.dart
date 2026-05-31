@@ -15,6 +15,7 @@ import '../services/device_service.dart';
 import '../services/drive_sync_service.dart';
 import '../services/encryption_service.dart';
 import '../services/local_auth_service.dart';
+import '../services/feedback_service.dart';
 import '../services/persistence_service.dart';
 import '../services/sharing_service.dart';
 import '../services/sync_log_service.dart';
@@ -199,6 +200,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
       await LocalAuthService.instance.signOut();
     }
     EncryptionService.instance.clear();
+    FeedbackService.instance.reset();
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);
     ref.read(selectedNoteProvider.notifier).state = null;
@@ -258,6 +260,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     DriveSyncService.instance.clearCache();
     SyncLogService.instance.clearCache();
     EncryptionService.instance.clear();
+    FeedbackService.instance.reset();
     ref.invalidate(notesProvider);
     ref.invalidate(foldersProvider);
     ref.read(selectedNoteProvider.notifier).state = null;

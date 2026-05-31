@@ -184,5 +184,52 @@ void main() {
         throwsA(isA<FeedbackAlreadySubmittedException>()),
       );
     });
+
+    test('reset_afterSuccessfulSubmit_allowsSecondSubmit', () async {
+      // Arrange
+      final client = MockClient((_) async => _response(200));
+      final service = _serviceWith(client);
+      await service.submit(
+        message: _kArgs.message,
+        appVersion: _kArgs.appVersion,
+        platform: _kArgs.platform,
+      );
+
+      // Act
+      service.reset();
+
+      // Assert
+      expect(service.hasSubmittedThisSession, isFalse);
+      await expectLater(
+        service.submit(
+          message: _kArgs.message,
+          appVersion: _kArgs.appVersion,
+          platform: _kArgs.platform,
+        ),
+        completes,
+      );
+    });
+
+    test('reset_afterTimeout_allowsSecondSubmit', () async {
+      // Arrange — first call times out
+      final client =
+          MockClient((_) async => throw TimeoutException('timeout'));
+      final service = _serviceWith(client);
+      try {
+        await service.submit(
+          message: _kArgs.message,
+          appVersion: _kArgs.appVersion,
+          platform: _kArgs.platform,
+        );
+      } on TimeoutException {
+        // expected
+      }
+
+      // Act
+      service.reset();
+
+      // Assert
+      expect(service.hasSubmittedThisSession, isFalse);
+    });
   });
 }
