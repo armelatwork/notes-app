@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Pin notes** — pin any note so it always appears at the top of every view. Pinned notes appear in a sticky group above all others in All Notes, folders, and inbox. Pin state syncs to Google Drive. Pin or unpin via the pin icon in the note title bar, or via the context menu (right-click on macOS, long-press on Android).
 - **Theme picker** — choose Light, Dark, or System in Settings → Appearance. The preference is saved and restored on next launch.
 
 ### Fixed
