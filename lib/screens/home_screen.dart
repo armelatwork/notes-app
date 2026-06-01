@@ -429,6 +429,12 @@ class _NarrowLayoutState extends ConsumerState<_NarrowLayout> {
                 onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
             if (_page == 1 && selectedNote != null) ...[
+              if (ref.watch(claudeKeyVerifiedProvider).valueOrNull ?? false)
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  tooltip: 'AI helper',
+                  onPressed: () => ref.read(aiHelperRequestProvider.notifier).state++,
+                ),
               if (isGoogleUser)
                 IconButton(
                   icon: Icon(selectedNote.isShared

@@ -20,7 +20,6 @@ import 'share_dialog.dart';
 import '../services/rich_clipboard_service.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
-import '../utils/markdown_utils.dart';
 import '../utils/note_utils.dart';
 import 'ai_suggestion_sheet.dart';
 import 'note_editor_widgets.dart';
@@ -289,7 +288,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     final plainText = _controller!.document.toPlainText().trim();
     if (plainText.isEmpty) return;
     setState(() => _isAiSheetOpen = true);
-    final suggestion = await showModalBottomSheet<String>(
+    final doc = await showModalBottomSheet<Document>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -297,11 +296,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     );
     if (!mounted) return;
     setState(() => _isAiSheetOpen = false);
-    if (suggestion != null) _applyAiSuggestion(suggestion);
+    if (doc != null) _applyAiSuggestion(doc);
   }
 
-  void _applyAiSuggestion(String text) {
-    final doc = quillDocumentFromMarkdown(text);
+  void _applyAiSuggestion(Document doc) {
     _initNoteController(doc);
     _scheduleSave();
     setState(() {});
@@ -322,6 +320,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    // AI helper trigger from Android AppBar wand button.
+    ref.listen(aiHelperRequestProvider, (prev, next) {
+      if (next > (prev ?? 0) && _controller != null) _onAiHelper();
+    });
     // Real-time listener: apply remote changes when this is a shared note
     // and the current user has no unsaved edits.
     final firestoreId = note.firestoreId;

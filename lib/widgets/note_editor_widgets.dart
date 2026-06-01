@@ -730,13 +730,13 @@ class NoteTitleField extends StatelessWidget {
               ),
             ),
           ),
-          if (onAiHelper != null)
-            IconButton(
-              icon: const Icon(Icons.auto_awesome_outlined, size: 22),
-              tooltip: 'AI helper',
-              onPressed: onAiHelper,
-            ),
           if (isMacOS) ...[
+            if (onAiHelper != null)
+              IconButton(
+                icon: const Icon(Icons.auto_awesome_outlined, size: 22),
+                tooltip: 'AI helper',
+                onPressed: onAiHelper,
+              ),
             if (onShare != null)
               IconButton(
                 icon: Icon(

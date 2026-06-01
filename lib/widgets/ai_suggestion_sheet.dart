@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import '../services/claude_api_service.dart';
+import '../utils/markdown_utils.dart';
 
 enum _SheetState { loading, loaded, error }
 
@@ -14,7 +16,8 @@ class AiSuggestionSheet extends StatefulWidget {
 
 class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
   _SheetState _state = _SheetState.loading;
-  String _suggestion = '';
+  Document? _document;
+  QuillController? _quillController;
   String _errorMessage = '';
 
   @override
@@ -23,11 +26,30 @@ class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
     _rewrite();
   }
 
+  @override
+  void dispose() {
+    _quillController?.dispose();
+    super.dispose();
+  }
+
   Future<void> _rewrite() async {
     setState(() => _state = _SheetState.loading);
+    _quillController?.dispose();
+    _quillController = null;
     try {
-      final result = await ClaudeApiService.instance.rewriteNote(widget.noteContent);
-      if (mounted) setState(() { _suggestion = result; _state = _SheetState.loaded; });
+      final markdown = await ClaudeApiService.instance.rewriteNote(widget.noteContent);
+      final doc = quillDocumentFromMarkdown(markdown);
+      if (mounted) {
+        setState(() {
+          _document = doc;
+          _quillController = QuillController(
+            document: doc,
+            selection: const TextSelection.collapsed(offset: 0),
+            readOnly: true,
+          );
+          _state = _SheetState.loaded;
+        });
+      }
     } on ClaudeException catch (e) {
       if (mounted) setState(() { _errorMessage = _messageFor(e); _state = _SheetState.error; });
     } catch (_) {
@@ -44,7 +66,7 @@ class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
     ClaudeErrorKind.server => 'Claude is temporarily unavailable. Try again later.',
   };
 
-  void _apply() => Navigator.of(context).pop(_suggestion);
+  void _apply() => Navigator.of(context).pop(_document);
   void _dismiss() => Navigator.of(context).pop();
 
   @override
@@ -56,7 +78,7 @@ class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
       expand: false,
       builder: (_, scrollController) => _SheetContent(
         state: _state,
-        suggestion: _suggestion,
+        quillController: _quillController,
         errorMessage: _errorMessage,
         scrollController: scrollController,
         onApply: _apply,
@@ -69,7 +91,7 @@ class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
 
 class _SheetContent extends StatelessWidget {
   final _SheetState state;
-  final String suggestion;
+  final QuillController? quillController;
   final String errorMessage;
   final ScrollController scrollController;
   final VoidCallback onApply;
@@ -78,7 +100,7 @@ class _SheetContent extends StatelessWidget {
 
   const _SheetContent({
     required this.state,
-    required this.suggestion,
+    required this.quillController,
     required this.errorMessage,
     required this.scrollController,
     required this.onApply,
@@ -128,15 +150,16 @@ class _SheetContent extends StatelessWidget {
             ),
           ),
         ),
-      _SheetState.loaded => ListView(
-          controller: scrollController,
+      _SheetState.loaded => Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-          children: [
-            SelectableText(
-              suggestion,
-              style: const TextStyle(fontSize: 15, height: 1.6),
+          child: QuillEditor.basic(
+            controller: quillController!,
+            scrollController: scrollController,
+            config: const QuillEditorConfig(
+              enableInteractiveSelection: true,
+              enableSelectionToolbar: false,
             ),
-          ],
+          ),
         ),
     };
   }

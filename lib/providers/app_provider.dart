@@ -36,6 +36,7 @@ final pollTriggerProvider = StateProvider<int>((ref) => 0);
 final claudeKeyVerifiedProvider = FutureProvider<bool>(
   (_) => ClaudeApiService.instance.isVerified(),
 );
+final aiHelperRequestProvider = StateProvider<int>((ref) => 0);
 
 enum DriveStorageSeverity { none, warning, exceeded }
 
