@@ -60,9 +60,11 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
       preview: note.preview,
       folderId: note.folderId,
     );
+    // Get a DB-assigned ID first, then go through saveNote so the copy is
+    // added to pendingNotes and scheduled for Drive sync like any other save.
     final id = await DatabaseService.instance.saveNote(copy);
     copy.id = id;
-    await reload();
+    await saveNote(copy);
     return copy;
   }
 

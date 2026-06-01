@@ -115,6 +115,23 @@ class _DuplicateCapturingNotifier extends NotesNotifier {
   }
 }
 
+/// Mirrors the real duplicateNote flow (call saveNote after creating copy) but
+/// bypasses DatabaseService so the test has no Isar dependency.
+class _DuplicateViaSaveTrackingNotifier extends _TrackingNotifier {
+  @override
+  Future<Note> duplicateNote(Note note) async {
+    final sourceTitle = note.title.isEmpty ? 'New Note' : note.title;
+    final copy = Note.create(
+      title: 'Copy - $sourceTitle',
+      content: note.content,
+      preview: note.preview,
+      folderId: note.folderId,
+    )..id = 99;
+    await saveNote(copy);
+    return copy;
+  }
+}
+
 // ── Container helpers ─────────────────────────────────────────────────────────
 
 ProviderContainer _makeContainer(NotesNotifier notesNotifier) =>
@@ -422,6 +439,20 @@ void main() {
       await notifier.duplicateNote(source);
 
       expect(notifier.captured?.isPinned, isFalse);
+    });
+
+    test('duplicateNote_queuesForDriveSync_whenGoogleUser', () async {
+      final source = Note.create(title: 'Doc', content: '{}', preview: '')
+        ..id = 1;
+      final notifier = _DuplicateViaSaveTrackingNotifier();
+      final container = _makeContainerWithGoogle(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      // ignore: invalid_use_of_visible_for_testing_member
+      expect(notifier.pendingNotes.values.single.title, 'Copy - Doc');
     });
 
     test('duplicateNote_doesNotInheritSharedUsers', () async {
