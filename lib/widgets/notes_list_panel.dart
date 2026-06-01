@@ -70,6 +70,8 @@ class NotesListPanel extends ConsumerWidget {
                         ref.read(notesProvider.notifier).deleteNote(note.id),
                     onMoveToFolder: () =>
                         _showFolderPicker(context, ref, note),
+                    onDuplicate: () =>
+                        ref.read(notesProvider.notifier).duplicateNote(note),
                     onShare: isGoogleUser
                         ? () => showShareDialog(context, note,
                             onNoteUpdated: () =>

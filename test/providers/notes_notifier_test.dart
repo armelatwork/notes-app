@@ -90,6 +90,31 @@ class _GuardedNotifier extends NotesNotifier {
   }
 }
 
+class _DuplicateCapturingNotifier extends NotesNotifier {
+  final List<Note> _store;
+  Note? captured;
+
+  _DuplicateCapturingNotifier(Note source) : _store = [source..id = 1];
+
+  @override
+  Future<List<Note>> build() async => _store;
+
+  @override
+  Future<Note> duplicateNote(Note note) async {
+    final sourceTitle = note.title.isEmpty ? 'New Note' : note.title;
+    final copy = Note.create(
+      title: 'Copy - $sourceTitle',
+      content: note.content,
+      preview: note.preview,
+      folderId: note.folderId,
+    )..id = _store.length + 1;
+    _store.add(copy);
+    state = AsyncData(List.from(_store));
+    captured = copy;
+    return copy;
+  }
+}
+
 // ── Container helpers ─────────────────────────────────────────────────────────
 
 ProviderContainer _makeContainer(NotesNotifier notesNotifier) =>
@@ -319,6 +344,72 @@ void main() {
 
         expect(notifier.lastDeletedImages, contains('img_abc.jpg'));
       });
+    });
+  });
+
+  group('NotesNotifier – duplicateNote', () {
+    Note makeNote(String title) =>
+        Note.create(title: title, content: '{}', preview: '');
+
+    test('duplicateNote_setsTitle_withCopyPrefix', () async {
+      final source = makeNote('Meeting Notes');
+      final notifier = _DuplicateCapturingNotifier(source);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      expect(notifier.captured?.title, 'Copy - Meeting Notes');
+    });
+
+    test('duplicateNote_emptyTitle_usesNewNoteFallback', () async {
+      final source = makeNote('')..id = 1;
+      final notifier = _DuplicateCapturingNotifier(source);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      expect(notifier.captured?.title, 'Copy - New Note');
+    });
+
+    test('duplicateNote_preservesContent', () async {
+      final source = makeNote('Note')
+        ..content = '[{"insert":"hello world"}]';
+      final notifier = _DuplicateCapturingNotifier(source);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      expect(notifier.captured?.content, '[{"insert":"hello world"}]');
+    });
+
+    test('duplicateNote_preservesFolderId', () async {
+      final source = makeNote('Note')..folderId = 7;
+      final notifier = _DuplicateCapturingNotifier(source);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      expect(notifier.captured?.folderId, 7);
+    });
+
+    test('duplicateNote_addsNoteToState', () async {
+      final source = makeNote('Note');
+      final notifier = _DuplicateCapturingNotifier(source);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      expect(container.read(notesProvider).requireValue, hasLength(2));
     });
   });
 }

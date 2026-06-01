@@ -165,6 +165,7 @@ class _NoteTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onMoveToFolder;
+  final VoidCallback onDuplicate;
   final VoidCallback? onShare;
   final VoidCallback? onPin;
 
@@ -175,6 +176,7 @@ class _NoteTile extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onMoveToFolder,
+    required this.onDuplicate,
     this.onShare,
     this.onPin,
   });
@@ -292,6 +294,14 @@ class _NoteTile extends StatelessWidget {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.copy_outlined),
+              title: const Text('Duplicate'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onDuplicate();
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
               title: const Text('Delete',
                   style: TextStyle(color: Colors.red)),
@@ -347,12 +357,14 @@ class _NoteTile extends StatelessWidget {
         if (onShare != null)
           const PopupMenuItem(value: 'share', child: Text('Share')),
         const PopupMenuItem(value: 'move', child: Text('Move to Folder')),
+        const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
         const PopupMenuItem(value: 'delete', child: Text('Delete Note')),
       ],
     );
     if (result == 'pin') onPin?.call();
     if (result == 'share') onShare?.call();
     if (result == 'move') onMoveToFolder();
+    if (result == 'duplicate') onDuplicate();
     if (result == 'delete') onDelete();
   }
 }

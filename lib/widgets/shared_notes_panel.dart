@@ -96,6 +96,8 @@ class _SharedNotesPanel extends ConsumerWidget {
                   ref.read(notesProvider.notifier).deleteNote(note.id);
                 },
                 onMoveToFolder: () => _showFolderPicker(context, ref, note),
+                onDuplicate: () =>
+                    ref.read(notesProvider.notifier).duplicateNote(note),
                 onShare: () => showShareDialog(context, note,
                     onNoteUpdated: () =>
                         ref.read(notesProvider.notifier).reload()),

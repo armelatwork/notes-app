@@ -52,6 +52,20 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     return note;
   }
 
+  Future<Note> duplicateNote(Note note) async {
+    final sourceTitle = note.title.isEmpty ? 'New Note' : note.title;
+    final copy = Note.create(
+      title: 'Copy - $sourceTitle',
+      content: note.content,
+      preview: note.preview,
+      folderId: note.folderId,
+    );
+    final id = await DatabaseService.instance.saveNote(copy);
+    copy.id = id;
+    await reload();
+    return copy;
+  }
+
   /// Saves locally and schedules a push. Title changes use 5 s; content edits 15 s.
   Future<void> saveNote(Note note,
       {List<String> deletedImageFilenames = const []}) async {
