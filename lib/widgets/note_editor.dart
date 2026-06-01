@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_quill/quill_delta.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -300,9 +301,21 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   void _applyAiSuggestion(Document doc) {
-    _initNoteController(doc);
+    // Replace content via compose so the controller instance is preserved.
+    // Replacing the controller entirely disposes it mid-frame, causing the
+    // QuillEditor to lose its binding and ignore edits until re-focused.
+    // compose() also records the replacement as one undoable action.
+    final currentLength = _controller!.document.length;
+    final replaceDelta = Delta()..delete(currentLength);
+    for (final op in doc.toDelta().toList()) {
+      if (op.isInsert) replaceDelta.insert(op.data, op.attributes);
+    }
+    _controller!.compose(
+      replaceDelta,
+      const TextSelection.collapsed(offset: 0),
+      ChangeSource.local,
+    );
     _scheduleSave();
-    setState(() {});
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
