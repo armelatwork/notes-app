@@ -92,5 +92,27 @@ void main() {
       final doc = quillDocumentFromMarkdown('hello');
       expect(doc.toPlainText().endsWith('\n'), isTrue);
     });
+
+    test('quillDocumentFromMarkdown_twoParagraphs_separatedByNewline', () {
+      final doc = quillDocumentFromMarkdown('First paragraph.\n\nSecond paragraph.');
+      final plain = doc.toPlainText();
+      final p1 = plain.indexOf('First paragraph.');
+      final p2 = plain.indexOf('Second paragraph.');
+      expect(p1, greaterThanOrEqualTo(0));
+      expect(p2, greaterThan(p1));
+      final between = plain.substring(p1 + 'First paragraph.'.length, p2);
+      expect(between.contains('\n'), isTrue);
+    });
+
+    test('quillDocumentFromMarkdown_paragraphAfterHeading_separatedByNewline', () {
+      final doc = quillDocumentFromMarkdown('# Title\n\nBody text here.');
+      final plain = doc.toPlainText();
+      expect(plain.indexOf('Title') < plain.indexOf('Body text'), isTrue);
+      final between = plain.substring(
+        plain.indexOf('Title') + 'Title'.length,
+        plain.indexOf('Body text'),
+      );
+      expect(between.contains('\n'), isTrue);
+    });
   });
 }

@@ -10,10 +10,16 @@ import '../services/app_logger.dart';
 Document quillDocumentFromMarkdown(String markdownText) {
   if (markdownText.trim().isEmpty) return Document();
   try {
-    final html = md.markdownToHtml(
+    final rawHtml = md.markdownToHtml(
       markdownText,
       extensionSet: md.ExtensionSet.gitHubFlavored,
     );
+    // flutter_quill_delta_from_html classifies <p> as inline (not block),
+    // so it never inserts a block-terminating \n between plain paragraphs.
+    // <div> IS classified as block, so replacing <p> fixes paragraph breaks.
+    final html = rawHtml
+        .replaceAll('<p>', '<div>')
+        .replaceAll('</p>', '</div>');
     final delta = HtmlToDelta().convert(html);
     return Document.fromJson(delta.toJson());
   } catch (e) {

@@ -82,6 +82,8 @@ class ClaudeApiService {
         apiKey: apiKey,
         body: _buildBody(
           prompt: 'Rewrite the following note to be clearer and better written. '
+              'Use plain paragraphs and headings only — do not use dashes or hyphens as list markers. '
+              'A dash may only appear as a subtraction operator in a math expression. '
               'Return only the rewritten text, no explanations or commentary:\n\n$plainText',
           maxTokens: 4096,
         ),
