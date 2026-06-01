@@ -370,7 +370,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
 
   Widget _buildEditorLayout() {
     final aiVerified =
-        ref.watch(claudeKeyVerifiedProvider).valueOrNull ?? false;
+        ref.watch(aiKeyVerifiedProvider).valueOrNull ?? false;
     // ValueKey forces toolbar rebuild on controller change so the history
     // buttons re-subscribe to the new controller.changes stream.
     final toolbar = NoteFormattingToolbar(

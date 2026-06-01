@@ -8,6 +8,7 @@ class PersistenceService {
   static const _folderKey = 'last_folder_id';
   static const _noteKey = 'last_note_id';
   static const _themeModeKey = 'theme_mode';
+  static const _aiProviderKey = 'ai_provider';
 
   // -1 means "All Notes", null means "No folder selected (root)"
   Future<void> saveLastFolder(int? folderId) async {
@@ -50,5 +51,15 @@ class PersistenceService {
       (m) => m.name == value,
       orElse: () => ThemeMode.system,
     );
+  }
+
+  Future<void> saveAiProvider(String providerName) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_aiProviderKey, providerName);
+  }
+
+  Future<String?> loadAiProvider() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_aiProviderKey);
   }
 }

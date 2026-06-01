@@ -6,8 +6,12 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/app_user.dart';
 import '../providers/app_provider.dart';
+import '../services/ai_service.dart';
 import '../services/app_logger.dart';
 import '../services/claude_api_service.dart';
+import '../services/gemini_api_service.dart';
+import '../services/openai_api_service.dart';
+import '../services/perplexity_api_service.dart';
 import '../services/persistence_service.dart';
 import '../widgets/feedback_dialog.dart';
 
@@ -179,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
           const _ThemePicker(),
           const Divider(),
           _SectionHeader(label: 'AI Helper (Beta)'),
-          const _ClaudeAiSection(),
+          const _AiHelperSection(),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
@@ -293,27 +297,80 @@ class _ThemePicker extends ConsumerWidget {
   }
 }
 
-class _ClaudeAiSection extends ConsumerStatefulWidget {
-  const _ClaudeAiSection();
+class _AiHelperSection extends ConsumerWidget {
+  const _AiHelperSection();
 
   @override
-  ConsumerState<_ClaudeAiSection> createState() => _ClaudeAiSectionState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(aiProviderProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: DropdownButtonFormField<AiProvider>(
+            initialValue: active,
+            decoration: const InputDecoration(
+              labelText: 'AI provider',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            items: const [
+              DropdownMenuItem(value: AiProvider.claude, child: Text('Claude (Anthropic)')),
+              DropdownMenuItem(value: AiProvider.perplexity, child: Text('Perplexity')),
+              DropdownMenuItem(value: AiProvider.gemini, child: Text('Gemini (Google)')),
+              DropdownMenuItem(value: AiProvider.chatgpt, child: Text('ChatGPT (OpenAI)')),
+            ],
+            onChanged: (p) {
+              if (p != null) ref.read(aiProviderProvider.notifier).select(p);
+            },
+          ),
+        ),
+        _AiKeyTile(
+          key: ValueKey(active),
+          provider: active,
+        ),
+      ],
+    );
+  }
 }
 
-class _ClaudeAiSectionState extends ConsumerState<_ClaudeAiSection> {
+class _AiKeyTile extends ConsumerStatefulWidget {
+  final AiProvider provider;
+  const _AiKeyTile({super.key, required this.provider});
+
+  @override
+  ConsumerState<_AiKeyTile> createState() => _AiKeyTileState();
+}
+
+class _AiKeyTileState extends ConsumerState<_AiKeyTile> {
   final _keyController = TextEditingController();
   bool _isLoading = false;
   bool _isVerified = false;
   String? _error;
 
+  AiService get _service => switch (widget.provider) {
+    AiProvider.claude => ClaudeApiService.instance,
+    AiProvider.perplexity => PerplexityApiService.instance,
+    AiProvider.gemini => GeminiApiService.instance,
+    AiProvider.chatgpt => OpenAiApiService.instance,
+  };
+
+  String get _hint => switch (widget.provider) {
+    AiProvider.claude => 'Anthropic API key (sk-ant-…)',
+    AiProvider.perplexity => 'Perplexity API key (pplx-…)',
+    AiProvider.gemini => 'Google AI API key (AIza…)',
+    AiProvider.chatgpt => 'OpenAI API key (sk-…)',
+  };
+
   @override
   void initState() {
     super.initState();
-    ClaudeApiService.instance.isVerified().then((v) {
+    _service.isVerified().then((v) {
       if (mounted) setState(() => _isVerified = v);
-    }).catchError((Object _) {
-      // Storage unavailable (e.g. test environment) — default to not verified.
-    });
+    }).catchError((Object _) {});
   }
 
   @override
@@ -324,42 +381,38 @@ class _ClaudeAiSectionState extends ConsumerState<_ClaudeAiSection> {
 
   Future<void> _activate() async {
     setState(() { _isLoading = true; _error = null; });
-    final error = await ClaudeApiService.instance.activateKey(_keyController.text);
+    final error = await _service.activateKey(_keyController.text);
     if (!mounted) return;
     if (error != null) {
       setState(() { _isLoading = false; _error = error; });
       return;
     }
     _keyController.clear();
+    ref.invalidate(aiKeyVerifiedProvider);
     ref.invalidate(claudeKeyVerifiedProvider);
     setState(() { _isLoading = false; _isVerified = true; _error = null; });
   }
 
   Future<void> _remove() async {
-    await ClaudeApiService.instance.clearKey();
+    await _service.clearKey();
     if (!mounted) return;
+    ref.invalidate(aiKeyVerifiedProvider);
     ref.invalidate(claudeKeyVerifiedProvider);
     setState(() { _isVerified = false; _error = null; });
-    AppLogger.instance.info('SettingsScreen', 'Claude API key removed');
+    AppLogger.instance.info('SettingsScreen', '${widget.provider.name} API key removed');
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isVerified) return _buildActive(context);
-    return _buildInput(context);
-  }
-
-  Widget _buildActive(BuildContext context) {
-    return ListTile(
-      leading: Icon(Icons.auto_awesome_outlined,
-          color: Theme.of(context).colorScheme.primary),
-      title: const Text('AI Helper'),
-      subtitle: const Text('API key active'),
-      trailing: TextButton(onPressed: _remove, child: const Text('Remove')),
-    );
-  }
-
-  Widget _buildInput(BuildContext context) {
+    if (_isVerified) {
+      return ListTile(
+        leading: Icon(Icons.auto_awesome_outlined,
+            color: Theme.of(context).colorScheme.primary),
+        title: const Text('AI Helper'),
+        subtitle: const Text('API key active'),
+        trailing: TextButton(onPressed: _remove, child: const Text('Remove')),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Column(
@@ -371,11 +424,12 @@ class _ClaudeAiSectionState extends ConsumerState<_ClaudeAiSection> {
                 child: TextField(
                   controller: _keyController,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Anthropic API key (sk-ant-…)',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    hintText: _hint,
+                    border: const OutlineInputBorder(),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                   ),
                 ),
               ),
@@ -385,7 +439,8 @@ class _ClaudeAiSectionState extends ConsumerState<_ClaudeAiSection> {
                 child: _isLoading
                     ? const SizedBox(
                         width: 16, height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
                     : const Text('Activate'),
               ),
@@ -393,7 +448,10 @@ class _ClaudeAiSectionState extends ConsumerState<_ClaudeAiSection> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 6),
-            Text(_error!, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error)),
+            Text(_error!,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.error)),
           ],
         ],
       ),

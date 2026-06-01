@@ -7,18 +7,14 @@ import 'ai_service.dart';
 import 'app_logger.dart';
 import 'secure_storage_service.dart';
 
-// Keep legacy type aliases so existing call-sites compile without changes.
-typedef ClaudeErrorKind = AiErrorKind;
-typedef ClaudeException = AiException;
+class PerplexityApiService implements AiService {
+  static final PerplexityApiService instance = PerplexityApiService._();
+  PerplexityApiService._();
 
-class ClaudeApiService implements AiService {
-  static final ClaudeApiService instance = ClaudeApiService._();
-  ClaudeApiService._();
-
-  static const _keyApiKey = 'claude_api_key';
-  static const _keyVerified = 'claude_api_key_verified';
-  static const _apiUrl = 'https://api.anthropic.com/v1/messages';
-  static const _model = 'claude-haiku-4-5-20251001';
+  static const _keyApiKey = 'perplexity_api_key';
+  static const _keyVerified = 'perplexity_api_key_verified';
+  static const _apiUrl = 'https://api.perplexity.ai/chat/completions';
+  static const _model = 'sonar';
   static const _activateTimeout = kActivateTimeout;
   static const _rewriteTimeout = kRewriteTimeout;
 
@@ -27,7 +23,8 @@ class ClaudeApiService implements AiService {
   @visibleForTesting
   void setClient(http.Client client) => _client = client;
 
-  Future<String?> readKey() => SecureStorageService.instance.read(_keyApiKey);
+  Future<String?> readKey() =>
+      SecureStorageService.instance.read(_keyApiKey);
 
   @override
   Future<bool> isVerified() async {
@@ -47,7 +44,7 @@ class ClaudeApiService implements AiService {
     if (error != null) return error;
     await SecureStorageService.instance.write(_keyApiKey, trimmed);
     await SecureStorageService.instance.write(_keyVerified, 'true');
-    AppLogger.instance.info('ClaudeApiService', 'API key activated');
+    AppLogger.instance.info('PerplexityApiService', 'API key activated');
     return null;
   }
 
@@ -66,7 +63,7 @@ class ClaudeApiService implements AiService {
     } on SocketException {
       return 'No internet connection.';
     } catch (e) {
-      AppLogger.instance.error('ClaudeApiService', 'testKey failed', e);
+      AppLogger.instance.error('PerplexityApiService', 'testKey failed', e);
       return 'An unexpected error occurred.';
     }
   }
@@ -91,7 +88,7 @@ class ClaudeApiService implements AiService {
       if (response.statusCode == 429) throw const AiException(AiErrorKind.rateLimit);
       if (response.statusCode != 200) throw const AiException(AiErrorKind.server);
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return (json['content'] as List).first['text'] as String;
+      return (json['choices'] as List).first['message']['content'] as String;
     } on AiException {
       rethrow;
     } on TimeoutException {
@@ -110,8 +107,7 @@ class ClaudeApiService implements AiService {
           .post(
             Uri.parse(_apiUrl),
             headers: {
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
+              'Authorization': 'Bearer $apiKey',
               'content-type': 'application/json',
             },
             body: jsonEncode(body),

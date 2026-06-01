@@ -7,18 +7,14 @@ import 'ai_service.dart';
 import 'app_logger.dart';
 import 'secure_storage_service.dart';
 
-// Keep legacy type aliases so existing call-sites compile without changes.
-typedef ClaudeErrorKind = AiErrorKind;
-typedef ClaudeException = AiException;
+class OpenAiApiService implements AiService {
+  static final OpenAiApiService instance = OpenAiApiService._();
+  OpenAiApiService._();
 
-class ClaudeApiService implements AiService {
-  static final ClaudeApiService instance = ClaudeApiService._();
-  ClaudeApiService._();
-
-  static const _keyApiKey = 'claude_api_key';
-  static const _keyVerified = 'claude_api_key_verified';
-  static const _apiUrl = 'https://api.anthropic.com/v1/messages';
-  static const _model = 'claude-haiku-4-5-20251001';
+  static const _keyApiKey = 'openai_api_key';
+  static const _keyVerified = 'openai_api_key_verified';
+  static const _apiUrl = 'https://api.openai.com/v1/chat/completions';
+  static const _model = 'gpt-4o-mini';
   static const _activateTimeout = kActivateTimeout;
   static const _rewriteTimeout = kRewriteTimeout;
 
@@ -47,7 +43,7 @@ class ClaudeApiService implements AiService {
     if (error != null) return error;
     await SecureStorageService.instance.write(_keyApiKey, trimmed);
     await SecureStorageService.instance.write(_keyVerified, 'true');
-    AppLogger.instance.info('ClaudeApiService', 'API key activated');
+    AppLogger.instance.info('OpenAiApiService', 'API key activated');
     return null;
   }
 
@@ -66,7 +62,7 @@ class ClaudeApiService implements AiService {
     } on SocketException {
       return 'No internet connection.';
     } catch (e) {
-      AppLogger.instance.error('ClaudeApiService', 'testKey failed', e);
+      AppLogger.instance.error('OpenAiApiService', 'testKey failed', e);
       return 'An unexpected error occurred.';
     }
   }
@@ -78,10 +74,7 @@ class ClaudeApiService implements AiService {
     try {
       final response = await _post(
         apiKey: apiKey,
-        body: _buildBody(
-          prompt: '$kRewritePrompt$plainText',
-          maxTokens: 4096,
-        ),
+        body: _buildBody(prompt: '$kRewritePrompt$plainText', maxTokens: 4096),
         timeout: _rewriteTimeout,
       );
       if (response.statusCode == 401) {
@@ -91,7 +84,7 @@ class ClaudeApiService implements AiService {
       if (response.statusCode == 429) throw const AiException(AiErrorKind.rateLimit);
       if (response.statusCode != 200) throw const AiException(AiErrorKind.server);
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return (json['content'] as List).first['text'] as String;
+      return (json['choices'] as List).first['message']['content'] as String;
     } on AiException {
       rethrow;
     } on TimeoutException {
@@ -110,8 +103,7 @@ class ClaudeApiService implements AiService {
           .post(
             Uri.parse(_apiUrl),
             headers: {
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
+              'Authorization': 'Bearer $apiKey',
               'content-type': 'application/json',
             },
             body: jsonEncode(body),

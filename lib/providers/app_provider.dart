@@ -19,7 +19,11 @@ import '../services/feedback_service.dart';
 import '../services/persistence_service.dart';
 import '../services/sharing_service.dart';
 import '../services/sync_log_service.dart';
+import '../services/ai_service.dart';
 import '../services/claude_api_service.dart';
+import '../services/gemini_api_service.dart';
+import '../services/openai_api_service.dart';
+import '../services/perplexity_api_service.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
 
@@ -33,10 +37,51 @@ enum SyncStatus { idle, syncing, success, error }
 final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 final noteReloadTriggerProvider = StateProvider<int>((ref) => 0);
 final pollTriggerProvider = StateProvider<int>((ref) => 0);
+// Keep for any existing call-sites; new code should use aiKeyVerifiedProvider.
 final claudeKeyVerifiedProvider = FutureProvider<bool>(
   (_) => ClaudeApiService.instance.isVerified(),
 );
 final aiHelperRequestProvider = StateProvider<int>((ref) => 0);
+
+// ── Multi-provider AI ─────────────────────────────────────────────────────────
+
+enum AiProvider { claude, perplexity, gemini, chatgpt }
+
+class AiProviderNotifier extends Notifier<AiProvider> {
+  @override
+  AiProvider build() => AiProvider.claude;
+
+  Future<void> select(AiProvider provider) async {
+    state = provider;
+    await PersistenceService.instance.saveAiProvider(provider.name);
+  }
+
+  Future<void> restore() async {
+    final saved = await PersistenceService.instance.loadAiProvider();
+    if (saved != null) {
+      state = AiProvider.values.firstWhere(
+        (p) => p.name == saved,
+        orElse: () => AiProvider.claude,
+      );
+    }
+  }
+}
+
+final aiProviderProvider =
+    NotifierProvider<AiProviderNotifier, AiProvider>(AiProviderNotifier.new);
+
+final activeAiServiceProvider = Provider<AiService>((ref) {
+  return switch (ref.watch(aiProviderProvider)) {
+    AiProvider.claude => ClaudeApiService.instance,
+    AiProvider.perplexity => PerplexityApiService.instance,
+    AiProvider.gemini => GeminiApiService.instance,
+    AiProvider.chatgpt => OpenAiApiService.instance,
+  };
+});
+
+final aiKeyVerifiedProvider = FutureProvider<bool>((ref) {
+  return ref.watch(activeAiServiceProvider).isVerified();
+});
 
 enum DriveStorageSeverity { none, warning, exceeded }
 
