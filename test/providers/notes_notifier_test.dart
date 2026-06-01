@@ -411,5 +411,34 @@ void main() {
 
       expect(container.read(notesProvider).requireValue, hasLength(2));
     });
+
+    test('duplicateNote_doesNotInheritPinnedState', () async {
+      final source = makeNote('Note')..isPinned = true;
+      final notifier = _DuplicateCapturingNotifier(source);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      expect(notifier.captured?.isPinned, isFalse);
+    });
+
+    test('duplicateNote_doesNotInheritSharedUsers', () async {
+      final source = makeNote('Note')
+        ..sharedWithEmails = ['alice@example.com']
+        ..sharedByEmail = 'bob@example.com'
+        ..firestoreId = 'doc-123';
+      final notifier = _DuplicateCapturingNotifier(source);
+      final container = _makeContainer(notifier);
+      addTearDown(container.dispose);
+      await container.read(notesProvider.future);
+
+      await notifier.duplicateNote(source);
+
+      expect(notifier.captured?.sharedWithEmails, isEmpty);
+      expect(notifier.captured?.sharedByEmail, isNull);
+      expect(notifier.captured?.firestoreId, isNull);
+    });
   });
 }
