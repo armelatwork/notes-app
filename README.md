@@ -32,6 +32,10 @@ Sign out via the user menu at the bottom of the sidebar.
 - **Delete (Android):** long-press a note and choose **Delete** from the bottom sheet.
 - **Share (macOS):** right-click any note in the list and choose **Share** to open the share dialog without opening the note.
 - **Share (Android):** long-press any note in the list and choose **Share** from the bottom sheet.
+- **Duplicate (macOS):** right-click a note and choose **Duplicate**.
+- **Duplicate (Android):** long-press a note and choose **Duplicate** from the bottom sheet.
+
+The duplicate is saved with the title *Copy - \<original title\>* in the same folder. It does not inherit pinned state or sharing settings.
 
 ### Rich Text Editor
 
@@ -93,6 +97,16 @@ The macOS menu bar Edit menu supports the following actions with standard shortc
 - The dialog lets you set the display text and URL independently.
 - Click a link in the editor to open it in the browser.
 - Right-click linked text to choose **Edit Link** and update or remove the link.
+
+### AI Writing Assistant
+
+Tap the **wand icon** (✦) in the note editor toolbar to open the AI assistant.
+
+1. The assistant analyses the note content and generates a suggested rewrite.
+2. Read the suggestion in the sheet. Enter a refinement prompt in the field at the bottom and tap **→** to apply it.
+3. Tap **Apply** to replace the note content with the suggestion, or **Dismiss** to close without changes.
+
+The suggestion is cached for the current editing session — tapping the wand again shows the last suggestion instantly without an additional API call. Closing the note clears the session cache.
 
 ### Note Sharing
 
@@ -164,6 +178,10 @@ The icon in the sidebar header reflects the current state:
 | ✗ Red | Persistent sync error — tap to retry |
 
 Tap the icon at any time to trigger an immediate sync.
+
+#### Storage warnings
+
+A warning banner appears when your Google Drive storage reaches 90% full (shown once per session). A persistent alert replaces it when storage is completely full and is shown on every sync attempt until space is freed.
 
 #### First login
 

@@ -29,6 +29,8 @@ import '../utils/note_utils.dart';
 
 part 'folders_provider.dart';
 part 'notes_provider.dart';
+part 'notes_drive_sync.dart';
+part 'app_provider_helpers.dart';
 
 // ── Sync status ───────────────────────────────────────────────────────────────
 
@@ -180,7 +182,6 @@ class AppUserNotifier extends Notifier<AppUser?> {
   }
 
   Future<void> _initGoogleSession(String userId, dynamic googleUser) async {
-    final enc = EncryptionService.instance;
     final drv = DriveSyncService.instance;
     // Always start with a clean folder cache so a stale ID from a previous
     // session never leaks into the new user's Drive requests.
@@ -189,48 +190,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     final api = await drv.getApi();
     if (api == null) return;
     final appFolderId = await drv.getOrCreateAppFolder(api);
-
-    // Prefer the locally stored key (SecureStorage). It is the key that was
-    // used to encrypt notes on this device and is preserved across sign-outs.
-    // This prevents data loss when another device generates a new random key
-    // (e.g. on a fresh install with empty SecureStorage) and overwrites Drive.
-    final localKey = await enc.readLocalKeyBase64(userId);
-    if (localKey != null) {
-      enc.initWithKey(Uint8List.fromList(base64Decode(localKey)));
-      // Self-repair: if Drive has drifted to a different key, restore the local one.
-      final remoteKey = await drv.fetchEncryptionKey(api, appFolderId);
-      if (remoteKey == null || remoteKey != localKey) {
-        AppLogger.instance.warn('AppUserNotifier',
-            'Drive key differs from local storage — restoring local key to Drive');
-        try {
-          await drv.uploadEncryptionKey(api, appFolderId, localKey);
-        } catch (e) {
-          AppLogger.instance.warn('AppUserNotifier', 'Drive key repair failed', e);
-        }
-      }
-    } else {
-      // No local key (fresh install). Fall back to Drive; persist locally to
-      // prevent future divergence.
-      final remoteKey = await drv.fetchEncryptionKey(api, appFolderId);
-      if (remoteKey != null) {
-        enc.initWithKey(Uint8List.fromList(base64Decode(remoteKey)));
-        await enc.saveCurrentKeyLocally(userId);
-      } else {
-        await enc.initForGoogleUser(userId);
-        final newKey = await enc.exportCurrentKeyBase64();
-        try {
-          await drv.uploadEncryptionKey(api, appFolderId, newKey);
-        } catch (e) {
-          // The parent folder may have been deleted from Drive between the list
-          // and the create calls. Clear the cache and retry with a fresh folder.
-          AppLogger.instance.warn(
-              'AppUserNotifier', 'uploadEncryptionKey failed, retrying with fresh folder', e);
-          drv.clearCache();
-          final freshFolderId = await drv.getOrCreateAppFolder(api);
-          await drv.uploadEncryptionKey(api, freshFolderId, newKey);
-        }
-      }
-    }
+    await _initEncryptionKey(api, appFolderId, userId);
     state = AppUser(
       id: userId,
       displayName: googleUser.displayName as String? ?? googleUser.email as String,
@@ -241,23 +201,23 @@ class AppUserNotifier extends Notifier<AppUser?> {
 
   void setLocalUser(AppUser user) => state = user;
 
+  // Flush pending Drive uploads before revoking auth so notes edited just
+  // before logout are not lost when clearAll() wipes the local copy.
+  Future<void> _flushPendingSync() async {
+    try {
+      await Future.wait([
+        ref.read(notesProvider.notifier).flushAndDrain(),
+        ref.read(foldersProvider.notifier).flushNow(),
+      ]).timeout(const Duration(seconds: 15));
+    } catch (e) {
+      AppLogger.instance.warn(
+          'AppUserNotifier', 'pre-logout sync flush failed or timed out', e);
+    }
+  }
+
   Future<void> signOut() async {
     final current = state;
-    // Flush pending Drive uploads before revoking auth or clearing caches.
-    // Without this, notes/folders modified just before logout are lost: the
-    // debounce timer is cancelled, data never reaches Drive, and clearAll()
-    // then wipes the local copy on the next line.
-    if (current?.type == AuthType.google) {
-      try {
-        await Future.wait([
-          ref.read(notesProvider.notifier).flushAndDrain(),
-          ref.read(foldersProvider.notifier).flushNow(),
-        ]).timeout(const Duration(seconds: 15));
-      } catch (e) {
-        AppLogger.instance.warn(
-            'AppUserNotifier', 'pre-logout sync flush failed or timed out', e);
-      }
-    }
+    if (current?.type == AuthType.google) await _flushPendingSync();
     DriveSyncService.instance.clearCache();
     SyncLogService.instance.clearCache();
     ref.read(notesProvider.notifier).cancelPendingPush();
@@ -282,55 +242,7 @@ class AppUserNotifier extends Notifier<AppUser?> {
     state = null;
   }
 
-  // Remote data (Firestore + Drive) is deleted first. If any remote step fails
-  // after all retries, the method throws and local data is left intact so the
-  // user can retry. Local data is only wiped once every remote deletion succeeds.
-  // State reset always runs even if the final signOut throws (e.g. keychain error).
-  Future<void> deleteAccount() async {
-    final current = state;
-    ref.read(notesProvider.notifier).cancelPendingPush();
-    ref.read(foldersProvider.notifier).cancelPendingPush();
-    ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
-
-    // Step 1 — remote cleanup (throws on failure so local data stays intact).
-    if (current?.type == AuthType.google) {
-      await _cleanupFirestoreSharing(current!);
-      await _withRetry(() async {
-        final api = await DriveSyncService.instance.getApi();
-        if (api == null) throw Exception('Could not connect to Google Drive');
-        await DriveSyncService.instance.deleteAppData(api);
-      }, 'Drive deletion');
-    }
-
-    // Step 2 — local data cleanup.
-    await DatabaseService.instance.clearAll();
-    try {
-      await deleteLocalImages();
-    } catch (e) {
-      AppLogger.instance.warn('AppUserNotifier', 'failed to delete local images', e);
-    }
-    try {
-      await PersistenceService.instance.saveLastFolder(null);
-      await PersistenceService.instance.saveLastNote(null);
-    } catch (e) {
-      AppLogger.instance.warn('AppUserNotifier', 'failed to clear persistence', e);
-    }
-
-    // Step 3 — auth signOut. A 10 s timeout ensures a hanging Firebase
-    // keychain call (common on macOS without a developer certificate) never
-    // blocks the state reset. The try-catch handles both throws and timeouts.
-    try {
-      if (current?.type == AuthType.google) {
-        await AuthService.instance.signOut()
-            .timeout(const Duration(seconds: 10));
-      } else if (current?.type == AuthType.local) {
-        await LocalAuthService.instance.deleteAccount();
-      }
-    } catch (e) {
-      AppLogger.instance.warn('AppUserNotifier', 'signOut during deleteAccount failed', e);
-    }
-
-    // Step 4 — state reset always runs.
+  void _resetState() {
     DriveSyncService.instance.clearCache();
     SyncLogService.instance.clearCache();
     EncryptionService.instance.clear();
@@ -340,6 +252,38 @@ class AppUserNotifier extends Notifier<AppUser?> {
     ref.read(selectedNoteProvider.notifier).state = null;
     ref.read(selectedFolderProvider.notifier).state = null;
     state = null;
+  }
+
+  // Remote data (Firestore + Drive) is deleted first. If any remote step fails
+  // after all retries, the method throws and local data is left intact so the
+  // user can retry. Local data is only wiped once every remote deletion succeeds.
+  // State reset always runs even if the final signOut throws (e.g. keychain error).
+  Future<void> deleteAccount() async {
+    final current = state;
+    ref.read(notesProvider.notifier).cancelPendingPush();
+    ref.read(foldersProvider.notifier).cancelPendingPush();
+    ref.read(driveStorageAlertProvider.notifier).state = DriveStorageAlert.none;
+    if (current?.type == AuthType.google) {
+      await _cleanupFirestoreSharing(current!);
+      await _withRetry(() async {
+        final api = await DriveSyncService.instance.getApi();
+        if (api == null) throw Exception('Could not connect to Google Drive');
+        await DriveSyncService.instance.deleteAppData(api);
+      }, 'Drive deletion');
+    }
+    await _deleteLocalData();
+    // A 10 s timeout ensures a hanging Firebase keychain call (common on
+    // macOS without a developer certificate) never blocks the state reset.
+    try {
+      if (current?.type == AuthType.google) {
+        await AuthService.instance.signOut().timeout(const Duration(seconds: 10));
+      } else if (current?.type == AuthType.local) {
+        await LocalAuthService.instance.deleteAccount();
+      }
+    } catch (e) {
+      AppLogger.instance.warn('AppUserNotifier', 'signOut during deleteAccount failed', e);
+    }
+    _resetState();
   }
 
   Future<void> _cleanupFirestoreSharing(AppUser user) async {

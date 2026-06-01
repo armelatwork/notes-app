@@ -165,6 +165,7 @@ class _NoteTile extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onMoveToFolder;
+  final VoidCallback onDuplicate;
   final VoidCallback? onShare;
   final VoidCallback? onPin;
 
@@ -175,6 +176,7 @@ class _NoteTile extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onMoveToFolder,
+    required this.onDuplicate,
     this.onShare,
     this.onPin,
   });
@@ -203,105 +205,72 @@ class _NoteTile extends StatelessWidget {
             .withValues(alpha: _kSelectedTileOpacity),
         onTap: onTap,
         onLongPress: isDragMode ? null : () => _showLongPressActions(context),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                note.title.isEmpty ? 'New Note' : note.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontWeight:
-                        isSelected ? FontWeight.w600 : FontWeight.w500,
-                    fontSize: 14),
-              ),
-            ),
-            if (note.isPinned)
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Icon(Icons.push_pin,
-                    size: 13, color: Theme.of(context).colorScheme.primary),
-              ),
-            if (note.isShared)
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Icon(
-                  note.isSharedByMe
-                      ? Icons.people
-                      : Icons.people_outline,
-                  size: 14,
-                  color: note.isSharedByMe
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.grey[400],
-                ),
-              ),
-          ],
-        ),
-        subtitle: Row(
-          children: [
-            Text(_formatDate(note.updatedAt),
-                style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                note.preview,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-              ),
-            ),
-          ],
-        ),
+        title: _buildTitleRow(context),
+        subtitle: _buildSubtitle(),
       ),
+    );
+  }
+
+  Widget _buildTitleRow(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            note.title.isEmpty ? 'New Note' : note.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 14),
+          ),
+        ),
+        if (note.isPinned)
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Icon(Icons.push_pin,
+                size: 13, color: Theme.of(context).colorScheme.primary),
+          ),
+        if (note.isShared)
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Icon(
+              note.isSharedByMe ? Icons.people : Icons.people_outline,
+              size: 14,
+              color: note.isSharedByMe
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.grey[400],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSubtitle() {
+    return Row(
+      children: [
+        Text(_formatDate(note.updatedAt),
+            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(note.preview,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+        ),
+      ],
     );
   }
 
   void _showLongPressActions(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (onPin != null)
-              ListTile(
-                leading: Icon(note.isPinned
-                    ? Icons.push_pin_outlined
-                    : Icons.push_pin),
-                title: Text(note.isPinned ? 'Unpin' : 'Pin Note'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onPin!();
-                },
-              ),
-            if (onShare != null)
-              ListTile(
-                leading: const Icon(Icons.share_outlined),
-                title: const Text('Share'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onShare!();
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.drive_file_move_outlined),
-              title: const Text('Move to Folder'),
-              onTap: () {
-                Navigator.pop(ctx);
-                onMoveToFolder();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Delete',
-                  style: TextStyle(color: Colors.red)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showDeleteConfirmation(context);
-              },
-            ),
-          ],
-        ),
+      builder: (_) => _NoteActionsSheet(
+        note: note,
+        onPin: onPin,
+        onShare: onShare,
+        onMoveToFolder: onMoveToFolder,
+        onDuplicate: onDuplicate,
+        onDeleteRequested: () => _showDeleteConfirmation(context),
       ),
     );
   }
@@ -347,12 +316,83 @@ class _NoteTile extends StatelessWidget {
         if (onShare != null)
           const PopupMenuItem(value: 'share', child: Text('Share')),
         const PopupMenuItem(value: 'move', child: Text('Move to Folder')),
+        const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
         const PopupMenuItem(value: 'delete', child: Text('Delete Note')),
       ],
     );
     if (result == 'pin') onPin?.call();
     if (result == 'share') onShare?.call();
     if (result == 'move') onMoveToFolder();
+    if (result == 'duplicate') onDuplicate();
     if (result == 'delete') onDelete();
+  }
+}
+
+// ── Note actions bottom sheet ─────────────────────────────────────────────────
+
+class _NoteActionsSheet extends StatelessWidget {
+  final Note note;
+  final VoidCallback? onPin;
+  final VoidCallback? onShare;
+  final VoidCallback onMoveToFolder;
+  final VoidCallback onDuplicate;
+  final VoidCallback onDeleteRequested;
+
+  const _NoteActionsSheet({
+    required this.note,
+    required this.onMoveToFolder,
+    required this.onDuplicate,
+    required this.onDeleteRequested,
+    this.onPin,
+    this.onShare,
+  });
+
+  ListTile _tile(BuildContext ctx,
+      {required IconData icon,
+      required String label,
+      Color? color,
+      required VoidCallback action}) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label,
+          style: color != null ? TextStyle(color: color) : null),
+      onTap: () { Navigator.pop(ctx); action(); },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onPin != null)
+            _tile(context,
+                icon: note.isPinned
+                    ? Icons.push_pin_outlined
+                    : Icons.push_pin,
+                label: note.isPinned ? 'Unpin' : 'Pin Note',
+                action: onPin!),
+          if (onShare != null)
+            _tile(context,
+                icon: Icons.share_outlined,
+                label: 'Share',
+                action: onShare!),
+          _tile(context,
+              icon: Icons.drive_file_move_outlined,
+              label: 'Move to Folder',
+              action: onMoveToFolder),
+          _tile(context,
+              icon: Icons.copy_outlined,
+              label: 'Duplicate',
+              action: onDuplicate),
+          _tile(context,
+              icon: Icons.delete_outline,
+              label: 'Delete',
+              color: Colors.red,
+              action: onDeleteRequested),
+        ],
+      ),
+    );
   }
 }
