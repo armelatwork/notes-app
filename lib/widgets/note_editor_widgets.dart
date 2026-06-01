@@ -157,6 +157,33 @@ class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
   final _menu = MenuController();
 
   @override
+  void initState() {
+    super.initState();
+    widget.ctrl.addListener(_onControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.ctrl.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() => setState(() {});
+
+  String get _label {
+    final value = widget.ctrl
+        .getSelectionStyle()
+        .attributes[Attribute.size.key]
+        ?.value as String?;
+    return switch (value) {
+      'small' => 'Small',
+      'large' => 'Large',
+      'huge' => 'Huge',
+      _ => 'Normal',
+    };
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MenuAnchor(
       controller: _menu,
@@ -168,6 +195,7 @@ class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
       ],
       child: Builder(
         builder: (ctx) => QuillToolbarIconButton(
+          key: const ValueKey('font-size-selector'),
           onPressed: () {
             if (_menu.isOpen) {
               _menu.close();
@@ -190,7 +218,7 @@ class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
           icon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Font size', style: TextStyle(
+              Text(_label, style: TextStyle(
                 color: IconTheme.of(ctx).color, fontSize: 13)),
               Icon(Icons.arrow_drop_down, size: 18),
             ],

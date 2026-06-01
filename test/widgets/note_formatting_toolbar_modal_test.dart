@@ -61,8 +61,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
-      // Button label ('Normal') + menu item 'Normal' → two widgets.
-      expect(find.text('Normal'), findsNWidgets(2));
+      // heading label 'Normal' + font-size label 'Normal' + menu item 'Normal' → three widgets.
+      expect(find.text('Normal'), findsNWidgets(3));
       expect(find.text('Heading 1'), findsOneWidget);
       expect(find.text('Heading 2'), findsOneWidget);
       expect(find.text('Heading 3'), findsOneWidget);
@@ -107,7 +107,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Normal'));
+      await tester.tap(find.widgetWithText(MenuItemButton, 'Normal'));
       await tester.pump();
 
       final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
@@ -129,12 +129,12 @@ void main() {
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Font size'));
+      await tester.tap(find.byKey(const ValueKey('font-size-selector')));
       await tester.pumpAndSettle();
 
       expect(find.text('Small'), findsOneWidget);
-      // heading button shows 'Normal' too (no heading active) → two widgets
-      expect(find.text('Normal'), findsNWidgets(2));
+      // heading button shows 'Normal' + font-size button shows 'Normal' + menu item 'Normal' → three
+      expect(find.text('Normal'), findsNWidgets(3));
       expect(find.text('Large'), findsOneWidget);
       expect(find.text('Huge'), findsOneWidget);
 
@@ -151,7 +151,7 @@ void main() {
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Font size'));
+      await tester.tap(find.byKey(const ValueKey('font-size-selector')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Large'));
