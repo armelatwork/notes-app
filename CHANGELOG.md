@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0] — 2026-06-01
+
+### Added
+
+- **AI Writing Assistant** — tap the wand icon (✦) in the note editor to generate an AI-powered rewrite of your note. Refine the suggestion with a follow-up prompt, then apply it with one tap. The suggestion is cached for the session so re-opening the sheet is instant. Supported providers: Claude (Anthropic), Perplexity, Gemini (Google), ChatGPT (OpenAI). Configure your provider and API key in Settings → AI Helper.
+- **Duplicate note** — right-click a note (macOS) or long-press (Android) and choose Duplicate to create an exact copy. The duplicate is saved with the title *Copy - \<original title\>* in the same folder, without pinned state or sharing settings.
+
 ## [1.6.1] — 2026-05-31
 
 ### Fixed
