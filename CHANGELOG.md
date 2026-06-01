@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1] — 2026-05-31
+
+### Fixed
+
+- Signing out from the Settings screen now returns to the login screen immediately instead of leaving the Settings page open.
+- Fixed a data-loss edge case where a fresh install on one device could generate a new encryption key and overwrite the correct key on Google Drive, making all notes on other devices unreadable. The app now treats the locally stored key as the source of truth and automatically restores it to Drive if the two ever drift apart.
+
 ## [1.6.0] — 2026-05-29
 
 ### Added
