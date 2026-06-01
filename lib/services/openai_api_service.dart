@@ -15,8 +15,8 @@ class OpenAiApiService implements AiService {
   static const _keyVerified = 'openai_api_key_verified';
   static const _apiUrl = 'https://api.openai.com/v1/chat/completions';
   static const _model = 'gpt-4o-mini';
-  static const _activateTimeout = Duration(seconds: 20);
-  static const _rewriteTimeout = Duration(seconds: 60);
+  static const _activateTimeout = kActivateTimeout;
+  static const _rewriteTimeout = kRewriteTimeout;
 
   http.Client _client = http.Client();
 

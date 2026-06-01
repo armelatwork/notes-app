@@ -15,8 +15,8 @@ class GeminiApiService implements AiService {
   static const _keyVerified = 'gemini_api_key_verified';
   static const _baseUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-  static const _activateTimeout = Duration(seconds: 20);
-  static const _rewriteTimeout = Duration(seconds: 60);
+  static const _activateTimeout = kActivateTimeout;
+  static const _rewriteTimeout = kRewriteTimeout;
 
   http.Client _client = http.Client();
 

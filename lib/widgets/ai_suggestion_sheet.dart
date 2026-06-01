@@ -5,7 +5,7 @@ import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../utils/markdown_utils.dart';
 
-enum _SheetState { loading, loaded, error }
+enum _SheetState { loading, retrying, loaded, error }
 
 class AiSuggestionSheet extends ConsumerStatefulWidget {
   final String noteContent;
@@ -38,26 +38,42 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
     setState(() => _state = _SheetState.loading);
     _quillController?.dispose();
     _quillController = null;
-    try {
-      final service = ref.read(activeAiServiceProvider);
-      final markdown = await service.rewriteNote(widget.noteContent);
-      final doc = quillDocumentFromMarkdown(markdown);
-      if (mounted) {
-        setState(() {
-          _document = doc;
-          _quillController = QuillController(
-            document: doc,
-            selection: const TextSelection.collapsed(offset: 0),
-            readOnly: true,
-          );
-          _state = _SheetState.loaded;
-        });
+
+    final service = ref.read(activeAiServiceProvider);
+    AiException? lastError;
+
+    for (var attempt = 0; attempt < kMaxRewriteAttempts; attempt++) {
+      if (attempt > 0) {
+        if (!mounted) return;
+        setState(() => _state = _SheetState.retrying);
+        await Future.delayed(const Duration(seconds: 2));
       }
-    } on AiException catch (e) {
-      if (mounted) setState(() { _errorMessage = _messageFor(e); _state = _SheetState.error; });
-    } catch (_) {
-      if (mounted) setState(() { _errorMessage = 'An unexpected error occurred.'; _state = _SheetState.error; });
+      try {
+        final markdown = await service.rewriteNote(widget.noteContent);
+        final doc = quillDocumentFromMarkdown(markdown);
+        if (mounted) {
+          setState(() {
+            _document = doc;
+            _quillController = QuillController(
+              document: doc,
+              selection: const TextSelection.collapsed(offset: 0),
+              readOnly: true,
+            );
+            _state = _SheetState.loaded;
+          });
+        }
+        return;
+      } on AiException catch (e) {
+        lastError = e;
+        // Only retry on transient failures.
+        if (e.kind != AiErrorKind.timeout && e.kind != AiErrorKind.network) break;
+      } catch (_) {
+        if (mounted) setState(() { _errorMessage = 'An unexpected error occurred.'; _state = _SheetState.error; });
+        return;
+      }
     }
+
+    if (mounted) setState(() { _errorMessage = _messageFor(lastError!); _state = _SheetState.error; });
   }
 
   String _messageFor(AiException e) => switch (e.kind) {
@@ -125,7 +141,7 @@ class _SheetContent extends StatelessWidget {
           const Divider(height: 1),
           Expanded(child: _body(context)),
           if (state == _SheetState.loaded) _Actions(onApply: onApply, onDismiss: onDismiss),
-          if (state == _SheetState.error) _Actions(onApply: onRetry, onDismiss: onDismiss, applyLabel: 'Retry'),
+          if (state == _SheetState.error)  _Actions(onApply: onRetry, onDismiss: onDismiss, applyLabel: 'Retry'),
         ],
       ),
     );
@@ -140,6 +156,16 @@ class _SheetContent extends StatelessWidget {
               CircularProgressIndicator(),
               SizedBox(height: 16),
               Text('Generating suggestion…'),
+            ],
+          ),
+        ),
+      _SheetState.retrying => const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Retrying…'),
             ],
           ),
         ),

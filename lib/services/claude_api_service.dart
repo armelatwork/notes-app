@@ -19,8 +19,8 @@ class ClaudeApiService implements AiService {
   static const _keyVerified = 'claude_api_key_verified';
   static const _apiUrl = 'https://api.anthropic.com/v1/messages';
   static const _model = 'claude-haiku-4-5-20251001';
-  static const _activateTimeout = Duration(seconds: 20);
-  static const _rewriteTimeout = Duration(seconds: 60);
+  static const _activateTimeout = kActivateTimeout;
+  static const _rewriteTimeout = kRewriteTimeout;
 
   http.Client _client = http.Client();
 

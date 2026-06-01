@@ -15,8 +15,8 @@ class PerplexityApiService implements AiService {
   static const _keyVerified = 'perplexity_api_key_verified';
   static const _apiUrl = 'https://api.perplexity.ai/chat/completions';
   static const _model = 'sonar';
-  static const _activateTimeout = Duration(seconds: 20);
-  static const _rewriteTimeout = Duration(seconds: 60);
+  static const _activateTimeout = kActivateTimeout;
+  static const _rewriteTimeout = kRewriteTimeout;
 
   http.Client _client = http.Client();
 

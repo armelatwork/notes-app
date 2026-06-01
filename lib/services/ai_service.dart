@@ -16,6 +16,11 @@ abstract class AiService {
   Future<String> rewriteNote(String plainText);
 }
 
+// Shared timeouts and retry config used by every provider implementation.
+const kActivateTimeout = Duration(seconds: 20);
+const kRewriteTimeout = Duration(seconds: 40);
+const kMaxRewriteAttempts = 2;
+
 // Shared rewrite prompt used by every provider implementation.
 const kRewritePrompt =
     'Rewrite the following note to be clearer and better written. '
