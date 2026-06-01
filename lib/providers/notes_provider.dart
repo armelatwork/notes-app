@@ -11,11 +11,12 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
   final Map<int, List<String>> pendingDeletedImages = {};
   final List<Note> _pendingMoves = [];
   Timer? _moveTimer;
-  Future<void> _pushQueue = Future.value();
-  // Guards against duplicate Isar records when openSharedNote is called
-  // concurrently for the same firestoreId (e.g. ref.listen + user tap).
-  // All concurrent callers receive the same Future and share one DB write.
-  final Map<String, Future<Note>> _openSharedNoteCache = {};
+  late final _driveOps = _NotesDriveOps(ref);
+  late final _sharedNoteOpener = _SharedNoteOpener(
+    ref: ref,
+    reload: reload,
+    scheduleSync: _scheduleSharedNoteSync,
+  );
 
   @override
   Future<List<Note>> build() => _load();
@@ -123,28 +124,7 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     final notes = List<Note>.from(_pendingMoves);
     _pendingMoves.clear();
     if (notes.isEmpty) return;
-    _run(() => _pushMovedNotes(notes));
-  }
-
-  Future<void> _pushMovedNotes(List<Note> notes) async {
-    final drv = DriveSyncService.instance;
-    final api = await drv.getApi();
-    if (api == null) return;
-    final appFolderId = await drv.getOrCreateAppFolder(api);
-    final modTimes = await Future.wait(
-      notes.map((n) => drv.uploadNote(api, appFolderId, n)),
-    );
-    final deviceId = await DeviceService.instance.id;
-    final userId = ref.read(appUserProvider)?.id;
-    if (userId == null) return;
-    final lastSeq = await SyncLogService.instance.appendEntries(
-      api, appFolderId,
-      [for (var i = 0; i < notes.length; i++)
-        (op: 'upsert', type: 'note', entityId: notes[i].id,
-         filename: null as String?, deviceId: deviceId,
-         modifiedTime: modTimes[i])],
-    );
-    await SyncLogService.instance.saveLastSeq(userId, lastSeq);
+    _driveOps.run(() => _driveOps.pushMovedNotes(notes));
   }
 
   Future<void> deleteNote(int id) async {
@@ -157,47 +137,18 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     if (note?.driveFileId != null &&
         ref.read(appUserProvider)?.type == AuthType.google) {
       ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
-      _run(() => _pushDelete(note!));
+      _driveOps.run(() => _driveOps.pushDelete(note!));
     }
   }
 
-  Future<Note> openSharedNote(SharedNoteData data) {
-    final fid = data.firestoreId;
-    if (_openSharedNoteCache.containsKey(fid)) return _openSharedNoteCache[fid]!;
-    final future = _doOpenSharedNote(data);
-    _openSharedNoteCache[fid] = future;
-    future.whenComplete(() => _openSharedNoteCache.remove(fid));
-    return future;
-  }
+  Future<Note> openSharedNote(SharedNoteData data) =>
+      _sharedNoteOpener.open(data);
 
-  Future<Note> _doOpenSharedNote(SharedNoteData data) async {
-    final existing =
-        await DatabaseService.instance.getNoteByFirestoreId(data.firestoreId);
-    final note = existing ?? (Note()
-      ..folderId = null
-      ..createdAt = data.updatedAt
-      ..firestoreId = data.firestoreId);
-    final currentEmail = ref.read(appUserProvider)?.email;
-    final directSharer = currentEmail != null
-        ? data.collaboratorSharedBy[currentEmail]
-        : null;
-    note
-      ..title = data.title
-      ..content = data.content
-      ..preview = data.preview
-      ..sharedByEmail = directSharer ?? data.ownerEmail
-      ..updatedAt = data.updatedAt;
-    await DatabaseService.instance.upsertNote(note);
-    await reload();
-    // Queue a Drive push so the sharing metadata survives full syncs.
-    if (ref.read(appUserProvider)?.type == AuthType.google) {
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
-      pendingNotes[note.id] = note;
-      pushTimer?.cancel();
-      pushTimer = Timer(
-          const Duration(milliseconds: _kFastPushDebounceMs), _flushPush);
-    }
-    return note;
+  void _scheduleSharedNoteSync(Note note) {
+    pendingNotes[note.id] = note;
+    pushTimer?.cancel();
+    pushTimer =
+        Timer(const Duration(milliseconds: _kFastPushDebounceMs), _flushPush);
   }
 
   void cancelPendingPush() {
@@ -210,23 +161,21 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     pendingDeletedImages.clear();
   }
 
-  /// True when there are note writes or moves waiting for their debounce timer.
   bool get hasPendingSync =>
       pendingNotes.isNotEmpty || _pendingMoves.isNotEmpty;
 
-  /// Bypasses all debounce timers and returns a future that resolves when every
-  /// queued Drive upload has completed (or failed). Used by sign-out to avoid
-  /// losing notes that were created or edited just before the user logged out.
+  /// Bypasses all debounce timers and waits for every queued Drive upload to
+  /// complete. Used by sign-out to avoid losing notes edited just before logout.
   Future<void> flushAndDrain() {
     _flushPush();
     _flushMoves();
-    return _pushQueue;
+    return _driveOps.drainQueue;
   }
 
   /// Bypasses the debounce — used by folder cascade and sync button.
-  Future<void> pushNoteNow(Note note) => _pushNoteAndImages(note, []);
+  Future<void> pushNoteNow(Note note) =>
+      _driveOps.pushNoteAndImages(note, []);
 
-  /// Flushes any pending debounce immediately (sync button / poll trigger).
   void flushPendingPush() => _flushPush();
 
   void _flushPush() {
@@ -237,80 +186,13 @@ class NotesNotifier extends AsyncNotifier<List<Note>> {
     pushTimer = null;
     for (final entry in notes.entries) {
       final imgs = deleted[entry.key] ?? [];
-      _run(() => performPush(entry.value, imgs));
+      _driveOps.run(() => performPush(entry.value, imgs));
     }
   }
 
   @visibleForTesting
   Future<void> performPush(Note note, List<String> deletedImages) =>
-      _pushNoteAndImages(note, deletedImages);
-
-  void _run(Future<void> Function() task) {
-    ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
-    _pushQueue = _pushQueue.then((_) => task()).then((_) {
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
-    }).catchError((Object e) {
-      if (isStorageQuotaExceeded(e)) {
-        ref.read(driveStorageAlertProvider.notifier).state =
-            const DriveStorageAlert(severity: DriveStorageSeverity.exceeded);
-      } else if (e.toString().contains('status: 404')) {
-        DriveSyncService.instance.clearCache();
-        AppLogger.instance.warn('NotesNotifier', 'push failed (stale folder), cache cleared', e);
-      } else {
-        AppLogger.instance.error('NotesNotifier', 'push failed', e);
-      }
-      ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
-    });
-  }
-
-  Future<void> _pushNoteAndImages(
-      Note note, List<String> deletedImages) async {
-    final drv = DriveSyncService.instance;
-    final api = await drv.getApi();
-    if (api == null) return;
-    final appFolderId = await drv.getOrCreateAppFolder(api);
-    final modTime = await drv.uploadNote(api, appFolderId, note);
-    for (final fname in extractImageFilenames(note.content)) {
-      final path = await imageLocalPath(fname);
-      if (await File(path).exists()) {
-        await drv.uploadImage(api, appFolderId, fname, path);
-      }
-    }
-    for (final fname in deletedImages) {
-      await drv.deleteImageFile(api, appFolderId, fname);
-      await _appendLog(api, appFolderId, op: 'delete', type: 'image',
-          filename: fname, modifiedTime: DateTime.now().toIso8601String());
-    }
-    await _appendLog(api, appFolderId, op: 'upsert', type: 'note',
-        entityId: note.id, modifiedTime: modTime);
-  }
-
-  Future<void> _pushDelete(Note note) async {
-    final drv = DriveSyncService.instance;
-    final api = await drv.getApi();
-    if (api == null) return;
-    final appFolderId = await drv.getOrCreateAppFolder(api);
-    await drv.deleteNoteFile(api, note.driveFileId!);
-    await _appendLog(api, appFolderId, op: 'delete', type: 'note',
-        entityId: note.id, modifiedTime: DateTime.now().toIso8601String());
-  }
-
-  Future<void> _appendLog(drive.DriveApi api, String appFolderId,
-      {required String op,
-      required String type,
-      int? entityId,
-      String? filename,
-      required String modifiedTime}) async {
-    final deviceId = await DeviceService.instance.id;
-    final userId = ref.read(appUserProvider)?.id;
-    if (userId == null) return;
-    final seq = await SyncLogService.instance.appendEntry(
-      api, appFolderId,
-      op: op, type: type, entityId: entityId,
-      filename: filename, deviceId: deviceId, modifiedTime: modifiedTime,
-    );
-    await SyncLogService.instance.saveLastSeq(userId, seq);
-  }
+      _driveOps.pushNoteAndImages(note, deletedImages);
 }
 
 final notesProvider =

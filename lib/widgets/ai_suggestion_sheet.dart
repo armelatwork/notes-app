@@ -77,48 +77,56 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
     setState(() => _state = _SheetState.loading);
     _quillController?.dispose();
     _quillController = null;
+    final result = await _attemptRewrite(
+        ref.read(activeAiServiceProvider), customInstruction);
+    if (result != null && mounted) _onRewriteSuccess(result.$1, result.$2);
+  }
 
-    final service = ref.read(activeAiServiceProvider);
+  Future<(String, Document)?> _attemptRewrite(
+      AiService service, String? instruction) async {
     AiException? lastError;
-
     for (var attempt = 0; attempt < kMaxRewriteAttempts; attempt++) {
       if (attempt > 0) {
-        if (!mounted) return;
+        if (!mounted) return null;
         setState(() => _state = _SheetState.retrying);
         await Future.delayed(const Duration(seconds: 2));
       }
       try {
-        final markdown = await service.rewriteNote(
-          _baseContent,
-          customInstruction: customInstruction,
-        );
-        final doc = quillDocumentFromMarkdown(markdown);
-        if (mounted) {
-          setState(() {
-            _baseContent = markdown;
-            _document = doc;
-            _quillController = QuillController(
-              document: doc,
-              selection: const TextSelection.collapsed(offset: 0),
-              readOnly: true,
-            );
-            _state = _SheetState.loaded;
-          });
-          widget.onSuggestionGenerated?.call(
-            AiSheetResult(document: doc, baseContent: markdown, applied: false),
-          );
-        }
-        return;
+        final md = await service.rewriteNote(_baseContent,
+            customInstruction: instruction);
+        return (md, quillDocumentFromMarkdown(md));
       } on AiException catch (e) {
         lastError = e;
-        if (e.kind != AiErrorKind.timeout && e.kind != AiErrorKind.network) break;
+        if (e.kind != AiErrorKind.timeout && e.kind != AiErrorKind.network) {
+          return _reportError(_messageFor(e));
+        }
       } catch (_) {
-        if (mounted) setState(() { _errorMessage = 'An unexpected error occurred.'; _state = _SheetState.error; });
-        return;
+        return _reportError('An unexpected error occurred.');
       }
     }
+    return _reportError(_messageFor(lastError!));
+  }
 
-    if (mounted) setState(() { _errorMessage = _messageFor(lastError!); _state = _SheetState.error; });
+  (String, Document)? _reportError(String message) {
+    if (mounted) {
+      setState(() { _errorMessage = message; _state = _SheetState.error; });
+    }
+    return null;
+  }
+
+  void _onRewriteSuccess(String markdown, Document doc) {
+    setState(() {
+      _baseContent = markdown;
+      _document = doc;
+      _quillController = QuillController(
+        document: doc,
+        selection: const TextSelection.collapsed(offset: 0),
+        readOnly: true,
+      );
+      _state = _SheetState.loaded;
+    });
+    widget.onSuggestionGenerated
+        ?.call(AiSheetResult(document: doc, baseContent: markdown, applied: false));
   }
 
   void _submitRefine() {
@@ -226,7 +234,7 @@ class _SheetContent extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _Handle(),
+          const _Handle(),
           _Header(onDismiss: onDismiss),
           const Divider(height: 1),
           Expanded(child: _body(context)),
@@ -243,23 +251,15 @@ class _SheetContent extends StatelessWidget {
 
   Widget _body(BuildContext context) {
     return switch (state) {
-      _SheetState.loading => const Center(
+      _SheetState.loading || _SheetState.retrying => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Generating suggestion…'),
-            ],
-          ),
-        ),
-      _SheetState.retrying => const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Retrying…'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(state == _SheetState.retrying
+                  ? 'Retrying…'
+                  : 'Generating suggestion…'),
             ],
           ),
         ),
@@ -336,69 +336,58 @@ class _RefineField extends StatelessWidget {
 }
 
 class _Handle extends StatelessWidget {
+  const _Handle();
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 6),
-      child: Container(
-        width: 36,
-        height: 4,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.outlineVariant,
-          borderRadius: BorderRadius.circular(2),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 10, bottom: 6),
+        child: Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _Header extends StatelessWidget {
   final VoidCallback onDismiss;
   const _Header({required this.onDismiss});
-
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 8, 8),
-      child: Row(
-        children: [
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 8, 8),
+        child: Row(children: [
           const Icon(Icons.auto_awesome_outlined, size: 18),
           const SizedBox(width: 8),
-          const Text('AI Suggestion', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+          const Text('AI Suggestion',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
           const Spacer(),
-          IconButton(icon: const Icon(Icons.close, size: 20), onPressed: onDismiss),
-        ],
-      ),
-    );
-  }
+          IconButton(
+              icon: const Icon(Icons.close, size: 20), onPressed: onDismiss),
+        ]),
+      );
 }
 
 class _Actions extends StatelessWidget {
   final VoidCallback onApply;
   final VoidCallback onDismiss;
   final String applyLabel;
-
-  const _Actions({
-    required this.onApply,
-    required this.onDismiss,
-    this.applyLabel = 'Apply',
-  });
-
+  const _Actions(
+      {required this.onApply,
+      required this.onDismiss,
+      this.applyLabel = 'Apply'});
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
-        children: [
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(children: [
           Expanded(
-            child: OutlinedButton(onPressed: onDismiss, child: const Text('Dismiss')),
-          ),
+              child: OutlinedButton(
+                  onPressed: onDismiss, child: const Text('Dismiss'))),
           const SizedBox(width: 12),
           Expanded(
-            child: FilledButton(onPressed: onApply, child: Text(applyLabel)),
-          ),
-        ],
-      ),
-    );
-  }
+              child:
+                  FilledButton(onPressed: onApply, child: Text(applyLabel))),
+        ]),
+      );
 }
