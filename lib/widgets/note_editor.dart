@@ -53,6 +53,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _dragging = false;
   bool _isDirty = false;
   bool _isAiSheetOpen = false;
+  Document? _sessionAiDocument;
+  String? _sessionAiBaseContent;
   bool _secondaryButtonActive = false;
   bool _primaryPointerDown = false;
   Timer? _formatPainterTimer;
@@ -160,6 +162,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (_currentNote?.id == note.id) return;
     _formatPainterTimer?.cancel();
     _formatPainterTimer = null;
+    _sessionAiDocument = null;
+    _sessionAiBaseContent = null;
     ref.read(formatPainterProvider.notifier).clear();
     if (_isNewEmptyNote()) {
       ref.read(notesProvider.notifier).deleteNote(_currentNote!.id);
@@ -287,17 +291,26 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   Future<void> _onAiHelper() async {
     if (_controller == null) return;
     final plainText = _controller!.document.toPlainText().trim();
-    if (plainText.isEmpty) return;
+    if (plainText.isEmpty && _sessionAiDocument == null) return;
+    FocusScope.of(context).unfocus();
     setState(() => _isAiSheetOpen = true);
-    final doc = await showModalBottomSheet<Document>(
+    final result = await showModalBottomSheet<AiSheetResult>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => AiSuggestionSheet(noteContent: plainText),
+      builder: (_) => AiSuggestionSheet(
+        noteContent: plainText,
+        initialDocument: _sessionAiDocument,
+        initialPlainText: _sessionAiBaseContent,
+        onSuggestionGenerated: (r) {
+          _sessionAiDocument = r.document;
+          _sessionAiBaseContent = r.baseContent;
+        },
+      ),
     );
     if (!mounted) return;
     setState(() => _isAiSheetOpen = false);
-    if (doc != null) _applyAiSuggestion(doc);
+    if (result?.applied == true) _applyAiSuggestion(result!.document);
   }
 
   void _applyAiSuggestion(Document doc) {
