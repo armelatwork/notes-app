@@ -20,6 +20,7 @@ import 'share_dialog.dart';
 import '../services/rich_clipboard_service.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
+import '../utils/markdown_utils.dart';
 import '../utils/note_utils.dart';
 import 'ai_suggestion_sheet.dart';
 import 'note_editor_widgets.dart';
@@ -300,7 +301,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   void _applyAiSuggestion(String text) {
-    final doc = Document()..insert(0, text);
+    final doc = quillDocumentFromMarkdown(text);
     _initNoteController(doc);
     _scheduleSave();
     setState(() {});
