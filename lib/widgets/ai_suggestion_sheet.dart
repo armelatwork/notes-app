@@ -7,10 +7,30 @@ import '../utils/markdown_utils.dart';
 
 enum _SheetState { loading, retrying, loaded, error }
 
+class AiSheetResult {
+  final Document document;
+  final String baseContent;
+  final bool applied;
+  const AiSheetResult({
+    required this.document,
+    required this.baseContent,
+    required this.applied,
+  });
+}
+
 class AiSuggestionSheet extends ConsumerStatefulWidget {
   final String noteContent;
+  final Document? initialDocument;
+  final String? initialPlainText;
+  final void Function(AiSheetResult)? onSuggestionGenerated;
 
-  const AiSuggestionSheet({super.key, required this.noteContent});
+  const AiSuggestionSheet({
+    super.key,
+    required this.noteContent,
+    this.initialDocument,
+    this.initialPlainText,
+    this.onSuggestionGenerated,
+  });
 
   @override
   ConsumerState<AiSuggestionSheet> createState() => _AiSuggestionSheetState();
@@ -21,20 +41,39 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
   Document? _document;
   QuillController? _quillController;
   String _errorMessage = '';
+  late String _baseContent;
+  final _refineController = TextEditingController();
+  final _editorFocusNode = FocusNode(canRequestFocus: false);
+  final _sheetController = DraggableScrollableController();
+  double _lastKeyboardHeight = 0;
 
   @override
   void initState() {
     super.initState();
-    _rewrite();
+    _baseContent = widget.initialPlainText ?? widget.noteContent;
+    if (widget.initialDocument != null) {
+      _document = widget.initialDocument;
+      _quillController = QuillController(
+        document: widget.initialDocument!,
+        selection: const TextSelection.collapsed(offset: 0),
+        readOnly: true,
+      );
+      _state = _SheetState.loaded;
+    } else {
+      _generate();
+    }
   }
 
   @override
   void dispose() {
     _quillController?.dispose();
+    _refineController.dispose();
+    _editorFocusNode.dispose();
+    _sheetController.dispose();
     super.dispose();
   }
 
-  Future<void> _rewrite() async {
+  Future<void> _generate({String? customInstruction}) async {
     setState(() => _state = _SheetState.loading);
     _quillController?.dispose();
     _quillController = null;
@@ -49,10 +88,14 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
         await Future.delayed(const Duration(seconds: 2));
       }
       try {
-        final markdown = await service.rewriteNote(widget.noteContent);
+        final markdown = await service.rewriteNote(
+          _baseContent,
+          customInstruction: customInstruction,
+        );
         final doc = quillDocumentFromMarkdown(markdown);
         if (mounted) {
           setState(() {
+            _baseContent = markdown;
             _document = doc;
             _quillController = QuillController(
               document: doc,
@@ -61,11 +104,13 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
             );
             _state = _SheetState.loaded;
           });
+          widget.onSuggestionGenerated?.call(
+            AiSheetResult(document: doc, baseContent: markdown, applied: false),
+          );
         }
         return;
       } on AiException catch (e) {
         lastError = e;
-        // Only retry on transient failures.
         if (e.kind != AiErrorKind.timeout && e.kind != AiErrorKind.network) break;
       } catch (_) {
         if (mounted) setState(() { _errorMessage = 'An unexpected error occurred.'; _state = _SheetState.error; });
@@ -74,6 +119,13 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
     }
 
     if (mounted) setState(() { _errorMessage = _messageFor(lastError!); _state = _SheetState.error; });
+  }
+
+  void _submitRefine() {
+    final instruction = _refineController.text.trim();
+    if (instruction.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    _generate(customInstruction: instruction);
   }
 
   String _messageFor(AiException e) => switch (e.kind) {
@@ -85,24 +137,56 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
     AiErrorKind.server => 'The AI service is temporarily unavailable. Try again later.',
   };
 
-  void _apply() => Navigator.of(context).pop(_document);
-  void _dismiss() => Navigator.of(context).pop();
+  void _apply() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).pop(
+      AiSheetResult(document: _document!, baseContent: _baseContent, applied: true),
+    );
+  }
+
+  void _dismiss() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).pop(
+      _document != null
+          ? AiSheetResult(document: _document!, baseContent: _baseContent, applied: false)
+          : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.45,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (_, scrollController) => _SheetContent(
-        state: _state,
-        quillController: _quillController,
-        errorMessage: _errorMessage,
-        scrollController: scrollController,
-        onApply: _apply,
-        onDismiss: _dismiss,
-        onRetry: _rewrite,
+    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+    if (keyboardHeight != _lastKeyboardHeight) {
+      _lastKeyboardHeight = keyboardHeight;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_sheetController.isAttached) return;
+        _sheetController.animateTo(
+          keyboardHeight > 0 ? 0.92 : 0.45,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      });
+    }
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardHeight),
+      child: DraggableScrollableSheet(
+        controller: _sheetController,
+        initialChildSize: 0.45,
+        minChildSize: 0.3,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) => _SheetContent(
+          state: _state,
+          quillController: _quillController,
+          editorFocusNode: _editorFocusNode,
+          errorMessage: _errorMessage,
+          scrollController: scrollController,
+          refineController: _refineController,
+          onApply: _apply,
+          onDismiss: _dismiss,
+          onRetry: () => _generate(),
+          onRefine: _submitRefine,
+        ),
       ),
     );
   }
@@ -111,20 +195,26 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
 class _SheetContent extends StatelessWidget {
   final _SheetState state;
   final QuillController? quillController;
+  final FocusNode editorFocusNode;
   final String errorMessage;
   final ScrollController scrollController;
+  final TextEditingController refineController;
   final VoidCallback onApply;
   final VoidCallback onDismiss;
   final VoidCallback onRetry;
+  final VoidCallback onRefine;
 
   const _SheetContent({
     required this.state,
     required this.quillController,
+    required this.editorFocusNode,
     required this.errorMessage,
     required this.scrollController,
+    required this.refineController,
     required this.onApply,
     required this.onDismiss,
     required this.onRetry,
+    required this.onRefine,
   });
 
   @override
@@ -140,6 +230,10 @@ class _SheetContent extends StatelessWidget {
           _Header(onDismiss: onDismiss),
           const Divider(height: 1),
           Expanded(child: _body(context)),
+          if (state == _SheetState.loaded) _RefineField(
+            controller: refineController,
+            onSubmit: onRefine,
+          ),
           if (state == _SheetState.loaded) _Actions(onApply: onApply, onDismiss: onDismiss),
           if (state == _SheetState.error)  _Actions(onApply: onRetry, onDismiss: onDismiss, applyLabel: 'Retry'),
         ],
@@ -183,6 +277,7 @@ class _SheetContent extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
           child: QuillEditor.basic(
             controller: quillController!,
+            focusNode: editorFocusNode,
             scrollController: scrollController,
             config: const QuillEditorConfig(
               enableInteractiveSelection: true,
@@ -191,6 +286,52 @@ class _SheetContent extends StatelessWidget {
           ),
         ),
     };
+  }
+}
+
+class _RefineField extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onSubmit;
+
+  const _RefineField({required this.controller, required this.onSubmit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => onSubmit(),
+              decoration: InputDecoration(
+                hintText: 'Refine: make it shorter, more formal…',
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                border: const OutlineInputBorder(),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Regenerate',
+            onPressed: onSubmit,
+            style: IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.all(8),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -245,20 +386,18 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(onPressed: onDismiss, child: const Text('Dismiss')),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton(onPressed: onApply, child: Text(applyLabel)),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(onPressed: onDismiss, child: const Text('Dismiss')),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton(onPressed: onApply, child: Text(applyLabel)),
+          ),
+        ],
       ),
     );
   }

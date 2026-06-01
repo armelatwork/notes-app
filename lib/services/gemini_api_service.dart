@@ -71,13 +71,16 @@ class GeminiApiService implements AiService {
   }
 
   @override
-  Future<String> rewriteNote(String plainText) async {
+  Future<String> rewriteNote(String plainText, {String? customInstruction}) async {
     final apiKey = await readKey();
     if (apiKey == null) throw const AiException(AiErrorKind.auth);
+    final prompt = customInstruction != null
+        ? buildCustomRewritePrompt(plainText, customInstruction)
+        : '$kRewritePrompt$plainText';
     try {
       final response = await _post(
         apiKey: apiKey,
-        body: _buildBody('$kRewritePrompt$plainText', maxTokens: 4096),
+        body: _buildBody(prompt, maxTokens: 4096),
         timeout: _rewriteTimeout,
       );
       if (response.statusCode == 401 || response.statusCode == 403) {
