@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import '../services/claude_api_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/app_provider.dart';
+import '../services/ai_service.dart';
 import '../utils/markdown_utils.dart';
 
 enum _SheetState { loading, loaded, error }
 
-class AiSuggestionSheet extends StatefulWidget {
+class AiSuggestionSheet extends ConsumerStatefulWidget {
   final String noteContent;
 
   const AiSuggestionSheet({super.key, required this.noteContent});
 
   @override
-  State<AiSuggestionSheet> createState() => _AiSuggestionSheetState();
+  ConsumerState<AiSuggestionSheet> createState() => _AiSuggestionSheetState();
 }
 
-class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
+class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
   _SheetState _state = _SheetState.loading;
   Document? _document;
   QuillController? _quillController;
@@ -37,7 +39,8 @@ class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
     _quillController?.dispose();
     _quillController = null;
     try {
-      final markdown = await ClaudeApiService.instance.rewriteNote(widget.noteContent);
+      final service = ref.read(activeAiServiceProvider);
+      final markdown = await service.rewriteNote(widget.noteContent);
       final doc = quillDocumentFromMarkdown(markdown);
       if (mounted) {
         setState(() {
@@ -50,20 +53,20 @@ class _AiSuggestionSheetState extends State<AiSuggestionSheet> {
           _state = _SheetState.loaded;
         });
       }
-    } on ClaudeException catch (e) {
+    } on AiException catch (e) {
       if (mounted) setState(() { _errorMessage = _messageFor(e); _state = _SheetState.error; });
     } catch (_) {
       if (mounted) setState(() { _errorMessage = 'An unexpected error occurred.'; _state = _SheetState.error; });
     }
   }
 
-  String _messageFor(ClaudeException e) => switch (e.kind) {
-    ClaudeErrorKind.auth =>
+  String _messageFor(AiException e) => switch (e.kind) {
+    AiErrorKind.auth =>
       'Your API key is no longer valid. Go to Settings to re-activate it.',
-    ClaudeErrorKind.rateLimit => 'Rate limit reached. Try again in a moment.',
-    ClaudeErrorKind.timeout => 'Request timed out. Check your connection.',
-    ClaudeErrorKind.network => 'No internet connection.',
-    ClaudeErrorKind.server => 'Claude is temporarily unavailable. Try again later.',
+    AiErrorKind.rateLimit => 'Rate limit reached. Try again in a moment.',
+    AiErrorKind.timeout => 'Request timed out. Check your connection.',
+    AiErrorKind.network => 'No internet connection.',
+    AiErrorKind.server => 'The AI service is temporarily unavailable. Try again later.',
   };
 
   void _apply() => Navigator.of(context).pop(_document);

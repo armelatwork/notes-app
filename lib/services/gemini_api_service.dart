@@ -7,18 +7,14 @@ import 'ai_service.dart';
 import 'app_logger.dart';
 import 'secure_storage_service.dart';
 
-// Keep legacy type aliases so existing call-sites compile without changes.
-typedef ClaudeErrorKind = AiErrorKind;
-typedef ClaudeException = AiException;
+class GeminiApiService implements AiService {
+  static final GeminiApiService instance = GeminiApiService._();
+  GeminiApiService._();
 
-class ClaudeApiService implements AiService {
-  static final ClaudeApiService instance = ClaudeApiService._();
-  ClaudeApiService._();
-
-  static const _keyApiKey = 'claude_api_key';
-  static const _keyVerified = 'claude_api_key_verified';
-  static const _apiUrl = 'https://api.anthropic.com/v1/messages';
-  static const _model = 'claude-haiku-4-5-20251001';
+  static const _keyApiKey = 'gemini_api_key';
+  static const _keyVerified = 'gemini_api_key_verified';
+  static const _baseUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
   static const _activateTimeout = Duration(seconds: 20);
   static const _rewriteTimeout = Duration(seconds: 60);
 
@@ -47,7 +43,7 @@ class ClaudeApiService implements AiService {
     if (error != null) return error;
     await SecureStorageService.instance.write(_keyApiKey, trimmed);
     await SecureStorageService.instance.write(_keyVerified, 'true');
-    AppLogger.instance.info('ClaudeApiService', 'API key activated');
+    AppLogger.instance.info('GeminiApiService', 'API key activated');
     return null;
   }
 
@@ -55,18 +51,21 @@ class ClaudeApiService implements AiService {
     try {
       final response = await _post(
         apiKey: apiKey,
-        body: _buildBody(prompt: 'hi', maxTokens: 1),
+        body: _buildBody('hi', maxTokens: 1),
         timeout: _activateTimeout,
       );
       if (response.statusCode == 200) return null;
-      if (response.statusCode == 401) return 'Invalid API key. Check your key and try again.';
+      if (response.statusCode == 400 || response.statusCode == 401 ||
+          response.statusCode == 403) {
+        return 'Invalid API key. Check your key and try again.';
+      }
       return 'Activation failed (HTTP ${response.statusCode}). Try again later.';
     } on TimeoutException {
       return 'Connection timed out. Check your network and try again.';
     } on SocketException {
       return 'No internet connection.';
     } catch (e) {
-      AppLogger.instance.error('ClaudeApiService', 'testKey failed', e);
+      AppLogger.instance.error('GeminiApiService', 'testKey failed', e);
       return 'An unexpected error occurred.';
     }
   }
@@ -78,20 +77,18 @@ class ClaudeApiService implements AiService {
     try {
       final response = await _post(
         apiKey: apiKey,
-        body: _buildBody(
-          prompt: '$kRewritePrompt$plainText',
-          maxTokens: 4096,
-        ),
+        body: _buildBody('$kRewritePrompt$plainText', maxTokens: 4096),
         timeout: _rewriteTimeout,
       );
-      if (response.statusCode == 401) {
+      if (response.statusCode == 401 || response.statusCode == 403) {
         await SecureStorageService.instance.write(_keyVerified, 'false');
         throw const AiException(AiErrorKind.auth);
       }
       if (response.statusCode == 429) throw const AiException(AiErrorKind.rateLimit);
       if (response.statusCode != 200) throw const AiException(AiErrorKind.server);
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return (json['content'] as List).first['text'] as String;
+      final candidates = json['candidates'] as List;
+      return candidates.first['content']['parts'].first['text'] as String;
     } on AiException {
       rethrow;
     } on TimeoutException {
@@ -108,25 +105,20 @@ class ClaudeApiService implements AiService {
   }) =>
       _client
           .post(
-            Uri.parse(_apiUrl),
-            headers: {
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01',
-              'content-type': 'application/json',
-            },
+            Uri.parse('$_baseUrl?key=$apiKey'),
+            headers: {'content-type': 'application/json'},
             body: jsonEncode(body),
           )
           .timeout(timeout);
 
-  Map<String, dynamic> _buildBody({
-    required String prompt,
-    required int maxTokens,
-  }) =>
-      {
-        'model': _model,
-        'max_tokens': maxTokens,
-        'messages': [
-          {'role': 'user', 'content': prompt},
+  Map<String, dynamic> _buildBody(String prompt, {required int maxTokens}) => {
+        'contents': [
+          {
+            'parts': [
+              {'text': prompt}
+            ]
+          }
         ],
+        'generationConfig': {'maxOutputTokens': maxTokens},
       };
 }
