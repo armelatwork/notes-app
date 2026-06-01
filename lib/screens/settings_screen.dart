@@ -146,6 +146,11 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(appUserProvider, (prev, next) {
+      if (prev != null && next == null && context.mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    });
     final appUser = ref.watch(appUserProvider);
     final packageInfo = ref.watch(_packageInfoProvider);
 
