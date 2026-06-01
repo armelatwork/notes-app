@@ -64,6 +64,9 @@ dependencies:
   # Deep link handling (shared note links)
   app_links: ^7.0.0
 
+  # Markdown parsing (for AI suggestion → Quill delta conversion)
+  markdown: ^7.2.2
+
   cupertino_icons: ^1.0.8
   package_info_plus: ^9.0.1
   super_clipboard: ^0.9.1

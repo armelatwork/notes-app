@@ -10,13 +10,19 @@ Widget _wrap({List<Override> overrides = const []}) => ProviderScope(
       child: const MaterialApp(home: SettingsScreen()),
     );
 
+// Finds the ListView's Scrollable, excluding any Scrollable inside child
+// widgets (e.g. TextField), so scrollUntilVisible targets the right widget.
+final _listScrollable = find.byWidgetPredicate(
+  (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+);
+
 void main() {
   group('SettingsScreen — About section', () {
     testWidgets('build_rendersAboutSectionHeader', (tester) async {
       await tester.pumpWidget(_wrap());
       await tester.pump();
 
-      await tester.scrollUntilVisible(find.text('ABOUT'), 100);
+      await tester.scrollUntilVisible(find.text('ABOUT'), 100, scrollable: _listScrollable);
 
       expect(find.text('ABOUT'), findsOneWidget);
     });
@@ -25,7 +31,7 @@ void main() {
       await tester.pumpWidget(_wrap());
       await tester.pump();
 
-      await tester.scrollUntilVisible(find.text('Version'), 100);
+      await tester.scrollUntilVisible(find.text('Version'), 100, scrollable: _listScrollable);
 
       expect(find.text('Version'), findsOneWidget);
     });
@@ -34,7 +40,7 @@ void main() {
       await tester.pumpWidget(_wrap());
       await tester.pump();
 
-      await tester.scrollUntilVisible(find.text('Website'), 100);
+      await tester.scrollUntilVisible(find.text('Website'), 100, scrollable: _listScrollable);
 
       expect(find.text('Website'), findsOneWidget);
       expect(find.textContaining('thechaos-mynotes.web.app'), findsOneWidget);
@@ -46,7 +52,7 @@ void main() {
 
       // Version text visible once PackageInfo resolves (platform-dependent in
       // tests; we verify the tile itself is always present).
-      await tester.scrollUntilVisible(find.text('Version'), 100);
+      await tester.scrollUntilVisible(find.text('Version'), 100, scrollable: _listScrollable);
 
       expect(find.text('Version'), findsOneWidget);
     });
@@ -57,12 +63,16 @@ void main() {
       await tester.pumpWidget(_wrap());
       await tester.pump();
 
+      await tester.scrollUntilVisible(find.text('SUPPORT'), 100, scrollable: _listScrollable);
+
       expect(find.text('SUPPORT'), findsOneWidget);
     });
 
     testWidgets('build_rendersSendFeedbackTile', (tester) async {
       await tester.pumpWidget(_wrap());
       await tester.pump();
+
+      await tester.scrollUntilVisible(find.text('Send Feedback'), 100, scrollable: _listScrollable);
 
       expect(find.text('Send Feedback'), findsOneWidget);
     });

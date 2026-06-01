@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_quill/quill_delta.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -21,6 +22,7 @@ import '../services/rich_clipboard_service.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
+import 'ai_suggestion_sheet.dart';
 import 'note_editor_widgets.dart';
 import 'note_image_handler.dart';
 import 'note_link_handler.dart';
@@ -50,6 +52,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _saving = false;
   bool _dragging = false;
   bool _isDirty = false;
+  bool _isAiSheetOpen = false;
   bool _secondaryButtonActive = false;
   bool _primaryPointerDown = false;
   Timer? _formatPainterTimer;
@@ -281,6 +284,40 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     showInsertLinkDialog(context, _controller!);
   }
 
+  Future<void> _onAiHelper() async {
+    if (_controller == null) return;
+    final plainText = _controller!.document.toPlainText().trim();
+    if (plainText.isEmpty) return;
+    setState(() => _isAiSheetOpen = true);
+    final doc = await showModalBottomSheet<Document>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => AiSuggestionSheet(noteContent: plainText),
+    );
+    if (!mounted) return;
+    setState(() => _isAiSheetOpen = false);
+    if (doc != null) _applyAiSuggestion(doc);
+  }
+
+  void _applyAiSuggestion(Document doc) {
+    // Replace content via compose so the controller instance is preserved.
+    // Replacing the controller entirely disposes it mid-frame, causing the
+    // QuillEditor to lose its binding and ignore edits until re-focused.
+    // compose() also records the replacement as one undoable action.
+    final currentLength = _controller!.document.length;
+    final replaceDelta = Delta()..delete(currentLength);
+    for (final op in doc.toDelta().toList()) {
+      if (op.isInsert) replaceDelta.insert(op.data, op.attributes);
+    }
+    _controller!.compose(
+      replaceDelta,
+      const TextSelection.collapsed(offset: 0),
+      ChangeSource.local,
+    );
+    _scheduleSave();
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -296,6 +333,10 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    // AI helper trigger from Android AppBar wand button.
+    ref.listen(aiHelperRequestProvider, (prev, next) {
+      if (next > (prev ?? 0) && _controller != null) _onAiHelper();
+    });
     // Real-time listener: apply remote changes when this is a shared note
     // and the current user has no unsaved edits.
     final firestoreId = note.firestoreId;
@@ -328,6 +369,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditorLayout() {
+    final aiVerified =
+        ref.watch(claudeKeyVerifiedProvider).valueOrNull ?? false;
     // ValueKey forces toolbar rebuild on controller change so the history
     // buttons re-subscribe to the new controller.changes stream.
     final toolbar = NoteFormattingToolbar(
@@ -336,6 +379,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       onInsertImage: _pickAndInsertImage,
       onInsertLink: _onInsertLink,
       editorFocusNode: _focusNode,
+      isAiSheetOpen: _isAiSheetOpen,
     );
     final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
     return Column(
@@ -363,6 +407,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               : () => ref
                   .read(notesProvider.notifier)
                   .togglePin(_currentNote!.id),
+          onAiHelper: aiVerified ? _onAiHelper : null,
         ),
         if (isMacOS) toolbar,
         Expanded(
