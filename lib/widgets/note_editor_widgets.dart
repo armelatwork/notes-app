@@ -229,6 +229,101 @@ class _FontSizeMenuButtonState extends State<_FontSizeMenuButton> {
   }
 }
 
+// Font family list mirrors flutter_quill's default so the custom button
+// stays in sync with what Quill stores on the document.
+const _kFontFamilies = <String, String?>{
+  'Sans Serif': 'sans-serif',
+  'Serif': 'serif',
+  'Monospace': 'monospace',
+  'Ibarra Real Nova': 'ibarra-real-nova',
+  'SquarePeg': 'square-peg',
+  'Nunito': 'nunito',
+  'Pacifico': 'pacifico',
+  'Roboto Mono': 'roboto-mono',
+  'Clear': null,
+};
+
+class _FontFamilyMenuButton extends StatefulWidget {
+  const _FontFamilyMenuButton({required this.ctrl});
+  final QuillController ctrl;
+  @override
+  State<_FontFamilyMenuButton> createState() => _FontFamilyMenuButtonState();
+}
+
+class _FontFamilyMenuButtonState extends State<_FontFamilyMenuButton> {
+  final _menu = MenuController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.ctrl.addListener(_onControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.ctrl.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() => setState(() {});
+
+  String get _label {
+    final value = widget.ctrl
+        .getSelectionStyle()
+        .attributes[Attribute.font.key]
+        ?.value as String?;
+    if (value == null) return 'Font';
+    for (final entry in _kFontFamilies.entries) {
+      if (entry.value == value) return entry.key;
+    }
+    return 'Font';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      controller: _menu,
+      menuChildren: [
+        for (final entry in _kFontFamilies.entries)
+          MenuItemButton(
+            onPressed: () => widget.ctrl.formatSelection(
+              Attribute.fromKeyValue(Attribute.font.key, entry.value),
+            ),
+            child: Text(entry.key,
+                style: entry.value == null
+                    ? TextStyle(color: Theme.of(context).colorScheme.error)
+                    : null),
+          ),
+      ],
+      child: Builder(
+        builder: (ctx) => QuillToolbarIconButton(
+          key: const ValueKey('font-family-selector'),
+          onPressed: () {
+            if (_menu.isOpen) {
+              _menu.close();
+            } else {
+              // 9 items × 48 dp ≈ 432 dp. Open above the button when the
+              // keyboard is up so the full list clears the keyboard.
+              final kb = MediaQuery.viewInsetsOf(ctx).bottom;
+              _menu.open(position: kb > 0 ? const Offset(0, -460) : null);
+            }
+          },
+          isSelected: false,
+          iconTheme: null,
+          icon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_label, style: TextStyle(
+                color: IconTheme.of(ctx).color, fontSize: 13)),
+              Icon(Icons.arrow_drop_down, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Android sheet helpers ──────────────────────────────────────────────────────
 
 Widget _textStyleSheet(BuildContext _, QuillController ctrl) =>
@@ -288,6 +383,11 @@ Widget _headerFirstSheet(BuildContext _, QuillController ctrl,
                     icon: const Icon(Icons.format_size),
                     childBuilder: (dynamic opt, dynamic extra) =>
                         _FontSizeMenuButton(ctrl: ctrl),
+                  ),
+                  QuillToolbarCustomButtonOptions(
+                    icon: const Icon(Icons.font_download_outlined),
+                    childBuilder: (dynamic opt, dynamic extra) =>
+                        _FontFamilyMenuButton(ctrl: ctrl),
                   ),
                 ]),
               ),
@@ -380,8 +480,7 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
     if (fontsSplit) ...[
       _ToolbarGroup(
         icon: Icons.text_fields, tooltip: 'Text',
-        content: (ctx, _) => _headerFirstSheet(ctx, ctrl,
-            _cfg(fontFamily: true)),
+        content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg()),
         macContent: (_, _) => _macHeaderFirst(ctrl,
             _cfg(fontFamily: true, fontSize: true)),
       ),
@@ -397,7 +496,6 @@ List<_ToolbarGroup> _buildGroups(double width, QuillController ctrl,
       _ToolbarGroup(
         icon: Icons.text_format, tooltip: 'Fonts',
         content: (ctx, _) => _headerFirstSheet(ctx, ctrl, _cfg(
-            fontFamily: true,
             color: true, background: true, clearFormat: true)),
         macContent: (_, _) => _macHeaderFirst(ctrl, _cfg(
             fontFamily: true, fontSize: true,
