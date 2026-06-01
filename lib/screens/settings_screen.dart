@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/app_user.dart';
 import '../providers/app_provider.dart';
 import '../services/app_logger.dart';
+import '../services/claude_api_service.dart';
 import '../services/persistence_service.dart';
 import '../widgets/feedback_dialog.dart';
 
@@ -177,6 +178,9 @@ class SettingsScreen extends ConsumerWidget {
           _SectionHeader(label: 'Appearance'),
           const _ThemePicker(),
           const Divider(),
+          _SectionHeader(label: 'AI Helper (Beta)'),
+          const _ClaudeAiSection(),
+          const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sign out'),
@@ -284,6 +288,114 @@ class _ThemePicker extends ConsumerWidget {
           ref.read(themeModeProvider.notifier).state = mode;
           PersistenceService.instance.saveThemeMode(mode);
         },
+      ),
+    );
+  }
+}
+
+class _ClaudeAiSection extends ConsumerStatefulWidget {
+  const _ClaudeAiSection();
+
+  @override
+  ConsumerState<_ClaudeAiSection> createState() => _ClaudeAiSectionState();
+}
+
+class _ClaudeAiSectionState extends ConsumerState<_ClaudeAiSection> {
+  final _keyController = TextEditingController();
+  bool _isLoading = false;
+  bool _isVerified = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    ClaudeApiService.instance.isVerified().then((v) {
+      if (mounted) setState(() => _isVerified = v);
+    }).catchError((Object _) {
+      // Storage unavailable (e.g. test environment) — default to not verified.
+    });
+  }
+
+  @override
+  void dispose() {
+    _keyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _activate() async {
+    setState(() { _isLoading = true; _error = null; });
+    final error = await ClaudeApiService.instance.activateKey(_keyController.text);
+    if (!mounted) return;
+    if (error != null) {
+      setState(() { _isLoading = false; _error = error; });
+      return;
+    }
+    _keyController.clear();
+    ref.invalidate(claudeKeyVerifiedProvider);
+    setState(() { _isLoading = false; _isVerified = true; _error = null; });
+  }
+
+  Future<void> _remove() async {
+    await ClaudeApiService.instance.clearKey();
+    if (!mounted) return;
+    ref.invalidate(claudeKeyVerifiedProvider);
+    setState(() { _isVerified = false; _error = null; });
+    AppLogger.instance.info('SettingsScreen', 'Claude API key removed');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isVerified) return _buildActive(context);
+    return _buildInput(context);
+  }
+
+  Widget _buildActive(BuildContext context) {
+    return ListTile(
+      leading: Icon(Icons.auto_awesome_outlined,
+          color: Theme.of(context).colorScheme.primary),
+      title: const Text('AI Helper'),
+      subtitle: const Text('API key active'),
+      trailing: TextButton(onPressed: _remove, child: const Text('Remove')),
+    );
+  }
+
+  Widget _buildInput(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _keyController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Anthropic API key (sk-ant-…)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _isLoading ? null : _activate,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Activate'),
+              ),
+            ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 6),
+            Text(_error!, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.error)),
+          ],
+        ],
       ),
     );
   }

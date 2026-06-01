@@ -392,6 +392,7 @@ class NoteFormattingToolbar extends StatelessWidget {
   final VoidCallback onInsertImage;
   final VoidCallback onInsertLink;
   final FocusNode? editorFocusNode;
+  final bool isAiSheetOpen;
 
   const NoteFormattingToolbar({
     super.key,
@@ -399,11 +400,13 @@ class NoteFormattingToolbar extends StatelessWidget {
     required this.onInsertImage,
     required this.onInsertLink,
     this.editorFocusNode,
+    this.isAiSheetOpen = false,
   });
 
   @override
   Widget build(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.macOS) {
+      if (isAiSheetOpen) return const SizedBox.shrink();
       return _MacOSToolbar(
         controller: quillController,
         onInsertImage: onInsertImage,
@@ -415,6 +418,7 @@ class NoteFormattingToolbar extends StatelessWidget {
         groups: _buildGroups(
             constraints.maxWidth, quillController, onInsertLink, onInsertImage),
         editorFocusNode: editorFocusNode,
+        isAiSheetOpen: isAiSheetOpen,
       ),
     );
   }
@@ -568,7 +572,8 @@ class _MacOSGroupButtonState extends State<_MacOSGroupButton> {
 class _AndroidGroupBar extends StatefulWidget {
   final List<_ToolbarGroup> groups;
   final FocusNode? editorFocusNode;
-  const _AndroidGroupBar({required this.groups, this.editorFocusNode});
+  final bool isAiSheetOpen;
+  const _AndroidGroupBar({required this.groups, this.editorFocusNode, this.isAiSheetOpen = false});
 
   @override
   State<_AndroidGroupBar> createState() => _AndroidGroupBarState();
@@ -577,6 +582,14 @@ class _AndroidGroupBar extends StatefulWidget {
 class _AndroidGroupBarState extends State<_AndroidGroupBar> {
   PersistentBottomSheetController? _sheetController;
   String? _openTooltip;
+
+  @override
+  void didUpdateWidget(_AndroidGroupBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isAiSheetOpen && !oldWidget.isAiSheetOpen) {
+      _sheetController?.close();
+    }
+  }
 
   @override
   void dispose() {
@@ -678,6 +691,7 @@ class NoteTitleField extends StatelessWidget {
   final VoidCallback? onShare;
   final bool isPinned;
   final VoidCallback? onPin;
+  final VoidCallback? onAiHelper;
 
   const NoteTitleField({
     super.key,
@@ -688,6 +702,7 @@ class NoteTitleField extends StatelessWidget {
     this.onShare,
     this.isPinned = false,
     this.onPin,
+    this.onAiHelper,
   });
 
   @override
@@ -715,6 +730,12 @@ class NoteTitleField extends StatelessWidget {
               ),
             ),
           ),
+          if (onAiHelper != null)
+            IconButton(
+              icon: const Icon(Icons.auto_awesome_outlined, size: 22),
+              tooltip: 'AI helper',
+              onPressed: onAiHelper,
+            ),
           if (isMacOS) ...[
             if (onShare != null)
               IconButton(

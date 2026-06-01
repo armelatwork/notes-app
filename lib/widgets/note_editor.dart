@@ -21,6 +21,7 @@ import '../services/rich_clipboard_service.dart';
 import '../utils/font_utils.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
+import 'ai_suggestion_sheet.dart';
 import 'note_editor_widgets.dart';
 import 'note_image_handler.dart';
 import 'note_link_handler.dart';
@@ -50,6 +51,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   bool _saving = false;
   bool _dragging = false;
   bool _isDirty = false;
+  bool _isAiSheetOpen = false;
   bool _secondaryButtonActive = false;
   bool _primaryPointerDown = false;
   Timer? _formatPainterTimer;
@@ -281,6 +283,29 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
     showInsertLinkDialog(context, _controller!);
   }
 
+  Future<void> _onAiHelper() async {
+    if (_controller == null) return;
+    final plainText = _controller!.document.toPlainText().trim();
+    if (plainText.isEmpty) return;
+    setState(() => _isAiSheetOpen = true);
+    final suggestion = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => AiSuggestionSheet(noteContent: plainText),
+    );
+    if (!mounted) return;
+    setState(() => _isAiSheetOpen = false);
+    if (suggestion != null) _applyAiSuggestion(suggestion);
+  }
+
+  void _applyAiSuggestion(String text) {
+    final doc = Document()..insert(0, text);
+    _initNoteController(doc);
+    _scheduleSave();
+    setState(() {});
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -328,6 +353,8 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
   }
 
   Widget _buildEditorLayout() {
+    final aiVerified =
+        ref.watch(claudeKeyVerifiedProvider).valueOrNull ?? false;
     // ValueKey forces toolbar rebuild on controller change so the history
     // buttons re-subscribe to the new controller.changes stream.
     final toolbar = NoteFormattingToolbar(
@@ -336,6 +363,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
       onInsertImage: _pickAndInsertImage,
       onInsertLink: _onInsertLink,
       editorFocusNode: _focusNode,
+      isAiSheetOpen: _isAiSheetOpen,
     );
     final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
     return Column(
@@ -363,6 +391,7 @@ class _NoteEditorState extends ConsumerState<NoteEditor> {
               : () => ref
                   .read(notesProvider.notifier)
                   .togglePin(_currentNote!.id),
+          onAiHelper: aiVerified ? _onAiHelper : null,
         ),
         if (isMacOS) toolbar,
         Expanded(

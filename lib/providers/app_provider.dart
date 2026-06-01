@@ -19,6 +19,7 @@ import '../services/feedback_service.dart';
 import '../services/persistence_service.dart';
 import '../services/sharing_service.dart';
 import '../services/sync_log_service.dart';
+import '../services/claude_api_service.dart';
 import '../utils/image_utils.dart';
 import '../utils/note_utils.dart';
 
@@ -32,6 +33,9 @@ enum SyncStatus { idle, syncing, success, error }
 final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 final noteReloadTriggerProvider = StateProvider<int>((ref) => 0);
 final pollTriggerProvider = StateProvider<int>((ref) => 0);
+final claudeKeyVerifiedProvider = FutureProvider<bool>(
+  (_) => ClaudeApiService.instance.isVerified(),
+);
 
 enum DriveStorageSeverity { none, warning, exceeded }
 
