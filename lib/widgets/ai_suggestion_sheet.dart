@@ -21,20 +21,22 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
   Document? _document;
   QuillController? _quillController;
   String _errorMessage = '';
+  final _refineController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _rewrite();
+    _generate();
   }
 
   @override
   void dispose() {
     _quillController?.dispose();
+    _refineController.dispose();
     super.dispose();
   }
 
-  Future<void> _rewrite() async {
+  Future<void> _generate({String? customInstruction}) async {
     setState(() => _state = _SheetState.loading);
     _quillController?.dispose();
     _quillController = null;
@@ -49,7 +51,10 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
         await Future.delayed(const Duration(seconds: 2));
       }
       try {
-        final markdown = await service.rewriteNote(widget.noteContent);
+        final markdown = await service.rewriteNote(
+          widget.noteContent,
+          customInstruction: customInstruction,
+        );
         final doc = quillDocumentFromMarkdown(markdown);
         if (mounted) {
           setState(() {
@@ -65,7 +70,6 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
         return;
       } on AiException catch (e) {
         lastError = e;
-        // Only retry on transient failures.
         if (e.kind != AiErrorKind.timeout && e.kind != AiErrorKind.network) break;
       } catch (_) {
         if (mounted) setState(() { _errorMessage = 'An unexpected error occurred.'; _state = _SheetState.error; });
@@ -74,6 +78,13 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
     }
 
     if (mounted) setState(() { _errorMessage = _messageFor(lastError!); _state = _SheetState.error; });
+  }
+
+  void _submitRefine() {
+    final instruction = _refineController.text.trim();
+    if (instruction.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    _generate(customInstruction: instruction);
   }
 
   String _messageFor(AiException e) => switch (e.kind) {
@@ -100,9 +111,11 @@ class _AiSuggestionSheetState extends ConsumerState<AiSuggestionSheet> {
         quillController: _quillController,
         errorMessage: _errorMessage,
         scrollController: scrollController,
+        refineController: _refineController,
         onApply: _apply,
         onDismiss: _dismiss,
-        onRetry: _rewrite,
+        onRetry: () => _generate(),
+        onRefine: _submitRefine,
       ),
     );
   }
@@ -113,18 +126,22 @@ class _SheetContent extends StatelessWidget {
   final QuillController? quillController;
   final String errorMessage;
   final ScrollController scrollController;
+  final TextEditingController refineController;
   final VoidCallback onApply;
   final VoidCallback onDismiss;
   final VoidCallback onRetry;
+  final VoidCallback onRefine;
 
   const _SheetContent({
     required this.state,
     required this.quillController,
     required this.errorMessage,
     required this.scrollController,
+    required this.refineController,
     required this.onApply,
     required this.onDismiss,
     required this.onRetry,
+    required this.onRefine,
   });
 
   @override
@@ -140,6 +157,10 @@ class _SheetContent extends StatelessWidget {
           _Header(onDismiss: onDismiss),
           const Divider(height: 1),
           Expanded(child: _body(context)),
+          if (state == _SheetState.loaded) _RefineField(
+            controller: refineController,
+            onSubmit: onRefine,
+          ),
           if (state == _SheetState.loaded) _Actions(onApply: onApply, onDismiss: onDismiss),
           if (state == _SheetState.error)  _Actions(onApply: onRetry, onDismiss: onDismiss, applyLabel: 'Retry'),
         ],
@@ -191,6 +212,48 @@ class _SheetContent extends StatelessWidget {
           ),
         ),
     };
+  }
+}
+
+class _RefineField extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onSubmit;
+
+  const _RefineField({required this.controller, required this.onSubmit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => onSubmit(),
+              decoration: InputDecoration(
+                hintText: 'Refine: make it shorter, more formal…',
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                border: const OutlineInputBorder(),
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Regenerate',
+            onPressed: onSubmit,
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -247,7 +310,7 @@ class _Actions extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
         child: Row(
           children: [
             Expanded(
