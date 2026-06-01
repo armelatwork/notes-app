@@ -4,17 +4,15 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notes_app/widgets/note_editor_widgets.dart';
 
-// Regression tests for the heading and font-size sub-menu fix.
+// Regression tests for the heading, font-size, and font-family sub-menu fix.
 //
-// Root cause: Quill's heading and font-size buttons use MenuController.open()
-// inside a StatefulWidget that also registers controller.addListener(setState).
-// On real Android hardware the controller notification arrives before the menu
-// frame renders; the setState rebuild drops the pending open silently.
+// Root cause: Quill's built-in font buttons either race with setState listeners
+// or open MenuAnchor downward without accounting for keyboard height, hiding
+// items behind the keyboard on Android.
 //
-// Fix: _HeadingMenuButton and _FontSizeMenuButton mirror font family exactly —
-// MenuAnchor + MenuController, NO controller listener — and are hosted inside
-// QuillSimpleToolbar via customButtons so they share the same widget-tree
-// context as the working font family button.
+// Fix: _HeadingMenuButton, _FontSizeMenuButton, and _FontFamilyMenuButton all
+// use MenuAnchor + MenuController with an explicit upward offset when the
+// keyboard is up, and are hosted in QuillSimpleToolbar via customButtons.
 //
 // Note: tests render NoteFormattingToolbar inside a SizedBox(height: 600) to
 // ensure the persistent sheet content receives bounded height constraints.
@@ -57,10 +55,12 @@ void main() {
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Heading'));
+      // Button label is dynamic: 'Normal' when no heading is active.
+      await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Normal'), findsOneWidget);
+      // heading label 'Normal' + font-size label 'Normal' + menu item 'Normal' → three widgets.
+      expect(find.text('Normal'), findsNWidgets(3));
       expect(find.text('Heading 1'), findsOneWidget);
       expect(find.text('Heading 2'), findsOneWidget);
       expect(find.text('Heading 3'), findsOneWidget);
@@ -78,7 +78,7 @@ void main() {
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Heading'));
+      await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Heading 1'));
@@ -101,10 +101,11 @@ void main() {
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Heading'));
+      // Button shows 'Heading 2' because H2 is pre-applied.
+      await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Normal'));
+      await tester.tap(find.widgetWithText(MenuItemButton, 'Normal'));
       await tester.pump();
 
       final attr = ctrl.getSelectionStyle().attributes[Attribute.header.key];
@@ -126,11 +127,12 @@ void main() {
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Font size'));
+      await tester.tap(find.byKey(const ValueKey('font-size-selector')));
       await tester.pumpAndSettle();
 
       expect(find.text('Small'), findsOneWidget);
-      expect(find.text('Normal'), findsOneWidget);
+      // heading button shows 'Normal' + font-size button shows 'Normal' + menu item 'Normal' → three
+      expect(find.text('Normal'), findsNWidgets(3));
       expect(find.text('Large'), findsOneWidget);
       expect(find.text('Huge'), findsOneWidget);
 
@@ -147,7 +149,7 @@ void main() {
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Font size'));
+      await tester.tap(find.byKey(const ValueKey('font-size-selector')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Large'));
@@ -155,6 +157,79 @@ void main() {
 
       final attr = ctrl.getSelectionStyle().attributes[Attribute.size.key];
       expect(attr?.value, equals('large'));
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+  });
+
+  group('NoteFormattingToolbar Android font-family sub-menu', () {
+    testWidgets(
+        'fontFamilyButton_tapped_opensSubMenuWithAllFonts', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('font-family-selector')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sans Serif'), findsOneWidget);
+      expect(find.text('Serif'), findsOneWidget);
+      expect(find.text('Nunito'), findsOneWidget);
+      expect(find.text('Pacifico'), findsOneWidget);
+      expect(find.text('Roboto Mono'), findsOneWidget);
+      expect(find.text('Clear'), findsOneWidget);
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+        'fontFamilySubMenu_nunitoSelected_appliesFontAttribute', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('font-family-selector')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Nunito'));
+      await tester.pump();
+
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.font.key];
+      expect(attr?.value, equals('nunito'));
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+        'fontFamilySubMenu_clearSelected_removesFontAttribute', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      final ctrl = _makeController();
+      addTearDown(ctrl.dispose);
+      ctrl.formatSelection(
+          Attribute.fromKeyValue(Attribute.font.key, 'nunito'));
+
+      await tester.pumpWidget(_buildApp(ctrl));
+      await tester.tap(find.byIcon(Icons.text_format));
+      await tester.pumpAndSettle();
+      // Button shows 'Nunito' because the font is pre-applied.
+      await tester.tap(find.byKey(const ValueKey('font-family-selector')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(MenuItemButton, 'Clear'));
+      await tester.pump();
+
+      final attr = ctrl.getSelectionStyle().attributes[Attribute.font.key];
+      expect(attr, isNull);
 
       debugDefaultTargetPlatformOverride = null;
     });
