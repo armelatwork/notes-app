@@ -139,22 +139,46 @@ class AppUserNotifier extends Notifier<AppUser?> {
     final api = await drv.getApi();
     if (api == null) return;
     final appFolderId = await drv.getOrCreateAppFolder(api);
-    final remoteKey = await drv.fetchEncryptionKey(api, appFolderId);
-    if (remoteKey != null) {
-      enc.initWithKey(Uint8List.fromList(base64Decode(remoteKey)));
+
+    // Prefer the locally stored key (SecureStorage). It is the key that was
+    // used to encrypt notes on this device and is preserved across sign-outs.
+    // This prevents data loss when another device generates a new random key
+    // (e.g. on a fresh install with empty SecureStorage) and overwrites Drive.
+    final localKey = await enc.readLocalKeyBase64(userId);
+    if (localKey != null) {
+      enc.initWithKey(Uint8List.fromList(base64Decode(localKey)));
+      // Self-repair: if Drive has drifted to a different key, restore the local one.
+      final remoteKey = await drv.fetchEncryptionKey(api, appFolderId);
+      if (remoteKey == null || remoteKey != localKey) {
+        AppLogger.instance.warn('AppUserNotifier',
+            'Drive key differs from local storage — restoring local key to Drive');
+        try {
+          await drv.uploadEncryptionKey(api, appFolderId, localKey);
+        } catch (e) {
+          AppLogger.instance.warn('AppUserNotifier', 'Drive key repair failed', e);
+        }
+      }
     } else {
-      await enc.initForGoogleUser(userId);
-      final localKey = await enc.exportCurrentKeyBase64();
-      try {
-        await drv.uploadEncryptionKey(api, appFolderId, localKey);
-      } catch (e) {
-        // The parent folder may have been deleted from Drive between the list
-        // and the create calls. Clear the cache and retry with a fresh folder.
-        AppLogger.instance.warn(
-            'AppUserNotifier', 'uploadEncryptionKey failed, retrying with fresh folder', e);
-        drv.clearCache();
-        final freshFolderId = await drv.getOrCreateAppFolder(api);
-        await drv.uploadEncryptionKey(api, freshFolderId, localKey);
+      // No local key (fresh install). Fall back to Drive; persist locally to
+      // prevent future divergence.
+      final remoteKey = await drv.fetchEncryptionKey(api, appFolderId);
+      if (remoteKey != null) {
+        enc.initWithKey(Uint8List.fromList(base64Decode(remoteKey)));
+        await enc.saveCurrentKeyLocally(userId);
+      } else {
+        await enc.initForGoogleUser(userId);
+        final newKey = await enc.exportCurrentKeyBase64();
+        try {
+          await drv.uploadEncryptionKey(api, appFolderId, newKey);
+        } catch (e) {
+          // The parent folder may have been deleted from Drive between the list
+          // and the create calls. Clear the cache and retry with a fresh folder.
+          AppLogger.instance.warn(
+              'AppUserNotifier', 'uploadEncryptionKey failed, retrying with fresh folder', e);
+          drv.clearCache();
+          final freshFolderId = await drv.getOrCreateAppFolder(api);
+          await drv.uploadEncryptionKey(api, freshFolderId, newKey);
+        }
       }
     }
     state = AppUser(

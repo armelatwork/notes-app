@@ -68,6 +68,16 @@ class EncryptionService {
     return base64Encode(bytes);
   }
 
+  Future<String?> readLocalKeyBase64(String userId) =>
+      _storage.read('enc_key_$userId');
+
+  Future<void> saveCurrentKeyLocally(String userId) async {
+    final key = _secretKey;
+    if (key == null) return;
+    final bytes = await key.extractBytes();
+    await _storage.write('enc_key_$userId', base64Encode(bytes));
+  }
+
   Uint8List _randomBytes(int length) {
     final random = Random.secure();
     return Uint8List.fromList(List.generate(length, (_) => random.nextInt(256)));
