@@ -78,6 +78,29 @@ class _HeadingMenuButtonState extends State<_HeadingMenuButton> {
   final _menu = MenuController();
 
   @override
+  void initState() {
+    super.initState();
+    widget.ctrl.addListener(_onControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.ctrl.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() => setState(() {});
+
+  String get _label {
+    final level = widget.ctrl
+        .getSelectionStyle()
+        .attributes[Attribute.header.key]
+        ?.value;
+    if (level == null) return 'Normal';
+    return 'Heading $level';
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MenuAnchor(
       controller: _menu,
@@ -108,10 +131,11 @@ class _HeadingMenuButtonState extends State<_HeadingMenuButton> {
           },
           isSelected: false,
           iconTheme: null,
+          key: const ValueKey('heading-selector'),
           icon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Heading', style: TextStyle(
+              Text(_label, style: TextStyle(
                 color: IconTheme.of(ctx).color, fontSize: 13)),
               Icon(Icons.arrow_drop_down, size: 18),
             ],

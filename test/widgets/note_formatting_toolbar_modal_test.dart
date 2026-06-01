@@ -57,10 +57,12 @@ void main() {
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Heading'));
+      // Button label is dynamic: 'Normal' when no heading is active.
+      await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Normal'), findsOneWidget);
+      // Button label ('Normal') + menu item 'Normal' → two widgets.
+      expect(find.text('Normal'), findsNWidgets(2));
       expect(find.text('Heading 1'), findsOneWidget);
       expect(find.text('Heading 2'), findsOneWidget);
       expect(find.text('Heading 3'), findsOneWidget);
@@ -78,7 +80,7 @@ void main() {
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Heading'));
+      await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Heading 1'));
@@ -101,7 +103,8 @@ void main() {
       await tester.pumpWidget(_buildApp(ctrl));
       await tester.tap(find.byIcon(Icons.text_format));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Heading'));
+      // Button shows 'Heading 2' because H2 is pre-applied.
+      await tester.tap(find.byKey(const ValueKey('heading-selector')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Normal'));
@@ -130,7 +133,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Small'), findsOneWidget);
-      expect(find.text('Normal'), findsOneWidget);
+      // heading button shows 'Normal' too (no heading active) → two widgets
+      expect(find.text('Normal'), findsNWidgets(2));
       expect(find.text('Large'), findsOneWidget);
       expect(find.text('Huge'), findsOneWidget);
 
