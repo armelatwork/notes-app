@@ -108,6 +108,10 @@ Tap the **wand icon** (✦) in the note editor toolbar to open the AI assistant.
 
 The suggestion is cached for the current editing session — tapping the wand again shows the last suggestion instantly without an additional API call. Closing the note clears the session cache.
 
+**Supported providers:** Claude (Anthropic), Perplexity, Gemini (Google), ChatGPT (OpenAI).
+
+To enable: go to **Settings → AI Helper**, select your provider, and paste your API key. The key is stored securely in the platform keychain.
+
 ### Note Sharing
 
 Share a note with other Google account users for real-time collaborative viewing and editing. Sharing requires a Google account on both sides.
